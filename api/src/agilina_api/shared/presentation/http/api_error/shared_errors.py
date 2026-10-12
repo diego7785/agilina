@@ -12,6 +12,11 @@ class SharedErrors:
         "A valid access token is required.",
         {"WWW-Authenticate": "Bearer"},
     )
+    # A valid token of someone who is not an active user of the organization: the person is
+    # signed in, so the web must not send them to sign in again.
+    ACCOUNT_NOT_ACTIVE = ApiError(
+        403, "account_not_active", "The account is not active in this organization."
+    )
     # The same answer whether the team is someone else's, the user was removed from it or
     # it does not exist: a 404 for the last one would let anybody enumerate teams.
     NOT_A_TEAM_MEMBER = ApiError(403, "not_a_team_member", "The user is not a member of the team.")

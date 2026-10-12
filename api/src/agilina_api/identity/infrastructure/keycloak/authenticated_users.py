@@ -2,9 +2,9 @@
 
 It keeps the contract written in ``shared.application.access``: the token is validated
 completely before any claim is trusted, a bad token is an answer (``None``) and never an
-exception, and nothing about teams or roles is read from the token: only who the person is.
-The ``sub`` of the token is resolved to the ``app_user`` that was created when the invitation
-was accepted.
+exception, a valid one that belongs to nobody active raises ``AccountNotActiveError``, and
+nothing about teams or roles is read from the token: only who the person is. The ``sub`` of
+the token is resolved to the ``app_user`` that was created when the invitation was accepted.
 """
 
 import logging
@@ -18,7 +18,7 @@ from agilina_api.identity.infrastructure.keycloak.access_token_verifier import (
 from agilina_api.identity.infrastructure.persistence.user_repository import (
     SqlAlchemyUserRepository,
 )
-from agilina_api.shared.application.access import AuthenticatedUsers
+from agilina_api.shared.application.access import AccountNotActiveError, AuthenticatedUsers
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +42,8 @@ class KeycloakAuthenticatedUsers(AuthenticatedUsers):
             # A valid token of someone Keycloak knows and Agilina does not: for example an
             # account created in the console. It identifies nobody here.
             logger.info("Access token rejected: its subject has no user in Agilina")
-            return None
+            raise AccountNotActiveError("The token's subject has no user in Agilina")
         if not user.is_active:
             logger.info("Access token rejected: its user is not active")
-            return None
+            raise AccountNotActiveError("The token's user is not active")
         return user.id

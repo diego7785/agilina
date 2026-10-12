@@ -113,3 +113,13 @@ async def test_a_token_signed_by_someone_else_is_a_401(api, session_factory):
     )
 
     assert (await api.get("/v1/teams", headers=_bearer(forged))).status_code == 401
+
+
+async def test_a_valid_token_of_someone_without_a_user_is_a_403_not_a_loop(api, session_factory):
+    await stored_user(session_factory, AppUserBuilder().with_unique_email().with_subject("sub-ana"))
+    unknown = AccessTokenBuilder().for_subject("created-in-the-keycloak-console").build()
+
+    response = await api.get("/v1/teams", headers=_bearer(unknown))
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "account_not_active"

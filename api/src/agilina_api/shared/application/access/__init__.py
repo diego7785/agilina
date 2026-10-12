@@ -6,6 +6,7 @@ token is the login story's job (HU-03); until then the composition root wires an
 that turns every token away (``bootstrap.authentication``).
 """
 
+from agilina_api.shared.application.access.account_not_active_error import AccountNotActiveError
 from agilina_api.shared.application.access.authenticated_users import AuthenticatedUsers
 from agilina_api.shared.application.access.membership_ref import MembershipRef
 from agilina_api.shared.application.access.not_a_team_admin_error import NotATeamAdminError
@@ -15,6 +16,7 @@ from agilina_api.shared.application.access.team_access import TeamAccess
 from agilina_api.shared.application.access.team_context import TeamContext
 
 __all__ = [
+    "AccountNotActiveError",
     "AuthenticatedUsers",
     "MembershipRef",
     "NotATeamAdminError",

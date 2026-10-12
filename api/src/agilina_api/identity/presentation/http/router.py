@@ -174,6 +174,7 @@ role is the one stored in the membership.
         **errors_of(
             *TENANT,
             SharedErrors.NOT_AUTHENTICATED,
+            SharedErrors.ACCOUNT_NOT_ACTIVE,
             SharedErrors.NOT_A_TEAM_MEMBER,
             SharedErrors.NOT_A_TEAM_ADMIN,
             SharedErrors.TEAM_NOT_FOUND,

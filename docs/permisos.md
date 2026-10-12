@@ -26,7 +26,10 @@ código dejan de coincidir.
 
 ## La matriz
 
-Todas las rutas exigen tenant y sesión (AD-29, AD-28). «Mínimo» es el rol que la ruta exige.
+Todas las rutas exigen tenant y sesión (AD-29, AD-28). «Mínimo» es el rol que la ruta exige. Una
+sesión válida de alguien que no es usuario activo de la organización (sin `app_user`, o
+desactivado) recibe `403 account_not_active` en toda ruta con sesión, antes de mirar rol alguno; un
+token que falta o no vale recibe `401 not_authenticated`.
 
 | Acción | Endpoint | Mínimo | Miembro | Administrador / Scrum Master |
 | --- | --- | --- | :-: | :-: |

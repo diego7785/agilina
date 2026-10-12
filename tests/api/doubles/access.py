@@ -2,19 +2,27 @@
 
 from uuid import UUID
 
-from agilina_api.shared.application.access import MembershipRef
+from agilina_api.shared.application.access import AccountNotActiveError, MembershipRef
 from agilina_shared.enums import TeamRole
 from tests.api.builders.identifiers import next_id
 
 
 class FakeAuthenticatedUsers:
-    """Knows the tokens the test gives it, each one resolving to a user; any other token
-    does not identify anybody, like an invalid one."""
+    """Knows the tokens the test gives it, each one resolving to a user; a token in
+    ``inactive_tokens`` is valid but belongs to nobody active (it raises, like the adapter);
+    any other token does not identify anybody, like an invalid one."""
 
-    def __init__(self, users_by_token: dict[str, UUID] | None = None) -> None:
+    def __init__(
+        self,
+        users_by_token: dict[str, UUID] | None = None,
+        inactive_tokens: set[str] | None = None,
+    ) -> None:
         self.users_by_token = users_by_token or {}
+        self.inactive_tokens = inactive_tokens or set()
 
     async def user_id_for(self, bearer_token: str) -> UUID | None:
+        if bearer_token in self.inactive_tokens:
+            raise AccountNotActiveError("The token's user is not active")
         return self.users_by_token.get(bearer_token)
 
 
