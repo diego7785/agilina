@@ -20,7 +20,7 @@ Esta carpeta es la API (FastAPI): el código vive en `src/agilina_api/`, las mig
   `verify`. Antes de dar algo por terminado: `make verify` en verde.
 - Commits: un solo autor, sin `Co-Authored-By` ni líneas de atribución. Nada de commits ni
   push sin autorización explícita de quien lo pide, cada vez. Una rama por historia
-  (`tipo/HU-nn-descripcion`).
+  (`tipo/AGI-nnn-descripcion`).
 
 ## Dónde va cada cosa
 

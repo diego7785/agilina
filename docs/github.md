@@ -36,7 +36,7 @@ gh api -X PUT repos/:owner/:repo/branches/main/protection \
 - Automatically delete head branches.
 
 El mensaje del pull request queda como commit final en `main`, así que debe
-cumplir la convención: título `tipo(ambito): descripcion` y `Refs: HU-nn` en el
+cumplir la convención: título `tipo(ambito): descripcion` y `Refs: AGI-nnn` en el
 cuerpo.
 
 ## Etiquetas de release
