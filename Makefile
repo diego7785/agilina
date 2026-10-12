@@ -24,7 +24,7 @@ PYPACKAGES := shared/src api/src agent/src stt/src
 
 .PHONY: help env up infra down restart ps logs migrate migration stt agent \
         lint format typecheck arch test test-python test-integration test-keycloak test-web test-e2e coverage verify \
-        invite mail-test lock hooks keycloak-admin keycloak-reset keycloak-theme tenant-add tenants-dev tenant-realms migration-platform credentials clean
+        invite keycloak-orphan mail-test lock hooks keycloak-admin keycloak-reset keycloak-theme tenant-add tenants-dev tenant-realms migration-platform credentials clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -204,7 +204,23 @@ test-e2e: env ## End-to-end tests in a real browser against the running environm
 	echo "Inviting the admin of the members story (HU-06) to a new team of acme..."; \
 	$(MAKE) --no-print-directory invite tenant=acme team="E2E Integrantes $$run" \
 		email="e2e-admin-$$run@example.test" name="Ada Prueba" lang=es >/dev/null || exit 1; \
+	echo "Creating the Keycloak-only user of the not-active-account story (AGI-123) in acme..."; \
+	$(MAKE) --no-print-directory keycloak-orphan tenant=acme email="e2e-orphan-$$run@example.test" \
+		password="una-clave-bien-larga-1" >/dev/null || exit 1; \
 	E2E_RUN="$$run" $(COMPOSE) --profile tools run --rm --build e2e
+
+keycloak-orphan: env ## Create a user only in the Keycloak realm of a tenant, with no account in Agilina: make keycloak-orphan tenant=acme email=a@b.com password=...
+	@test -n "$(tenant)" -a -n "$(email)" -a -n "$(password)" || { \
+		echo 'Usage: make keycloak-orphan tenant=acme email=a@b.com password=a-long-password-1'; exit 1; }
+	@set -a; . ./.env; set +a; \
+	docker exec agilina-keycloak /opt/keycloak/bin/kcadm.sh config credentials \
+		--server http://localhost:8080 --realm master \
+		--user "$$KEYCLOAK_ADMIN" --password "$$KEYCLOAK_ADMIN_PASSWORD" >/dev/null && \
+	docker exec agilina-keycloak /opt/keycloak/bin/kcadm.sh create users -r "agilina-$(tenant)" \
+		-s username="$(email)" -s email="$(email)" -s firstName=Huerfana -s lastName=Prueba \
+		-s enabled=true -s emailVerified=true && \
+	docker exec agilina-keycloak /opt/keycloak/bin/kcadm.sh set-password -r "agilina-$(tenant)" \
+		--username "$(email)" --new-password "$(password)"
 
 coverage: env ## Unit + integration coverage of the API and the contract; fails below 100 %
 	$(COMPOSE) --profile tools run --rm --build tools sh -c "pytest --cov --cov-report= \
