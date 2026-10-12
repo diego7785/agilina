@@ -19,6 +19,7 @@ class FakeKeycloak {
   token: string | undefined;
   readonly inits: object[] = [];
   readonly logins: object[] = [];
+  readonly logouts: object[] = [];
   readonly renewals: number[] = [];
   renewalFails = false;
 
@@ -29,6 +30,11 @@ class FakeKeycloak {
 
   login(options: object): Promise<void> {
     this.logins.push(options);
+    return Promise.resolve();
+  }
+
+  logout(options: object): Promise<void> {
+    this.logouts.push(options);
     return Promise.resolve();
   }
 
@@ -172,6 +178,33 @@ describe('KeycloakAuthSession', () => {
       expect(keycloak.logins).toEqual([]);
     });
 
+    it('remembers that the page began with a sign-in until the API accepts the session', async () => {
+      keycloak.authenticated = true;
+      arriveAt('/acme/teams/a', '#state=s-1&code=c-1');
+      await session.readSignInAnswer();
+
+      expect(session.justSignedIn()).toBeTrue();
+
+      session.confirmSession();
+
+      expect(session.justSignedIn()).toBeFalse();
+    });
+
+    it('does not take a failed sign-in for a session', async () => {
+      keycloak.authenticated = false;
+      arriveAt('/acme/teams/a', '#state=s-1&error=access_denied');
+      await session.readSignInAnswer();
+
+      expect(session.justSignedIn()).toBeFalse();
+    });
+
+    it('did not just sign in when the page began some other way', async () => {
+      keycloak.authenticated = true;
+      await session.accessToken();
+
+      expect(session.justSignedIn()).toBeFalse();
+    });
+
     it('does nothing without an answer, as on the activation link', async () => {
       arriveAt('/acme/activate', '#t=activation-token');
       await session.readSignInAnswer();
@@ -188,6 +221,16 @@ describe('KeycloakAuthSession', () => {
       await session.readSignInAnswer();
 
       expect(realms).toEqual([]);
+    });
+  });
+
+  describe('signOut', () => {
+    it('ends the session in Keycloak and comes back to the entrance of the tenant', async () => {
+      keycloak.authenticated = true;
+
+      await session.signOut();
+
+      expect(keycloak.logouts).toEqual([{ redirectUri: 'http://app.test/acme' }]);
     });
   });
 

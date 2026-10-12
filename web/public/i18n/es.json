@@ -336,6 +336,11 @@
         "title": "Cuenta activada",
         "text": "Te llevamos al inicio de sesión…"
       }
+    },
+    "account_not_active": {
+      "title": "Tu cuenta no está activa en esta organización",
+      "text": "Iniciaste sesión, pero tu cuenta no tiene acceso a esta organización. Si crees que es un error, pide a quien administra tu equipo que te invite. Cierra la sesión para entrar con otra cuenta.",
+      "sign_out": "Cerrar sesión"
     }
   },
   "tenancy": {

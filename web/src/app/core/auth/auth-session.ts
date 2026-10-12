@@ -32,4 +32,18 @@ export abstract class AuthSession {
 
   /** Takes the person to the sign-in page, even if a session seems to exist. */
   abstract signIn(options?: SignInOptions): Promise<void>;
+
+  /**
+   * Whether this load of the page began with the answer of a sign-in and the API has not
+   * accepted the session yet. A 401 in that window cannot be an expired token, and signing in
+   * again would only come back to the same place: it is the end of a loop, not a reason to
+   * sign in.
+   */
+  abstract justSignedIn(): boolean;
+
+  /** The API accepted the session: from now on a 401 means the session needs renewing. */
+  abstract confirmSession(): void;
+
+  /** Ends the session in Keycloak and takes the person back to the entrance of the tenant. */
+  abstract signOut(): Promise<void>;
 }

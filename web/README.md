@@ -123,7 +123,7 @@ concepto se llame igual en todo el sistema:
 | --- | --- | --- |
 | `status` | Estado del entorno: prueba que la web habla con la API | Existe |
 | `tenancy` | La página «no encontrada» de una dirección sin organización | Existe |
-| `identity` | Activación de la cuenta desde la invitación (`/activate`); inicio y cierre de sesión | Activación existe (HU-02); el resto llega con HU-03/04 |
+| `identity` | Activación de la cuenta desde la invitación (`/activate`); inicio y cierre de sesión; la página de cuenta no activa (`/account-not-active`) | Activación existe (HU-02); la página de cuenta no activa con su botón de cerrar sesión, también (AGI-123); el resto llega con HU-03/04 |
 | `teams` | Equipo, integrantes, sprint y pestaña de configuración (solo `admin`) | Existe: selector mínimo, creación y dashboard placeholder (HU-05); Configuración → Equipo en `/:tenant/teams/:teamId/settings` (HU-06): integrantes con su etiqueta de rol, invitar, cambiar el rol y eliminar; Configuración → Sprint en `/:tenant/teams/:teamId/settings/sprint` (HU-07): fechas, hora de la daily en la zona del navegador y participantes ordenados con subir y bajar, y la línea «Día N de M» del dashboard. El resto llega con sus historias |
 | `ceremonies` | La sala de la Daily: LiveKit, turnos y controles hacia el agente | Llega con las historias de la ceremonia |
 
@@ -305,6 +305,13 @@ web es el **primer segmento de la dirección**: `/acme/teams`, `/acme/activate#t
 - `authInterceptor` envía el token **solo a la API** (nunca a Keycloak ni a otro host) y, ante un
   401, lleva a iniciar sesión y de vuelta a la página donde estaba. Un *guard* también vuelve a la
   página pedida.
+- **Una sesión válida sin cuenta activa en la organización no vuelve a iniciar sesión** (AGI-123):
+  la API responde `403 account_not_active` y el interceptor lleva a `/:tenant/account-not-active`
+  (`AccountNotActivePage`, de `identity`), que explica el caso y ofrece **Cerrar sesión**
+  (`AuthSession.signOut()`). Un 401 que llega justo después de volver del login (antes de que la
+  API acepte la sesión: `AuthSession.justSignedIn()`) va a la misma página en vez de a Keycloak,
+  porque iniciar sesión otra vez solo repetiría el rebote. Pasada la primera respuesta
+  exitosa (`confirmSession()`), un 401 vuelve a significar token vencido.
 - El token vive **solo en memoria**: nunca en `localStorage` ni `sessionStorage`.
 - Las rutas restringidas usan un *guard* y los elementos restringidos se
   ocultan según el rol interno, pero **la autorización es de la API**: un
@@ -500,7 +507,7 @@ estilos de una pantalla son **clases de utilidad en su plantilla**.
   - Tipos: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `build`,
     `ci`.
   - El cuerpo es opcional y explica el porqué, no el qué.
-  - Todo commit termina con `Refs: HU-nn`.
+  - Todo commit termina con `Refs: AGI-nnn`.
   - Si se rompe un contrato con la API, se marca con `BREAKING CHANGE` en el pie.
 - Cada commit tiene un solo autor. No se agrega `Co-Authored-By` ni líneas de
   atribución a Claude o a la sesión.

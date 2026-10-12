@@ -132,6 +132,13 @@ describe('routes', () => {
       expect(await screenAt('/acme/teams')).toBe('agl-centered-layout > agl-team-selector-page');
     });
 
+    it('opens the page of an account that is not active at /:tenant/account-not-active', async () => {
+      expect(await screenAt('/acme/account-not-active')).toBe(
+        'agl-centered-layout > agl-account-not-active-page',
+      );
+      expect(session.ensured).toEqual(['/acme/account-not-active']);
+    });
+
     it('opens the creation form at /:tenant/teams/new, not a team called "new"', async () => {
       expect(await screenAt('/acme/teams/new')).toBe('agl-centered-layout > agl-create-team-page');
       expect(port.requested).toEqual([]);
