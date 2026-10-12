@@ -7,6 +7,7 @@ realm signs with the same test key, so what keeps tenants apart is the issuer an
 """
 
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 
 import pytest
 from fastapi import Depends, FastAPI
@@ -211,7 +212,13 @@ async def test_the_members_of_a_team_are_read_from_the_database_of_its_tenant(
 
 async def test_an_invitation_is_only_found_in_the_database_of_its_tenant(platform, session_factory):
     team = await stored_team(session_factory)
-    await stored_invitation(session_factory, InvitationBuilder().for_team(team.id))
+    # The application of this fixture runs on the real clock (only the token validation uses a
+    # fake one), so the invitation is issued now: one issued at the builder's fixed instant
+    # would expire as the calendar moves on.
+    await stored_invitation(
+        session_factory,
+        InvitationBuilder().for_team(team.id).issued_at_instant(datetime.now(UTC)),
+    )
     body = {"token": InvitationBuilder().token}
 
     acme = await platform.post("/v1/invitations/status", json=body, headers={TENANT_HEADER: "acme"})
