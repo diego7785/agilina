@@ -11,6 +11,9 @@
       "label": "Team navigation",
       "dashboard": "Dashboard",
       "settings": "Settings"
+    },
+    "notifications": {
+      "close": "Dismiss notification"
     }
   },
   "status": {

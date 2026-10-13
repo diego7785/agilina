@@ -1,1 +1,8 @@
 <router-outlet />
+<agl-toast-list
+  [toasts]="notifier.notifications()"
+  [closeLabel]="'app.notifications.close' | transloco"
+  (dismissed)="notifier.dismiss($event)"
+  (paused)="notifier.pause($event)"
+  (resumed)="notifier.resume($event)"
+/>

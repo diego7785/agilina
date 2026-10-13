@@ -11,6 +11,9 @@
       "label": "Navegación del equipo",
       "dashboard": "Dashboard",
       "settings": "Configuración"
+    },
+    "notifications": {
+      "close": "Cerrar aviso"
     }
   },
   "status": {
