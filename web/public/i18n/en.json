@@ -84,8 +84,7 @@
       "mode": {
         "title": "Team mode",
         "support": "Support",
-        "autonomous": "Autonomous",
-        "read_only": "Read only · the Administrator changes it in Settings"
+        "autonomous": "Autonomous"
       },
       "room": {
         "title": "Meeting room",

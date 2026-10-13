@@ -78,18 +78,17 @@
       },
       "ceremony": {
         "title": "Próxima ceremonia",
-        "daily": "Daily",
+        "daily": "Reunión diaria",
         "none": "No hay ceremonias programadas"
       },
       "mode": {
         "title": "Modo del equipo",
         "support": "Soporte",
-        "autonomous": "Autónomo",
-        "read_only": "Solo lectura · lo cambia el Administrador en Configuración"
+        "autonomous": "Autónomo"
       },
       "room": {
         "title": "Sala de reunión",
-        "description": "Tu Scrum Master virtual para la Daily Stand-up",
+        "description": "Tu Scrum Master virtual para la reunión diaria",
         "join": "Unirse a la sala",
         "opens_at": "Se habilita a las {{ time }}",
         "no_ceremony": "No hay ceremonias programadas."

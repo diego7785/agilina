@@ -274,7 +274,7 @@ describe('TeamDashboardPage', () => {
       const page = await open('/acme/teams/atlas');
 
       expect(text(page, 'ceremony-time')).toBe(localTime);
-      expect(text(page, 'ceremony-day')).toBe(`Daily · ${localDay}`);
+      expect(text(page, 'ceremony-day')).toBe(`Reunión diaria · ${localDay}`);
     });
 
     it('says there are no ceremonies when there is none next', async () => {
@@ -293,7 +293,7 @@ describe('TeamDashboardPage', () => {
       const page = await open('/acme/teams/atlas');
 
       expect(text(page, 'team-mode')).toBe('Soporte');
-      expect(text(page, 'mode-card')).toContain('Solo lectura');
+      expect(text(page, 'mode-card')).toBe('Modo del equipo Soporte');
       const card = page.querySelector('[data-testid="mode-card"]')!;
       expect(card.querySelector('button, input, select, a')).toBeNull();
     });
