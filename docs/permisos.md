@@ -36,6 +36,7 @@ token que falta o no vale recibe `401 not_authenticated`.
 | Crear un equipo (y quedar como su admin) | `POST /v1/teams` | usuario | ✅ | ✅ |
 | Ver mis equipos | `GET /v1/teams` | usuario | ✅ | ✅ |
 | Ver un equipo | `GET /v1/teams/{team_id}` | miembro | ✅ | ✅ |
+| Ver el dashboard del equipo | `GET /v1/teams/{team_id}/dashboard` | miembro | ✅ | ✅ |
 | Verme en un equipo (encabezado) | `GET /v1/users/me` | miembro | ✅ | ✅ |
 | Ver los usuarios de un equipo y sus roles | `GET /v1/users` | admin | ❌ | ✅ |
 | Ver a un usuario de un equipo | `GET /v1/users/{user_id}` | admin | ❌ | ✅ |

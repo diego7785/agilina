@@ -232,6 +232,47 @@ Un equipo del usuario: nombre, modo, idioma y el rol de quien pregunta.
 | 422 | error `validation_error` | `team_id` no es un UUID |
 | 500 | error `internal_error` | Fallo inesperado |
 
+### `GET /v1/teams/{team_id}/dashboard`
+
+Lo que muestra el dashboard del equipo (HU-12), en una sola lectura: el equipo, su sprint activo con
+el día N de M, la próxima daily con el instante desde el que se abre la sala y si la interfaz dibuja
+la entrada a Configuración. Cualquier miembro activo del equipo.
+
+- `team`: `{id, name, mode, label}`. `label` es la etiqueta de quien pregunta en este equipo (igual
+  que en `GET /v1/teams/{team_id}`); solo se muestra, los permisos siguen al rol.
+- `sprint`: `{number, start_date, end_date, day: {number, total, phase}}` (`number` es el del sprint en
+  su equipo, como en [Sprint](#sprint); fechas de calendario
+  `AAAA-MM-DD`; `day` como en [Sprint](#sprint)), o `null` si el equipo no tiene sprint activo.
+- `next_ceremony`: `{type: "daily", starts_at, join_opens_at}` en UTC, o `null` si no hay sprint
+  activo o la última daily ya empezó. `starts_at` es el mismo instante que `next_daily_at` de
+  `GET …/sprints/active`; `join_opens_at` es diez minutos antes: desde ahí hasta `starts_at` se
+  puede entrar a la sala. La daily «en curso» todavía no se modela (llega con la ceremonia como
+  registro).
+- `can_configure`: `true` para un admin. Solo decide si se dibuja Configuración; la API sigue
+  validando el permiso en cada ruta de configuración.
+
+| Estado | Cuerpo | Cuándo |
+| --- | --- | --- |
+| 200 | `{team, sprint, next_ceremony, can_configure}` | El usuario es miembro activo |
+| 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
+| 401 | error `not_authenticated` | Sin token, o no es válido |
+| 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
+| 403 | error `not_a_team_member` | No es miembro: ajeno, retirado o inexistente (la misma respuesta) |
+| 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y la lectura (solo una carrera) |
+| 422 | error `validation_error` | `team_id` no es un UUID |
+| 500 | error `internal_error` | Fallo inesperado |
+
+```json
+{
+  "team": {"id": "6f1c…", "name": "Equipo Atlas", "mode": "support", "label": "scrum_master"},
+  "sprint": {"number": 12, "start_date": "2026-10-08", "end_date": "2026-10-21",
+             "day": {"number": 4, "total": 14, "phase": "in_progress"}},
+  "next_ceremony": {"type": "daily", "starts_at": "2026-10-12T14:15:00Z",
+                    "join_opens_at": "2026-10-12T14:05:00Z"},
+  "can_configure": true
+}
+```
+
 ## Usuarios
 
 Las personas de un equipo, sus roles y su retiro (HU-06), y quien llama como miembro de un equipo

@@ -170,6 +170,9 @@ def create_app() -> FastAPI:
         teams_dependencies.get_get_active_sprint_handler: from_container(
             lambda container: container.get_active_sprint
         ),
+        teams_dependencies.get_get_team_dashboard_handler: from_container(
+            lambda container: container.get_team_dashboard
+        ),
         get_authenticated_users: from_container(lambda container: container.authenticated_users),
         get_team_access: from_container(lambda container: container.team_access),
     }

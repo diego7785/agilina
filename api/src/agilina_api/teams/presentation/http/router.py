@@ -1,5 +1,5 @@
-"""Teams API: create a team, list the authenticated user's teams and read one (HU-05) and
-configure its active sprint (HU-07).
+"""Teams API: create a team, list the authenticated user's teams and read one (HU-05), configure
+its active sprint (HU-07) and read what its dashboard shows (HU-12).
 
 Every route needs an authenticated user, and that user is always the one behind the
 access token (``current_user_id``), never one named in the body. A route about one team
@@ -34,11 +34,16 @@ from agilina_api.teams.application.queries.get_active_sprint import (
     GetActiveSprintHandler,
 )
 from agilina_api.teams.application.queries.get_team import GetTeam, GetTeamHandler
+from agilina_api.teams.application.queries.get_team_dashboard import (
+    GetTeamDashboard,
+    GetTeamDashboardHandler,
+)
 from agilina_api.teams.application.queries.list_my_teams import ListMyTeams, ListMyTeamsHandler
 from agilina_api.teams.domain.errors import NoActiveSprintError
 from agilina_api.teams.presentation.http.dependencies import (
     get_create_team_as_admin_handler,
     get_get_active_sprint_handler,
+    get_get_team_dashboard_handler,
     get_get_team_handler,
     get_list_my_teams_handler,
     get_reconfigure_sprint_handler,
@@ -50,6 +55,7 @@ from agilina_api.teams.presentation.http.presenters import (
     present_created,
     present_my_team,
     present_team,
+    present_team_dashboard,
 )
 from agilina_api.teams.presentation.http.schemas import (
     ActiveSprintResponse,
@@ -57,6 +63,7 @@ from agilina_api.teams.presentation.http.schemas import (
     CreateTeamRequest,
     MyTeamResponse,
     SprintRequest,
+    TeamDashboardResponse,
     TeamResponse,
 )
 from agilina_shared.enums import Language, OperationMode, TeamRole
@@ -146,6 +153,34 @@ async def get_team(
 ) -> TeamResponse:
     view = await handler.handle(GetTeam(team_id=team.team_id))
     return present_team(view, team.role)
+
+
+@router.get(
+    "/{team_id}/dashboard",
+    response_model=TeamDashboardResponse,
+    summary="What the team's dashboard shows",
+    description=(
+        "The team's name, mode and the label of the user's role, its active sprint with its day "
+        "N of M, the next daily with the instant from which the room opens, and whether the "
+        "interface draws the Settings entry, all in one answer. `sprint` is `null` when the team "
+        "has no active sprint; `next_ceremony`, when it has none or its last daily has already "
+        "started. Instants are in UTC; the web shows them in the browser's time zone. Any member "
+        "of the team gets it: any other user receives `403 not_a_team_member`, whether the team "
+        "exists or not."
+    ),
+    responses=errors_of(
+        *SIGNED_IN,
+        SharedErrors.VALIDATION,
+        SharedErrors.NOT_A_TEAM_MEMBER,
+        SharedErrors.TEAM_NOT_FOUND,
+    ),
+)
+async def get_team_dashboard(
+    team: TeamContext = Depends(current_team_member),
+    handler: GetTeamDashboardHandler = Depends(get_get_team_dashboard_handler),
+) -> TeamDashboardResponse:
+    view = await handler.handle(GetTeamDashboard(team_id=team.team_id))
+    return present_team_dashboard(view, team.role)
 
 
 ACTIVE_SPRINT_BODY = (

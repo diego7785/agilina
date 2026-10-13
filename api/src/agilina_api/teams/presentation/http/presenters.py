@@ -5,6 +5,7 @@ from uuid import UUID
 from agilina_api.teams.application.dtos import (
     ActiveSprintView,
     MemberView,
+    TeamDashboardView,
     TeamMembersList,
     TeamView,
     UserTeamView,
@@ -13,16 +14,21 @@ from agilina_api.teams.presentation.http.schemas import (
     ActiveSprintResponse,
     CreatedTeamResponse,
     DailyParticipantResponse,
+    DashboardSprintResponse,
+    DashboardTeamResponse,
     MeResponse,
     MyTeamResponse,
+    NextCeremonyResponse,
     RoleOptionResponse,
     SprintDayResponse,
+    TeamDashboardResponse,
     TeamResponse,
     UserInTeamResponse,
     UsersInTeamResponse,
 )
 from agilina_shared import role_label
-from agilina_shared.enums import TeamRole
+from agilina_shared.enums import CeremonyType, TeamRole
+from agilina_shared.sprint_calendar import join_opens_at
 
 
 def present_created(team_id: UUID) -> CreatedTeamResponse:
@@ -98,4 +104,39 @@ def present_active_sprint(view: ActiveSprintView) -> ActiveSprintResponse:
             for position, user_id in enumerate(sprint.participants, start=1)
         ],
         day=SprintDayResponse(number=view.day.number, total=view.day.total, phase=view.day.phase),
+    )
+
+
+def present_team_dashboard(view: TeamDashboardView, role: TeamRole) -> TeamDashboardResponse:
+    sprint = view.sprint
+    next_daily_at = sprint.next_daily_at if sprint is not None else None
+    return TeamDashboardResponse(
+        team=DashboardTeamResponse(
+            id=view.team.team_id,
+            name=view.team.name,
+            mode=view.team.mode,
+            label=role_label(role, view.team.mode),
+        ),
+        sprint=(
+            DashboardSprintResponse(
+                number=sprint.sprint.number,
+                start_date=sprint.sprint.start_date,
+                end_date=sprint.sprint.end_date,
+                day=SprintDayResponse(
+                    number=sprint.day.number, total=sprint.day.total, phase=sprint.day.phase
+                ),
+            )
+            if sprint is not None
+            else None
+        ),
+        next_ceremony=(
+            NextCeremonyResponse(
+                type=CeremonyType.DAILY,
+                starts_at=next_daily_at,
+                join_opens_at=join_opens_at(next_daily_at),
+            )
+            if next_daily_at is not None
+            else None
+        ),
+        can_configure=role == TeamRole.ADMIN,
     )
