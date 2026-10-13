@@ -12,7 +12,7 @@ CABEZA="${2:-HEAD}"
 TIPOS="feat|fix|refactor|test|docs|chore|perf|build|ci"
 AMBITOS="api|agent|stt|web|infra|docs|shared"
 PATRON_ASUNTO="^(${TIPOS})(\((${AMBITOS})\))?!?: .+"
-PATRON_REFERENCIA="^Refs: (HU-[0-9]{1,3}|Sprint-0)$"
+PATRON_REFERENCIA="^Refs: (AGI-[0-9]{1,5}|Sprint-0)$"
 LARGO_MAXIMO_ASUNTO=72
 
 errores=0
@@ -42,7 +42,7 @@ for commit in $commits; do
 
   if ! printf '%s\n' "$cuerpo" | grep -Eq "$PATRON_REFERENCIA"; then
     echo "::error::$corto — falta la referencia al backlog en el pie del commit."
-    echo "          agrega una línea 'Refs: HU-nn' (o 'Refs: Sprint-0' para gestión de configuración)."
+    echo "          agrega una línea 'Refs: AGI-nnn' (o 'Refs: Sprint-0' para gestión de configuración)."
     errores=$((errores + 1))
   fi
 done

@@ -1,6 +1,6 @@
 <!--
 Título del PR: mismo formato que el commit.
-    tipo(ambito): descripcion en imperativo (HU-nn)
+    tipo(ambito): descripcion en imperativo (AGI-nnn)
 Un pull request por historia. Uno que mezcla dos historias no se puede aceptar
 a medias. El trabajo en curso se sube como borrador.
 -->
@@ -11,7 +11,7 @@ a medias. El trabajo en curso se sube como borrador.
 
 ## Qué historia cierra
 
-Refs: HU-
+Refs: AGI-
 
 ## Cómo probarlo paso a paso
 

@@ -1,0 +1,19 @@
+<section
+  class="rounded-2xl border border-border bg-surface p-6 text-center shadow-sm sm:p-8"
+  *transloco="let t; prefix: 'identity.account_not_active'"
+>
+  <h1 class="font-display text-xl font-semibold" data-testid="account-not-active-title">
+    {{ t('title') }}
+  </h1>
+  <p class="mt-2 text-sm text-muted">{{ t('text') }}</p>
+  <button
+    aglButton
+    type="button"
+    class="mt-4 w-full"
+    data-testid="account-not-active-sign-out"
+    [disabled]="leaving()"
+    (click)="signOut()"
+  >
+    {{ t('sign_out') }}
+  </button>
+</section>

@@ -67,6 +67,7 @@ SIGNED_IN = (
     SharedErrors.TENANT_REQUIRED,
     SharedErrors.TENANT_NOT_FOUND,
     SharedErrors.NOT_AUTHENTICATED,
+    SharedErrors.ACCOUNT_NOT_ACTIVE,
 )
 # A route only the team's admins may use: a user outside the team gets the first, the same
 # whether the team exists or not; a member who is not an admin, the second.

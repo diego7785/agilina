@@ -336,6 +336,11 @@
         "title": "Account activated",
         "text": "Taking you to the sign-in…"
       }
+    },
+    "account_not_active": {
+      "title": "Your account is not active in this organization",
+      "text": "You signed in, but your account has no access to this organization. If you think this is a mistake, ask whoever manages your team to invite you. Sign out to come back with another account.",
+      "sign_out": "Sign out"
     }
   },
   "tenancy": {

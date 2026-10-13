@@ -26,6 +26,7 @@ from tests.api.doubles import FakeAuthenticatedUsers, FakeTeamAccess
 
 TOKEN_A = "token-of-ana"
 TOKEN_B = "token-of-bruno"
+TOKEN_INACTIVE = "token-of-someone-not-active"
 
 
 class Scenario:
@@ -34,7 +35,9 @@ class Scenario:
     def __init__(self) -> None:
         self.ana, self.bruno = next_id(), next_id()
         self.team_a, self.team_b = next_id(), next_id()
-        self.users = FakeAuthenticatedUsers({TOKEN_A: self.ana, TOKEN_B: self.bruno})
+        self.users = FakeAuthenticatedUsers(
+            {TOKEN_A: self.ana, TOKEN_B: self.bruno}, inactive_tokens={TOKEN_INACTIVE}
+        )
         self.access = FakeTeamAccess(
             {
                 (self.team_a, self.ana): TeamRole.ADMIN,
@@ -182,3 +185,13 @@ async def test_being_admin_of_one_team_is_not_being_admin_of_another(scenario):
     response = await scenario.get(f"/teams/{scenario.team_b}/admin-thing", TOKEN_A)
 
     assert response.status_code == 403 and response.json()["error"]["code"] == "not_a_team_admin"
+
+
+async def test_a_valid_token_of_someone_who_is_not_active_is_a_403_not_a_401(scenario):
+    for path in ("/me", f"/teams/{scenario.team_a}/thing", f"/teams/{scenario.team_a}/admin-thing"):
+        response = await scenario.get(path, TOKEN_INACTIVE)
+
+        assert response.status_code == 403
+        assert response.json()["error"]["code"] == "account_not_active"
+        assert response.headers["cache-control"] == "no-store"
+        assert "www-authenticate" not in response.headers

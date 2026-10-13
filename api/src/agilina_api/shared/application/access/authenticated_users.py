@@ -11,8 +11,11 @@ class AuthenticatedUsers(Protocol):
     - it validates it completely (signature, issuer, audience and expiry) before trusting
       any of its claims;
     - it returns the ``app_user.id`` of the token's subject (the Keycloak ``sub``), or
-      ``None`` when the token is not valid or its subject has no user in Agilina. A bad
-      token is an answer, not a failure: it never raises for one;
+      ``None`` when the token is not valid. A bad token is an answer, not a failure: it
+      never raises for one;
+    - it raises ``AccountNotActiveError`` when the token is valid but its subject has no
+      user in Agilina or the user is not active: the person is signed in, so asking them to
+      sign in again would not help;
     - it says nothing about teams or roles. What the user may do in a team is decided
       against the stored membership, never against a claim of the token.
     """

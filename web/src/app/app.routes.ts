@@ -68,6 +68,23 @@ export const routes: Routes = [
         ],
       },
       {
+        // A valid session of someone who is not an active user of this tenant (AGI-123). It asks
+        // nothing of the API, so it cannot bounce between the application and Keycloak.
+        path: 'account-not-active',
+        component: CenteredLayout,
+        canActivate: [authGuard],
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('@features/identity/presentation/account-not-active-page').then(
+                (m) => m.AccountNotActivePage,
+              ),
+            title: 'Agilina',
+          },
+        ],
+      },
+      {
         path: '',
         component: AppShell,
         children: [

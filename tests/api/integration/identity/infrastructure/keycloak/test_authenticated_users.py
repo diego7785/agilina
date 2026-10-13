@@ -9,6 +9,7 @@ from agilina_api.identity.infrastructure.keycloak.access_token_verifier import (
 from agilina_api.identity.infrastructure.keycloak.authenticated_users import (
     KeycloakAuthenticatedUsers,
 )
+from agilina_api.shared.application.access import AccountNotActiveError
 from tests.api.builders import AUDIENCE, ISSUER, AccessTokenBuilder, AppUserBuilder, signing_key
 from tests.api.doubles import JWKS_URL, FakeClock, FakeRealmKeys
 from tests.api.integration.support import stored_user
@@ -37,20 +38,22 @@ async def test_the_subject_of_a_valid_token_is_resolved_to_its_user(users, sessi
     assert await users.user_id_for(token) == user.id
 
 
-async def test_a_valid_token_of_someone_agilina_does_not_know_identifies_nobody(
+async def test_a_valid_token_of_someone_agilina_does_not_know_is_an_account_not_active(
     users, session_factory
 ):
     await stored_user(session_factory, AppUserBuilder().with_unique_email().with_subject("sub-1"))
 
-    assert await users.user_id_for(AccessTokenBuilder().for_subject("someone-else").build()) is None
+    with pytest.raises(AccountNotActiveError):
+        await users.user_id_for(AccessTokenBuilder().for_subject("someone-else").build())
 
 
-async def test_a_user_that_is_not_active_identifies_nobody(users, session_factory, engine):
+async def test_a_user_that_is_not_active_is_an_account_not_active(users, session_factory, engine):
     await stored_user(session_factory, AppUserBuilder().with_unique_email().with_subject("sub-1"))
     async with engine.begin() as connection:
         await connection.execute(text("UPDATE app_user SET is_active = false"))
 
-    assert await users.user_id_for(AccessTokenBuilder().for_subject("sub-1").build()) is None
+    with pytest.raises(AccountNotActiveError):
+        await users.user_id_for(AccessTokenBuilder().for_subject("sub-1").build())
 
 
 async def test_an_invalid_token_does_not_even_reach_the_database():

@@ -202,6 +202,81 @@ describe('authInterceptor', () => {
       expect(session.signIns).toEqual([]);
     });
 
+    it('takes the person to the page of an account that is not active, and does not sign in again', async () => {
+      http.get(`${API}/v1/teams`).subscribe({ error: () => undefined });
+      await settle();
+
+      backend
+        .expectOne(`${API}/v1/teams`)
+        .flush({ error: { code: 'account_not_active' } }, { status: 403, statusText: 'Forbidden' });
+      await settle();
+
+      expect(navigations).toEqual(['/acme/account-not-active']);
+      expect(session.signIns).toEqual([]);
+    });
+
+    it('does not sign in again when a 401 arrives right after signing in: that is the loop', async () => {
+      session.cameBackFromSignIn = true;
+      http.get(`${API}/v1/teams`).subscribe({ error: () => undefined });
+      await settle();
+
+      backend
+        .expectOne(`${API}/v1/teams`)
+        .flush(
+          { error: { code: 'not_authenticated' } },
+          { status: 401, statusText: 'Unauthorized' },
+        );
+      await settle();
+
+      expect(navigations).toEqual(['/acme/account-not-active']);
+      expect(session.signIns).toEqual([]);
+    });
+
+    it('signs in again on a 401 once the API has accepted the session (an expired token)', async () => {
+      session.cameBackFromSignIn = true;
+      http.get(`${API}/v1/teams`).subscribe();
+      await settle();
+      backend.expectOne(`${API}/v1/teams`).flush([]);
+      await settle();
+      expect(session.confirmations).toBe(1);
+
+      http.get(`${API}/v1/teams`).subscribe({ error: () => undefined });
+      await settle();
+      backend
+        .expectOne(`${API}/v1/teams`)
+        .flush(
+          { error: { code: 'not_authenticated' } },
+          { status: 401, statusText: 'Unauthorized' },
+        );
+      await settle();
+
+      expect(session.signIns).toEqual([{ returnUrl: '/acme/teams/a?x=1' }]);
+      expect(navigations).toEqual([]);
+    });
+
+    it('does not take a 403 for another reason to that page', async () => {
+      http.get(`${API}/v1/teams`).subscribe({ error: () => undefined });
+      await settle();
+
+      backend
+        .expectOne(`${API}/v1/teams`)
+        .flush({ error: { code: 'not_a_team_member' } }, { status: 403, statusText: 'Forbidden' });
+      await settle();
+
+      expect(navigations).toEqual([]);
+    });
+
+    it('does not confirm the session with an answer to a request made without it', async () => {
+      http
+        .get(`${API}/v1/tenant`, { context: new HttpContext().set(WITHOUT_SESSION, true) })
+        .subscribe();
+      await settle();
+      backend.expectOne(`${API}/v1/tenant`).flush({});
+      await settle();
+
+      expect(session.confirmations).toBe(0);
+    });
+
     it('leaves any other 404 to the screen that asked', async () => {
       http.get(`${API}/v1/teams/x`).subscribe({ error: () => undefined });
       await settle();

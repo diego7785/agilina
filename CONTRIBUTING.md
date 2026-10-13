@@ -20,7 +20,7 @@ lugar el code review cruzado que exige el Definition of Done.
 - **Ramas cortas.** Una rama por historia o por grupo coherente de tareas, con
   vida máxima de una iteración. Si una rama sobrevive a un sprint, la historia
   estaba mal dimensionada y se divide.
-- **Nombre.** `tipo/HU-nn-descripcion-corta`, en minúsculas y con guiones. El
+- **Nombre.** `tipo/AGI-nnn-descripcion-corta`, en minúsculas y con guiones. El
   identificador de la historia es obligatorio: es lo que permite rastrear el
   código hasta el backlog.
 - **Tipos.** `feat` funcionalidad nueva · `fix` corrección · `chore`
@@ -34,7 +34,7 @@ lugar el code review cruzado que exige el Definition of Done.
 
 ```bash
 git switch main && git pull
-git switch -c feat/HU-13-token-de-sala
+git switch -c feat/AGI-13-token-de-sala
 ```
 
 ## Commits: Conventional Commits
@@ -44,7 +44,7 @@ tipo(ambito): descripcion en imperativo
 
 Cuerpo opcional que explica el porqué, no el qué.
 
-Refs: HU-nn
+Refs: AGI-nnn
 ```
 
 - **Tipo.** `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `build`
@@ -55,7 +55,7 @@ Refs: HU-nn
 - **Descripción.** En imperativo y en minúscula.
 - **Cuerpo.** Opcional. Explica el porqué, no el qué, que ya está en el diff. Es
   obligatorio cuando el cambio no es evidente o descarta una alternativa.
-- **Referencia.** Todo commit lleva al final `Refs: HU-nn`. Los commits de
+- **Referencia.** Todo commit lleva al final `Refs: AGI-nnn`. Los commits de
   gestión de configuración del Sprint 0 usan `Refs: Sprint-0`.
 - **Cambio de ruptura.** `BREAKING CHANGE` en el pie cuando rompe un contrato
   entre desplegables, en particular el contrato entre el worker y la API.

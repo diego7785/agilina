@@ -8,6 +8,9 @@ export class FakeAuthSession extends AuthSession {
   readonly authenticated = this.signedIn.asReadonly();
   readonly ensured: (string | undefined)[] = [];
   readonly signIns: SignInOptions[] = [];
+  readonly signOuts: number[] = [];
+  cameBackFromSignIn = false;
+  confirmations = 0;
   token: string | null = null;
   tokenRequests = 0;
 
@@ -24,6 +27,20 @@ export class FakeAuthSession extends AuthSession {
   accessToken(): Promise<string | null> {
     this.tokenRequests++;
     return Promise.resolve(this.token);
+  }
+
+  justSignedIn(): boolean {
+    return this.cameBackFromSignIn;
+  }
+
+  confirmSession(): void {
+    this.confirmations++;
+    this.cameBackFromSignIn = false;
+  }
+
+  signOut(): Promise<void> {
+    this.signOuts.push(this.signOuts.length + 1);
+    return Promise.resolve();
   }
 
   signIn(options: SignInOptions = {}): Promise<void> {

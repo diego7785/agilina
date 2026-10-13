@@ -1,35 +1,17 @@
-import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import { AuthSession, type SignInOptions } from '@core/auth/auth-session';
+import { AuthSession } from '@core/auth/auth-session';
+import { FakeAuthSession } from '@testing/auth';
 import { provideTestTenant } from '@testing/tenant';
 
 import { SessionLoginAdapter } from './session-login.adapter';
 
-class FakeSession extends AuthSession {
-  readonly authenticated = signal(false).asReadonly();
-  readonly signIns: SignInOptions[] = [];
-
-  ensureSignedIn(): Promise<boolean> {
-    return Promise.resolve(false);
-  }
-
-  accessToken(): Promise<string | null> {
-    return Promise.resolve(null);
-  }
-
-  signIn(options: SignInOptions = {}): Promise<void> {
-    this.signIns.push(options);
-    return Promise.resolve();
-  }
-}
-
 describe('SessionLoginAdapter', () => {
-  let session: FakeSession;
+  let session: FakeAuthSession;
   let adapter: SessionLoginAdapter;
 
   beforeEach(() => {
-    session = new FakeSession();
+    session = new FakeAuthSession();
     TestBed.configureTestingModule({
       providers: [
         SessionLoginAdapter,

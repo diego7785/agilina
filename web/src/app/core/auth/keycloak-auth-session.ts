@@ -12,7 +12,7 @@ import { type AuthSession, type SignInOptions } from './auth-session';
 /** The part of keycloak-js this adapter uses: what a test double has to answer. */
 export type KeycloakClient = Pick<
   Keycloak,
-  'init' | 'login' | 'updateToken' | 'authenticated' | 'token'
+  'init' | 'login' | 'logout' | 'updateToken' | 'authenticated' | 'token'
 >;
 
 /** Builds the keycloak-js client of a realm; bound in provide-auth.ts. */
@@ -54,6 +54,7 @@ export class KeycloakAuthSession implements AuthSession {
   private readonly language = inject(TranslocoService);
   private readonly sessions = new Map<string, TenantSession>();
   private readonly signedIn = signal(false);
+  private cameBackFromSignIn = false;
 
   readonly authenticated = this.signedIn.asReadonly();
 
@@ -87,6 +88,19 @@ export class KeycloakAuthSession implements AuthSession {
     await this.redirectToSignIn(client, options);
   }
 
+  justSignedIn(): boolean {
+    return this.cameBackFromSignIn;
+  }
+
+  confirmSession(): void {
+    this.cameBackFromSignIn = false;
+  }
+
+  async signOut(): Promise<void> {
+    const { client } = await this.start();
+    await client.logout({ redirectUri: `${this.document.location.origin}${this.tenant.url()}` });
+  }
+
   /**
    * Reads Keycloak's answer to a sign-in that has just come back, when the address carries
    * one, so that it happens before the router reads the address (provide-auth.ts runs it while
@@ -101,7 +115,8 @@ export class KeycloakAuthSession implements AuthSession {
     const { hash, pathname } = this.document.location;
     const slug = pathname.split('/')[1] ?? '';
     if (isSignInAnswer(hash) && isValidTenantSlug(slug)) {
-      await this.start(slug);
+      const { client } = await this.start(slug);
+      this.cameBackFromSignIn = client.authenticated;
     }
   }
 

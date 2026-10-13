@@ -60,7 +60,8 @@ Toda respuesta de error lleva `Cache-Control: no-store`.
 | --- | --- | --- | --- |
 | 400 | `tenant_required` | La petición no trae `X-Agilina-Tenant` | — |
 | 404 | `tenant_not_found` | El tenant no existe, está suspendido o el nombre no es válido (la misma respuesta para los tres) | — |
-| 401 | `not_authenticated` | Falta el token, o no identifica a un usuario. Lleva `WWW-Authenticate: Bearer` | — |
+| 401 | `not_authenticated` | Falta el token, o no es válido (firma, emisor, audiencia o vigencia). Lleva `WWW-Authenticate: Bearer` | — |
+| 403 | `account_not_active` | El token es válido, pero su dueño no es usuario activo de la organización: no tiene cuenta en ella o está desactivada. La persona tiene sesión, así que la web no la manda a iniciar sesión otra vez | — |
 | 403 | `not_a_team_member` | El usuario no es miembro activo del equipo (ajeno, retirado o inexistente: la misma respuesta) | — |
 | 403 | `not_a_team_admin` | El usuario es miembro del equipo, pero no uno de sus admins (según el rol guardado) | — |
 | 422 | `validation_error` | El cuerpo, un parámetro o una cabecera no es válido | `fields[]`: `{field, reason}` |
@@ -195,7 +196,8 @@ modo `support` e idioma `en`. Cuerpo: `{name}` (un campo desconocido se rechaza)
 | --- | --- | --- |
 | 201 | `{id}`; cabecera `Location: /v1/teams/{id}` | Equipo creado |
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
-| 401 | error `not_authenticated` | Sin token válido |
+| 401 | error `not_authenticated` | Sin token, o no es válido |
+| 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
 | 422 | error `validation_error` | Falta `name`, no es texto o hay un campo desconocido |
 | 422 | error `invalid_team_name` | El nombre está en blanco o es demasiado largo una vez recortado |
 | 500 | error `internal_error` | Fallo inesperado |
@@ -211,7 +213,8 @@ modo autónomo y `member` para un miembro; solo se muestra, los permisos siguen 
 | --- | --- | --- |
 | 200 | `[{id, name, role, mode, label}]` (vacía si no tiene equipos) | Siempre que hay sesión |
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
-| 401 | error `not_authenticated` | Sin token válido |
+| 401 | error `not_authenticated` | Sin token, o no es válido |
+| 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
 | 500 | error `internal_error` | Fallo inesperado |
 
 ### `GET /v1/teams/{team_id}`
@@ -222,7 +225,8 @@ Un equipo del usuario: nombre, modo, idioma y el rol de quien pregunta.
 | --- | --- | --- |
 | 200 | `{id, name, mode, language, role, label}` | El usuario es miembro activo |
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
-| 401 | error `not_authenticated` | Sin token válido |
+| 401 | error `not_authenticated` | Sin token, o no es válido |
+| 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
 | 403 | error `not_a_team_member` | No es miembro: ajeno, retirado o inexistente (la misma respuesta) |
 | 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y la lectura (solo una carrera) |
 | 422 | error `validation_error` | `team_id` no es un UUID |
@@ -255,7 +259,8 @@ un admin puede dar, con su etiqueta.
 | --- | --- | --- |
 | 200 | `{roles: [{role, label}], users: [UserInTeam]}` | Quien pregunta es admin del equipo |
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
-| 401 | error `not_authenticated` | Sin token válido |
+| 401 | error `not_authenticated` | Sin token, o no es válido |
+| 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
 | 403 | error `not_a_team_member` | No es miembro: ajeno, retirado o inexistente (la misma respuesta) |
 | 403 | error `not_a_team_admin` | Es miembro, pero no admin del equipo |
 | 422 | error `validation_error` | Falta `team_id` o no es un UUID |
@@ -270,7 +275,8 @@ activo, y solo para sí mismo. Responde `{user_id, full_name, email, role, label
 | --- | --- | --- |
 | 200 | `{user_id, full_name, email, role, label, joined_at}` | Quien llama es miembro activo del equipo |
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
-| 401 | error `not_authenticated` | Sin token válido |
+| 401 | error `not_authenticated` | Sin token, o no es válido |
+| 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
 | 403 | error `not_a_team_member` | No es miembro: ajeno, retirado o inexistente (la misma respuesta) |
 | 404 | error `member_not_found` | Lo retiraron entre la verificación de acceso y la lectura (solo una carrera) |
 | 422 | error `validation_error` | Falta `team_id` o no es un UUID |
@@ -285,7 +291,8 @@ para los admins del equipo.
 | --- | --- | --- |
 | 200 | `UserInTeam` | Quien pregunta es admin y la persona es miembro activo |
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
-| 401 | error `not_authenticated` | Sin token válido |
+| 401 | error `not_authenticated` | Sin token, o no es válido |
+| 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
 | 403 | error `not_a_team_member` | No es miembro: ajeno, retirado o inexistente (la misma respuesta) |
 | 403 | error `not_a_team_admin` | Es miembro, pero no admin del equipo |
 | 404 | error `member_not_found` | `user_id` no es miembro activo del equipo (nunca lo fue o lo retiraron) |
@@ -303,7 +310,8 @@ quién cambió qué rol a quién.
 | --- | --- | --- |
 | 204 | — | Rol cambiado (o ya era ese) |
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
-| 401 | error `not_authenticated` | Sin token válido |
+| 401 | error `not_authenticated` | Sin token, o no es válido |
+| 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
 | 403 | error `not_a_team_member` / `not_a_team_admin` | No es miembro del equipo, o lo es pero no es admin |
 | 404 | error `member_not_found` | `user_id` no es miembro activo del equipo |
 | 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y el cambio (solo una carrera) |
@@ -325,7 +333,8 @@ huecos), aunque la daily quede sin participantes. Queda en el registro quién re
 | --- | --- | --- |
 | 204 | — | Retirado del equipo |
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
-| 401 | error `not_authenticated` | Sin token válido |
+| 401 | error `not_authenticated` | Sin token, o no es válido |
+| 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
 | 403 | error `not_a_team_member` / `not_a_team_admin` | No es miembro del equipo, o lo es pero no es admin |
 | 404 | error `member_not_found` | `user_id` no es miembro activo del equipo |
 | 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y el cambio (solo una carrera) |
@@ -354,7 +363,8 @@ servidor de correo lo rechaza no cambia nada.
 | --- | --- | --- |
 | 201 | `{outcome: "invitation_sent" \| "member_added"}` | Invitación enviada o cuenta agregada al equipo |
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
-| 401 | error `not_authenticated` | Sin token válido |
+| 401 | error `not_authenticated` | Sin token, o no es válido |
+| 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
 | 403 | error `not_a_team_member` / `not_a_team_admin` | No es miembro del equipo, o lo es pero no es admin |
 | 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y la invitación (solo una carrera) |
 | 409 | error `already_a_team_member` | La persona ya es miembro activo; nada se guarda ni se envía |
@@ -418,7 +428,8 @@ Esa comprobación va antes que las reglas del sprint: con un sprint activo, la r
 | --- | --- | --- |
 | 201 | El sprint activo; cabecera `Location: /v1/teams/{team_id}/sprints/active` | Sprint guardado y activo |
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
-| 401 | error `not_authenticated` | Sin token válido |
+| 401 | error `not_authenticated` | Sin token, o no es válido |
+| 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
 | 403 | error `not_a_team_member` / `not_a_team_admin` | No es miembro del equipo, o lo es pero no es admin |
 | 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y el cambio (solo una carrera) |
 | 404 | error `no_active_sprint` | El sprint se guardó, pero dejó de estar activo antes de leerlo para responder (solo una carrera) |
@@ -437,7 +448,8 @@ dashboard lo usa). Sin sprint activo responde `200` con `null`: es un estado nor
 | --- | --- | --- |
 | 200 | El sprint activo, o `null` si el equipo no tiene uno | El usuario es miembro activo |
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
-| 401 | error `not_authenticated` | Sin token válido |
+| 401 | error `not_authenticated` | Sin token, o no es válido |
+| 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
 | 403 | error `not_a_team_member` | No es miembro: ajeno, retirado o inexistente (la misma respuesta) |
 | 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y la lectura (solo una carrera) |
 | 422 | error `validation_error` | `team_id` no es un UUID |
@@ -452,7 +464,8 @@ guarda y participantes con su orden. El sprint sigue activo. Solo para los admin
 | --- | --- | --- |
 | 200 | El sprint activo, con los cambios | Sprint editado |
 | 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
-| 401 | error `not_authenticated` | Sin token válido |
+| 401 | error `not_authenticated` | Sin token, o no es válido |
+| 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
 | 403 | error `not_a_team_member` / `not_a_team_admin` | No es miembro del equipo, o lo es pero no es admin |
 | 404 | error `no_active_sprint` | El equipo no tiene un sprint activo; nada cambia |
 | 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y el cambio (solo una carrera) |
