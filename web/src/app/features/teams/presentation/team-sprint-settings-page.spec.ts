@@ -3,9 +3,9 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { NEVER, of, Subject, throwError, type Observable } from 'rxjs';
 
+import { Notifier } from '@core/notifications/notifier';
 import { ShellContext } from '@core/shell/shell-context';
 import { BROWSER_TIME_ZONE } from '@core/time/browser-time-zone';
-import { formatLocalDateTime } from '@shared/utils/local-date-time';
 import { provideTestI18n } from '@testing/i18n';
 import { aTeam } from '@testing/team';
 import { provideTestTenant } from '@testing/tenant';
@@ -272,6 +272,13 @@ describe('TeamSprintSettingsPage', () => {
     return Array.from(page.querySelectorAll('[aria-live="polite"]')).map((region) => text(region));
   }
 
+  /** What the page asked the notifier to show: the toasts, which the page does not draw. */
+  function notices(): { kind: string; message: string }[] {
+    return TestBed.inject(Notifier)
+      .notifications()
+      .map(({ kind, message }) => ({ kind, message }));
+  }
+
   function submitButton(): HTMLButtonElement {
     return page.querySelector<HTMLButtonElement>('button[type="submit"]')!;
   }
@@ -282,7 +289,7 @@ describe('TeamSprintSettingsPage', () => {
   }
 
   /** The time of the daily the form starts with: 09:00. A different one is something to save. */
-  const dailyTimeLabel = 'Hora de la daily (única para el equipo)';
+  const dailyTimeLabel = 'Hora de la reunión diaria';
 
   async function makeChange(time = '10:30'): Promise<void> {
     await type(field(dailyTimeLabel), time);
@@ -325,7 +332,7 @@ describe('TeamSprintSettingsPage', () => {
     await open();
     await pickDate('Inicio', '2026-10-19');
     await pickDate('Fin', '2026-10-30');
-    await type(field('Hora de la daily (única para el equipo)'), '09:30');
+    await type(field('Hora de la reunión diaria'), '09:30');
     await toggle('Ana Gil');
     await submit();
 
@@ -349,10 +356,12 @@ describe('TeamSprintSettingsPage', () => {
     expect(dateIn('Inicio')).toBe('');
     expect(dateIn('Fin')).toBe('');
     expect(text(field('Inicio'))).toBe('Elige una fecha');
-    expect(field('Hora de la daily (única para el equipo)').value).toBe('');
+    expect(field('Hora de la reunión diaria').value).toBe('');
     expect(checkbox('Ana Gil').checked).toBeFalse();
     expect(turns()).toEqual([]);
-    expect(text(page)).toContain('Marca a los participantes de la daily para ordenar sus turnos.');
+    expect(text(page)).toContain(
+      'Marca a los participantes de la reunión diaria para ordenar sus turnos.',
+    );
     expect(submitButton().disabled).toBeTrue();
   });
 
@@ -373,7 +382,7 @@ describe('TeamSprintSettingsPage', () => {
     expect(dateIn('Inicio')).toBe('2026-10-05');
     expect(text(field('Inicio'))).toBe('5 de octubre de 2026');
     expect(dateIn('Fin')).toBe('2026-10-16');
-    const time = field('Hora de la daily (única para el equipo)');
+    const time = field('Hora de la reunión diaria');
     expect(time.type).toBe('time');
     expect(time.value).toBe('09:00');
   });
@@ -387,20 +396,20 @@ describe('TeamSprintSettingsPage', () => {
     };
     await open();
 
-    expect(field('Hora de la daily (única para el equipo)').value).toBe('08:15');
-    expect(text(page)).toContain('Ya no quedan dailies en este sprint.');
+    expect(field('Hora de la reunión diaria').value).toBe('08:15');
   });
 
-  it('says the times are in the browser zone and shows the next daily in it', async () => {
+  it('says the times are in the browser zone and the zone the daily was saved in', async () => {
     await open();
 
     expect(text(page)).toContain(
       'Las horas se muestran en la zona horaria de tu navegador (America/Bogota).',
     );
-    expect(text(page)).toContain('La hora de la daily está guardada en la zona America/Bogota.');
     expect(text(page)).toContain(
-      `Próxima daily: ${formatLocalDateTime(SPRINT.nextDailyAt!, 'es')}.`,
+      'La hora de la reunión diaria está guardada en la zona America/Bogota.',
     );
+    expect(text(page)).not.toContain('Próxima daily');
+    expect(text(page)).not.toContain('Ya no quedan dailies');
     expect(text(page)).not.toContain('pasará a la zona de tu navegador');
   });
 
@@ -408,16 +417,18 @@ describe('TeamSprintSettingsPage', () => {
     sprints.current = { ...SPRINT, timeZone: 'Europe/Madrid' };
     await open();
 
-    expect(text(page)).toContain('La hora de la daily está guardada en la zona Europe/Madrid.');
     expect(text(page)).toContain(
-      'Al guardar, la hora de la daily pasará a la zona de tu navegador.',
+      'La hora de la reunión diaria está guardada en la zona Europe/Madrid.',
+    );
+    expect(text(page)).toContain(
+      'Al guardar, la hora de la reunión diaria pasará a la zona de tu navegador.',
     );
   });
 
   it('ties the zone of the browser to the time control', async () => {
     await open();
 
-    const described = field('Hora de la daily (única para el equipo)')
+    const described = field('Hora de la reunión diaria')
       .getAttribute('aria-describedby')!
       .split(' ')
       .map((id) => text(page.querySelector(`#${id}`)));
@@ -457,10 +468,10 @@ describe('TeamSprintSettingsPage', () => {
       .querySelector('[role="dialog"]')!
       .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await harness.fixture.whenStable();
-    await type(field('Hora de la daily (única para el equipo)'), '');
+    await type(field('Hora de la reunión diaria'), '');
 
     expect(text(page)).toContain('Elige la fecha de inicio.');
-    expect(text(page)).toContain('Elige la hora de la daily.');
+    expect(text(page)).toContain('Elige la hora de la reunión diaria.');
     expect(submitButton().disabled).toBeTrue();
   });
 
@@ -482,7 +493,7 @@ describe('TeamSprintSettingsPage', () => {
     expect(text(page.querySelector('#sprint-participants-title'))).toBe(
       'Participantes por ceremonia',
     );
-    expect(text(page.querySelector('legend'))).toBe('Daily');
+    expect(text(page.querySelector('legend'))).toBe('Reunión diaria');
     expect(checkbox('Ana Gil').checked).toBeTrue();
     expect(checkbox('Bruno Díaz').checked).toBeTrue();
     expect(checkbox('Carla Ruiz').checked).toBeFalse();
@@ -532,7 +543,7 @@ describe('TeamSprintSettingsPage', () => {
     await toggle('Bruno Díaz');
 
     expect(turns()).toEqual([]);
-    expect(text(page)).toContain('Elige al menos un participante para la daily.');
+    expect(text(page)).toContain('Elige al menos un participante para la reunión diaria.');
     expect(submitButton().disabled).toBeTrue();
   });
 
@@ -547,7 +558,7 @@ describe('TeamSprintSettingsPage', () => {
   it('shows the saved participants in their turn order, numbered', async () => {
     await open();
 
-    expect(text(page)).toContain('Orden de turnos de la daily');
+    expect(text(page)).toContain('Orden de turnos de la reunión diaria');
     expect(turns()).toEqual(['1 Bruno Díaz', '2 Ana Gil']);
   });
 
@@ -585,7 +596,7 @@ describe('TeamSprintSettingsPage', () => {
 
     await pickDate('Inicio', '2026-10-19');
     await pickDate('Fin', '2026-10-30');
-    await type(field('Hora de la daily (única para el equipo)'), '09:30');
+    await type(field('Hora de la reunión diaria'), '09:30');
     await toggle('Carla Ruiz');
     await toggle('Ana Gil');
     await submit();
@@ -611,7 +622,8 @@ describe('TeamSprintSettingsPage', () => {
     });
     await settled();
 
-    expect(text(page.querySelector('[role="status"]'))).toBe('Sprint guardado.');
+    expect(notices()).toEqual([{ kind: 'success', message: 'Sprint guardado.' }]);
+    expect(text(page)).not.toContain('Sprint guardado.');
     expect(text(page)).toContain('Sprint activo');
     expect(turns()).toEqual(['1 Carla Ruiz', '2 Ana Gil']);
     expect(page.querySelector('[role="alert"]')).toBeNull();
@@ -650,22 +662,33 @@ describe('TeamSprintSettingsPage', () => {
 
     sprints.accept(savedAtTenThirty);
     await settled();
-    expect(text(submitButton())).toBe('Guardar sprint');
+    expect(text(submitButton())).toBe('Guardar');
     // What was in the form is now the saved sprint: nothing is left to save.
     expect(submitButton().disabled).toBeTrue();
   });
 
-  it('stops saying it saved once something changes', async () => {
+  it('confirms the save with a toast and writes nothing in the page, whatever changes after', async () => {
     await open();
     await makeChange();
     await submit();
     sprints.accept(savedAtTenThirty);
     await settled();
-    expect(text(page)).toContain('Sprint guardado.');
+    expect(notices()).toEqual([{ kind: 'success', message: 'Sprint guardado.' }]);
 
     await toggle('Carla Ruiz');
 
     expect(text(page)).not.toContain('Sprint guardado.');
+    expect(page.querySelector('[role="status"]')).toBeNull();
+    expect(notices().length).toBe(1);
+  });
+
+  it('does not confirm anything before the API answers', async () => {
+    await open();
+    await makeChange();
+
+    await submit();
+
+    expect(notices()).toEqual([]);
   });
 
   const refusals: [string, string][] = [
@@ -674,7 +697,7 @@ describe('TeamSprintSettingsPage', () => {
       'invalid_time_zone',
       'La zona horaria de tu navegador no es una zona válida. Revisa la configuración de tu dispositivo.',
     ],
-    ['no_participants', 'Elige al menos un participante para la daily.'],
+    ['no_participants', 'Elige al menos un participante para la reunión diaria.'],
     ['duplicate_participant', 'Un participante aparece más de una vez.'],
     [
       'participant_not_a_member',
@@ -693,7 +716,7 @@ describe('TeamSprintSettingsPage', () => {
   ];
 
   refusals.forEach(([kind, message]) => {
-    it(`says why the API refused the sprint (${kind}), as an alert`, async () => {
+    it(`says why the API refused the sprint (${kind}), as an error toast`, async () => {
       await open();
       await makeChange();
 
@@ -701,8 +724,9 @@ describe('TeamSprintSettingsPage', () => {
       sprints.refuse(new SprintFailure(kind as SprintFailure['kind']));
       await settled();
 
-      expect(text(page.querySelector('[role="alert"]'))).toBe(message);
-      expect(text(page)).not.toContain('Sprint guardado.');
+      expect(notices()).toEqual([{ kind: 'error', message }]);
+      expect(page.querySelector('[role="alert"]')).toBeNull();
+      expect(text(page)).not.toContain(message);
       expect(page.querySelector('form')).not.toBeNull();
     });
   });
@@ -826,7 +850,7 @@ describe('TeamSprintSettingsPage', () => {
     it('is off while nothing differs from the saved sprint', async () => {
       await open();
 
-      expect(text(submitButton())).toBe('Guardar sprint');
+      expect(text(submitButton())).toBe('Guardar');
       expect(submitButton().disabled).toBeTrue();
     });
 
@@ -888,14 +912,14 @@ describe('TeamSprintSettingsPage', () => {
       expect(sprints.reconfigured).toEqual([]);
     });
 
-    it('is off again once the change is saved, with the confirmation shown', async () => {
+    it('is off again once the change is saved, with the confirmation as a toast', async () => {
       await open();
       await makeChange();
       await submit();
       sprints.accept(savedAtTenThirty);
       await settled();
 
-      expect(text(page.querySelector('[role="status"]'))).toBe('Sprint guardado.');
+      expect(notices()).toEqual([{ kind: 'success', message: 'Sprint guardado.' }]);
       expect(submitButton().disabled).toBeTrue();
     });
 

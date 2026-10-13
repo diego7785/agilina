@@ -1,7 +1,8 @@
 import { Component, computed, inject, input, type OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { TranslocoDirective, TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoDirective, TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 
+import { Notifier } from '@core/notifications/notifier';
 import { TenantContext } from '@core/tenant/tenant-context';
 import { Button } from '@shared/ui/button';
 import { IconButton } from '@shared/ui/icon-button';
@@ -49,6 +50,8 @@ export class TeamSettingsPage implements OnInit {
 
   private readonly facade = inject(TeamMembersFacade);
   private readonly shell = inject(TeamShellFacade);
+  private readonly notifier = inject(Notifier);
+  private readonly transloco = inject(TranslocoService);
   protected readonly tenant = inject(TenantContext);
 
   protected readonly members = this.facade.members;
@@ -66,9 +69,6 @@ export class TeamSettingsPage implements OnInit {
   protected readonly problemMessage = computed(() =>
     this.forbidden() ? null : problemMessageKey(this.facade.problem()),
   );
-  protected readonly roleChangeMessage = computed(() =>
-    problemMessageKey(this.facade.roleChangeProblem()),
-  );
   protected readonly removalMessage = computed(() =>
     problemMessageKey(this.facade.removalProblem()),
   );
@@ -76,21 +76,28 @@ export class TeamSettingsPage implements OnInit {
   protected readonly inviting = signal(false);
   protected readonly removing = signal<TeamMember | null>(null);
   protected readonly viewing = signal<TeamMember | null>(null);
-  protected readonly lastInvitation = signal<InvitationOutcome | null>(null);
 
   ngOnInit(): void {
     this.facade.follow(this.teamId);
     this.shell.follow(this.teamId);
   }
 
+  /**
+   * Why a member's role is blocked, when the screen says it under the control. A sprint in
+   * progress blocks everybody's role and the table already says so once, in its hint; saying it
+   * under every role only repeats it. Being the last admin is about that person, so it stays.
+   */
+  protected roleNoteOf(member: TeamMember): 'last_admin' | null {
+    return member.roleChangeBlockedBy === 'last_admin' ? 'last_admin' : null;
+  }
+
   protected openInvitation(): void {
-    this.lastInvitation.set(null);
     this.inviting.set(true);
   }
 
   protected invited(outcome: InvitationOutcome): void {
     this.inviting.set(false);
-    this.lastInvitation.set(outcome);
+    this.notifier.success(`teams.settings.invite.outcomes.${outcome}`);
     this.facade.reload();
   }
 
@@ -102,11 +109,15 @@ export class TeamSettingsPage implements OnInit {
     const changed = await this.facade.changeRole(member.userId, role);
     if (changed) {
       this.lastChange.set('role_change');
+      this.notifier.success('teams.settings.role_change.success', { name: member.fullName });
       // It may have been my own role: the top bar shows the one the API has now.
       this.shell.refresh();
     } else {
-      // The API kept the old role: the control shows it again.
+      // The API kept the old role: the control shows it again, and a notice says why.
       control.value = member.role;
+      this.notifier.error(`teams.settings.role_change.${this.roleChangeKey()}`, {
+        admin: this.transloco.translate(`app.role_labels.${this.adminLabel()}`),
+      });
     }
   }
 
@@ -128,7 +139,13 @@ export class TeamSettingsPage implements OnInit {
     if (await this.facade.remove(member.userId)) {
       this.lastChange.set('removal');
       this.removing.set(null);
+      this.notifier.success('teams.settings.remove.success', { name: member.fullName });
       this.shell.refresh();
     }
+  }
+
+  /** The key, inside `teams.settings.role_change`, of why the API refused the new role. */
+  private roleChangeKey(): string {
+    return problemMessageKey(this.facade.roleChangeProblem()) ?? 'failed';
   }
 }

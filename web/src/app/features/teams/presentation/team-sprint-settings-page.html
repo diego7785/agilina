@@ -151,13 +151,6 @@
                   {{ t('zone_change') }}
                 }
               </p>
-              <p data-testid="sprint-next-daily">
-                @if (sprint.nextDailyAt; as next) {
-                  {{ t('next_daily', { when: formatInstant(next, language) }) }}
-                } @else {
-                  {{ t('no_next_daily') }}
-                }
-              </p>
             }
           </div>
         </div>
@@ -309,17 +302,6 @@
             </p>
           </div>
         </div>
-
-        @if (saveMessage(); as message) {
-          <p role="alert" class="text-sm text-danger" data-testid="sprint-save-problem">
-            {{ t('save.' + message) }}
-          </p>
-        }
-        @if (justSaved()) {
-          <p role="status" class="text-sm text-muted" data-testid="sprint-saved">
-            {{ t('saved') }}
-          </p>
-        }
 
         <div class="flex justify-end">
           <button

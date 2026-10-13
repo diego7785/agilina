@@ -11,11 +11,12 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
+import { Notifier } from '@core/notifications/notifier';
 import { TenantContext } from '@core/tenant/tenant-context';
 import { Button } from '@shared/ui/button';
 import { DatePicker } from '@shared/ui/date-picker';
 import { TextField } from '@shared/ui/text-field';
-import { formatLocalDateTime, localTimeOf } from '@shared/utils/local-date-time';
+import { localTimeOf } from '@shared/utils/local-date-time';
 
 import { problemMessageKey } from './problem-message';
 import { SettingsNoAccess } from './settings-no-access';
@@ -64,6 +65,7 @@ export class TeamSprintSettingsPage implements OnInit {
 
   private readonly facade = inject(SprintSettingsFacade);
   private readonly shell = inject(TeamShellFacade);
+  private readonly notifier = inject(Notifier);
   protected readonly tenant = inject(TenantContext);
 
   protected readonly sprint = this.facade.sprint;
@@ -157,8 +159,6 @@ export class TeamSprintSettingsPage implements OnInit {
   });
   /** The last move, announced to screen readers: who now has which turn. */
   protected readonly lastMove = signal<Turn | null>(null);
-  /** Whether the last save worked and nothing changed since. */
-  protected readonly justSaved = signal(false);
 
   ngOnInit(): void {
     this.facade.follow(this.teamId);
@@ -172,26 +172,22 @@ export class TeamSprintSettingsPage implements OnInit {
   protected changeStartDate(value: string): void {
     this.startDate.set(value);
     this.startTouched.set(true);
-    this.changed();
   }
 
   protected changeEndDate(value: string): void {
     this.endDate.set(value);
     this.endTouched.set(true);
-    this.changed();
   }
 
   protected changeDailyTime(value: string): void {
     this.dailyTime.set(value);
     this.timeTouched.set(true);
-    this.changed();
   }
 
   protected toggle(userId: string): void {
     this.order.update((order) => toggleParticipant(order, userId));
     this.participantsTouched.set(true);
     this.lastMove.set(null);
-    this.changed();
   }
 
   protected moveUp(userId: string): void {
@@ -200,11 +196,6 @@ export class TeamSprintSettingsPage implements OnInit {
 
   protected moveDown(userId: string): void {
     this.move(moveDown(this.order(), userId), userId);
-  }
-
-  /** An instant, in the browser's time zone and the active language. */
-  protected formatInstant(instant: string, language: string): string {
-    return formatLocalDateTime(instant, language);
   }
 
   protected async submit(): Promise<void> {
@@ -217,17 +208,20 @@ export class TeamSprintSettingsPage implements OnInit {
       dailyTime: this.dailyTime(),
       participants: this.order(),
     });
-    this.justSaved.set(saved);
+    if (saved) {
+      this.notifier.success('teams.sprint.saved');
+      return;
+    }
+    // A refusal for lack of access replaces the screen with "no access"; any other says why.
+    const message = this.saveMessage();
+    if (!this.forbidden() && message !== null) {
+      this.notifier.error(`teams.sprint.save.${message}`);
+    }
   }
 
   private move(order: readonly string[], userId: string): void {
     this.order.set(order);
     this.lastMove.set(this.turns().find((turn) => turn.userId === userId) ?? null);
-    this.changed();
-  }
-
-  private changed(): void {
-    this.justSaved.set(false);
   }
 }
 

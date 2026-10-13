@@ -98,8 +98,7 @@
       }
     },
     "settings": {
-      "title": "Team",
-      "subtitle": "The people who take part in the team's ceremonies, and their role.",
+      "title": "Members",
       "back": "Back to the team",
       "members": "Members",
       "columns": {
@@ -119,7 +118,6 @@
       "role_of": "Role of {{ name }}",
       "blocked": {
         "role_change": {
-          "sprint_in_progress": "The role cannot change while the team has a sprint in progress.",
           "last_admin": "This is the only {{ admin }}: the team cannot be left without one."
         },
         "removal": {
@@ -147,7 +145,8 @@
           "not_found": "This person is no longer in the team.",
           "last_admin": "The role cannot change: the team cannot be left without its {{ admin }}.",
           "sprint_in_progress": "The role cannot change while the team has a sprint in progress."
-        }
+        },
+        "success": "{{ name }}'s role updated."
       },
       "invite": {
         "open": "Invite member",
@@ -201,7 +200,8 @@
           "forbidden": "You are no longer the {{ admin }} of this team.",
           "not_found": "This person is no longer in the team.",
           "last_admin": "They cannot be removed: the team cannot be left without its {{ admin }}."
-        }
+        },
+        "success": "{{ name }} is no longer on the team."
       },
       "view": {
         "open_label": "View {{ name }}",
@@ -249,8 +249,6 @@
       "zone_hint": "Times are shown in your browser's time zone ({{ zone }}).",
       "saved_zone": "The daily time is saved in the {{ zone }} time zone.",
       "zone_change": "When you save, the daily time will move to your browser's time zone.",
-      "next_daily": "Next daily: {{ when }}.",
-      "no_next_daily": "There are no dailies left in this sprint.",
       "errors": {
         "start_date": {
           "blank": "Choose the start date."
@@ -278,7 +276,7 @@
         "move_down": "Move {{ name }} down",
         "moved": "{{ name }} now has turn {{ position }}."
       },
-      "submit": "Save sprint",
+      "submit": "Save",
       "saving": "Saving…",
       "saved": "Sprint saved.",
       "save": {

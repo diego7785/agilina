@@ -3,6 +3,7 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { NEVER, of, Subject, throwError, type Observable } from 'rxjs';
 
+import { Notifier } from '@core/notifications/notifier';
 import { ShellContext } from '@core/shell/shell-context';
 import { provideTestI18n } from '@testing/i18n';
 import { aTeam } from '@testing/team';
@@ -152,6 +153,13 @@ class FakeUsersPort extends UsersPort {
   }
 }
 
+/** What the page asked the notifier to show: the toasts, which the page does not draw. */
+function notices(): { kind: string; message: string }[] {
+  return TestBed.inject(Notifier)
+    .notifications()
+    .map(({ kind, message }) => ({ kind, message }));
+}
+
 describe('TeamSettingsPage', () => {
   let port: FakeUsersPort;
   let harness: RouterTestingHarness;
@@ -217,11 +225,24 @@ describe('TeamSettingsPage', () => {
   }
 
   // ----------------------------------------------------------- criterion 1 --
+  it('titles the card Miembros, as the mockup does, and shows each one as Activo in a neutral badge', async () => {
+    await open();
+
+    expect(text(page.querySelector('[data-testid="settings-title"]'))).toBe('Miembros');
+    const badges = Array.from(page.querySelectorAll('[data-testid="member-status"]'));
+    expect(badges.map((badge) => text(badge))).toEqual(['Activo', 'Activo']);
+    for (const badge of badges) {
+      expect(badge.className).toContain('bg-border/60');
+      expect(badge.className).not.toContain('text-accent');
+    }
+  });
+
   it('lists each member with name, email and the translated label of their role', async () => {
     await open();
 
     expect(port.listed).toEqual(['atlas']);
-    expect(page.querySelector('h2')?.textContent.trim()).toBe('Equipo');
+    expect(page.querySelector('h2')?.textContent.trim()).toBe('Miembros');
+    expect(text(page)).not.toContain('Las personas que participan en las ceremonias');
     const [ana, bruno] = rows();
     expect(text(ana)).toContain('Ana Gil');
     expect(text(ana)).toContain('ana@example.com');
@@ -239,8 +260,8 @@ describe('TeamSettingsPage', () => {
     expect(tabs.map((tab) => text(tab))).toEqual(['Equipo', 'Sprint']);
     expect(text(page.querySelector('nav a[aria-current="page"]'))).toBe('Equipo');
     expect(tabs[1]?.getAttribute('href')).toBe('/acme/teams/atlas/settings/sprint');
-    // The end-to-end tests of HU-06 look for this title: it keeps its text.
-    expect(text(page.querySelector('[data-testid="settings-title"]'))).toBe('Equipo');
+    // The end-to-end tests of HU-06 look for this title, which the mockup calls Miembros.
+    expect(text(page.querySelector('[data-testid="settings-title"]'))).toBe('Miembros');
   });
 
   it('shows each role in a control with the options the API gave', async () => {
@@ -267,7 +288,7 @@ describe('TeamSettingsPage', () => {
   });
 
   // ----------------------------------------------------------- criterion 3 --
-  it('disables the role of a member with the reason the API gives, tied to the control', async () => {
+  it('disables the role of every member while a sprint is active, and says it once in the hint', async () => {
     port.answer = {
       roles: [
         { role: 'admin', label: 'admin' },
@@ -282,9 +303,31 @@ describe('TeamSettingsPage', () => {
 
     const control = roleControl('bruno');
     expect(control.disabled).toBeTrue();
+    expect(roleControl('ana').disabled).toBeTrue();
+    // Nothing is repeated under each role: the hint of the table says it for all of them.
+    expect(page.querySelector('[data-testid="member-role-blocked"]')).toBeNull();
+    expect(control.hasAttribute('aria-describedby')).toBeFalse();
+    expect(page.textContent).not.toContain(
+      'No se puede cambiar el rol mientras el equipo tiene un sprint activo.',
+    );
+    expect(page.textContent).toContain('El rol solo se puede cambiar sin sprint activo.');
+  });
+
+  it('keeps the reason under the role of the only admin, tied to the control', async () => {
+    port.answer = {
+      roles: [
+        { role: 'admin', label: 'admin' },
+        { role: 'member', label: 'member' },
+      ],
+      members: [{ ...ANA, roleChangeBlockedBy: 'last_admin' }, BRUNO],
+    };
+    await open();
+
+    const control = roleControl('ana');
+    expect(control.disabled).toBeTrue();
     const reason = page.querySelector(`#${control.getAttribute('aria-describedby')!}`);
     expect(text(reason)).toBe(
-      'No se puede cambiar el rol mientras el equipo tiene un sprint activo.',
+      'Es el único Administrador: el equipo no puede quedarse sin Administrador.',
     );
   });
 
@@ -313,6 +356,7 @@ describe('TeamSettingsPage', () => {
     expect(port.changes).toEqual([['bruno', 'admin']]);
     expect(port.listed).toEqual(['atlas', 'atlas']);
     expect(page.querySelector('[role="alert"]')).toBeNull();
+    expect(notices()).toEqual([{ kind: 'success', message: 'Rol de Bruno Díaz actualizado.' }]);
   });
 
   it('puts the role back and says why when the API refuses the change', async () => {
@@ -324,9 +368,13 @@ describe('TeamSettingsPage', () => {
     await settled();
 
     expect(roleControl('bruno').value).toBe('member');
-    expect(text(page.querySelector('[role="alert"]'))).toBe(
-      'No se puede cambiar el rol mientras el equipo tiene un sprint activo.',
-    );
+    expect(notices()).toEqual([
+      {
+        kind: 'error',
+        message: 'No se puede cambiar el rol mientras el equipo tiene un sprint activo.',
+      },
+    ]);
+    expect(page.querySelector('[role="alert"]')).toBeNull();
     expect(port.listed).toEqual(['atlas', 'atlas']);
   });
 
@@ -360,6 +408,9 @@ describe('TeamSettingsPage', () => {
     expect(port.removals).toEqual(['bruno']);
     expect(dialog()).toBeNull();
     expect(rows().map((row) => text(row))).not.toContain(jasmine.stringContaining('Bruno'));
+    expect(notices()).toEqual([
+      { kind: 'success', message: 'Bruno Díaz ya no está en el equipo.' },
+    ]);
   });
 
   it('does not remove anybody when the confirmation is cancelled', async () => {
@@ -423,9 +474,13 @@ describe('TeamSettingsPage', () => {
       { fullName: 'Laura', email: 'laura@example.com', role: 'member' },
     ]);
     expect(dialog()).toBeNull();
-    expect(text(page.querySelector('[role="status"]'))).toBe(
-      'Enviamos la invitación por correo. El enlace de activación vale 7 días.',
-    );
+    expect(notices()).toEqual([
+      {
+        kind: 'success',
+        message: 'Enviamos la invitación por correo. El enlace de activación vale 7 días.',
+      },
+    ]);
+    expect(page.querySelector('[data-testid="invite-outcome"]')).toBeNull();
     expect(port.listed).toEqual(['atlas', 'atlas']);
   });
 
@@ -497,7 +552,7 @@ describe('TeamSettingsPage', () => {
     expect(text(page.querySelector('[role="alert"]'))).toBe(
       'No se pudo cargar a los integrantes. Inténtalo de nuevo más tarde.',
     );
-    expect(page.querySelector('h2')?.textContent.trim()).toBe('Equipo');
+    expect(page.querySelector('h2')?.textContent.trim()).toBe('Miembros');
   });
 
   it('puts the team and how the user is called in it in the top bar while it lives', async () => {
