@@ -62,8 +62,11 @@ Dentro de `web/`, los scripts de `package.json` son los mismos que usa la CI:
   código ambos son el mismo rol interno `admin` (SM es su etiqueta visible en
   modo soporte, ver el [glosario](../docs/glossary.md)): la interfaz decide con
   el rol interno, nunca con la etiqueta.
-  El dashboard muestra el enlace a Configuración solo si `GET /v1/teams/{id}`
-  devuelve `role: admin`. Configuración tiene dos pestañas, cada una con su ruta:
+  Configuración es una entrada del encabezado, junto a Dashboard, en todas las pantallas
+  del equipo: no existe en el árbol de navegación del Miembro (`@if`, no se oculta con
+  estilos). El encabezado la dibuja según `ShellTeam.canConfigure`, que
+  `TeamShellFacade` saca de `GET /v1/teams/{id}` (`role === 'admin'`) y el dashboard de su
+  propio `can_configure`. Configuración tiene dos pestañas, cada una con su ruta:
   Equipo (`/:tenant/teams/:teamId/settings`) y Sprint (`/:tenant/teams/:teamId/settings/sprint`).
   Ninguna lleva guard de rol: la pantalla pide los integrantes a la API y, si responde 403,
   muestra «sin acceso» (`settings-no-access`; un guard escondería esa respuesta). Las
@@ -95,7 +98,7 @@ web/
         │   ├── i18n/             Transloco, idiomas y manejo de claves faltantes
         │   ├── logging/          Puerto Logger, adaptador de consola, ErrorHandler
         │   ├── tenant/           El tenant de la dirección: contexto, guards y puerto del catálogo (AD-29)
-        │   ├── time/             La zona horaria del navegador (BROWSER_TIME_ZONE)
+        │   ├── time/             La zona horaria del navegador (BROWSER_TIME_ZONE) y el reloj (NOW)
         │   └── auth/             Sesión: puerto AuthSession, adaptador de keycloak-js, guards e interceptor
         ├── layout/               Marcos de pantalla (@layout/*): app-shell (con la cabecera) y
         │                         centered-layout (las pantallas antes de entrar a un equipo)
@@ -124,7 +127,7 @@ concepto se llame igual en todo el sistema:
 | `status` | Estado del entorno: prueba que la web habla con la API | Existe |
 | `tenancy` | La página «no encontrada» de una dirección sin organización | Existe |
 | `identity` | Activación de la cuenta desde la invitación (`/activate`); inicio y cierre de sesión; la página de cuenta no activa (`/account-not-active`) | Activación existe (HU-02); la página de cuenta no activa con su botón de cerrar sesión, también (AGI-123); el resto llega con HU-03/04 |
-| `teams` | Equipo, integrantes, sprint y pestaña de configuración (solo `admin`) | Existe: selector mínimo, creación y dashboard placeholder (HU-05); Configuración → Equipo en `/:tenant/teams/:teamId/settings` (HU-06): integrantes con su etiqueta de rol, invitar, cambiar el rol y eliminar; Configuración → Sprint en `/:tenant/teams/:teamId/settings/sprint` (HU-07): fechas, hora de la daily en la zona del navegador y participantes ordenados con subir y bajar, y la línea «Día N de M» del dashboard. El resto llega con sus historias |
+| `teams` | Equipo, integrantes, sprint, dashboard y pestaña de configuración (solo `admin`) | Existe: dashboard en `/:tenant/teams/:teamId` (HU-12), que lee `GET /v1/teams/{id}/dashboard` en una sola llamada y muestra el día N de M con su barra y el número del sprint («Sprint 12», que asigna la API), la próxima daily en la hora del navegador, el modo como etiqueta de solo lectura y la sala; «Unirse a la sala» se habilita desde diez minutos antes de la daily (`join-window.ts`, con un temporizador, sin recargar) y por ahora no hace nada: la conexión llega con AGI-60; Configuración → Sprint tiene el botón «Cerrar sprint activo» del mockup, sin función todavía (llega con AGI-81); el encabezado tiene las entradas Dashboard y Configuración y **Cambiar de equipo**, que lleva al selector aunque haya un solo equipo (`{ choose: true }`);  selector mínimo, creación y dashboard placeholder (HU-05); Configuración → Equipo en `/:tenant/teams/:teamId/settings` (HU-06): integrantes con su etiqueta de rol, invitar, cambiar el rol y eliminar; Configuración → Sprint en `/:tenant/teams/:teamId/settings/sprint` (HU-07): fechas, hora de la daily en la zona del navegador y participantes ordenados con subir y bajar, y la línea «Día N de M» del dashboard. El resto llega con sus historias |
 | `ceremonies` | La sala de la Daily: LiveKit, turnos y controles hacia el agente | Llega con las historias de la ceremonia |
 
 ### Capas dentro de una funcionalidad
@@ -329,6 +332,10 @@ web es el **primer segmento de la dirección**: `/acme/teams`, `/acme/activate#t
   `localDateTimeToIso` (una hora de pared en una fecha, al instante UTC), `localTimeOf`,
   `formatLocalDateTime` y `formatCalendarDate` (una fecha de calendario se arma a medianoche
   local y se formatea en la misma zona, así nunca se corre un día).
+- Lo que cambia con la hora (la sala abierta, la daily que ya empezó) lee el instante del token
+  `NOW` (`core/time/now.ts`), que una prueba fija con `TestClock` (`@testing/now`) en vez de
+  depender de la hora de la máquina. `formatLocalTime` y `formatShortLocalDate` dan la hora y el
+  día corto («02:15 p. m.», «jue, 17 de sept») de un instante en la zona del navegador.
 - No se guarda ni se calcula con zonas horarias por equipo: no existen. La única excepción es la
   **zona de captura de la hora de la daily**
   ([AD-31](../docs/adr/0031-guardar-la-hora-de-la-daily-en-utc-con-su-zona-de-captura.md)): al
