@@ -121,8 +121,14 @@ test('with a sprint whose daily is hours away, the dashboard shows day 1 and the
   await pickDate('sprint-end-date', bogotaDateIn(9));
   await page.getByTestId('sprint-daily-time').fill(bogotaTimeIn(180));
   await page.getByTestId(`sprint-participant-${EMAIL}`).locator('input').check();
+  await expect(page.getByTestId('sprint-submit')).toHaveText('Guardar');
   await page.getByTestId('sprint-submit').click();
-  await expect(page.getByTestId('sprint-saved')).toHaveText('Sprint guardado.');
+  // The confirmation is a toast, outside the page: it does not push anything.
+  await expect(page.getByTestId('toast-success').last()).toHaveText(/Sprint guardado\./);
+  await expect(page.locator('main')).not.toContainText('Sprint guardado.');
+  // The pointer is still where "Guardar" was, now under the toast, which waits while it is there:
+  // a person moves away before going on.
+  await page.mouse.move(0, 0);
   // What was typed is now the saved sprint: there is nothing new to save.
   await expect(page.getByTestId('sprint-submit')).toBeDisabled();
   // The first sprint of the team is number 1, assigned by the API.
@@ -141,7 +147,7 @@ test('with a sprint whose daily is hours away, the dashboard shows day 1 and the
   await expect(page.getByTestId('sprint-progress')).toHaveAttribute('value', '1');
   await expect(page.getByTestId('sprint-progress')).toHaveAttribute('max', '10');
   await expect(page.getByTestId('ceremony-time')).toHaveText(/\d{1,2}:\d{2}/);
-  await expect(page.getByTestId('ceremony-day')).toContainText('Daily');
+  await expect(page.getByTestId('ceremony-day')).toContainText('Reunión diaria');
   await expect(page.getByTestId('join-room')).toBeDisabled();
   await expect(page.getByTestId('join-hint')).toContainText('Se habilita a las');
 });
@@ -158,7 +164,8 @@ test('when the daily is minutes away the room is open, and pressing it does noth
   await page.getByTestId('sprint-daily-time').fill(bogotaTimeIn(5));
   await expect(page.getByTestId('sprint-submit')).toBeEnabled();
   await page.getByTestId('sprint-submit').click();
-  await expect(page.getByTestId('sprint-saved')).toHaveText('Sprint guardado.');
+  await expect(page.getByTestId('toast-success').last()).toHaveText(/Sprint guardado\./);
+  await page.mouse.move(0, 0);
   await page.getByTestId('nav-dashboard').click();
 
   await expect(page.getByTestId('join-room')).toBeEnabled();
@@ -166,6 +173,11 @@ test('when the daily is minutes away the room is open, and pressing it does noth
   await page.getByTestId('join-room').click();
   await expect(page).toHaveURL(teamUrl);
   testInfo.annotations.push({ type: 'note', description: 'Joining arrives with AGI-60' });
+});
+
+test('a success toast goes away by itself, a few seconds after it appeared', async () => {
+  await page.getByTestId('nav-dashboard').click();
+  await expect(page.getByTestId('toast-success')).toHaveCount(0, { timeout: 10_000 });
 });
 
 test('switching team leads to the selector even with a single team, with the way to create another', async () => {

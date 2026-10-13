@@ -126,7 +126,7 @@ test('the admin opens Settings → Team and sees themself as the only admin', as
 
   await page.getByTestId('nav-settings').click();
   await expect(page).toHaveURL(new RegExp(`/${TENANT}/teams/[0-9a-f-]{36}/settings$`));
-  await expect(page.getByTestId('settings-title')).toHaveText('Equipo');
+  await expect(page.getByTestId('settings-title')).toHaveText('Miembros');
   settingsUrl = page.url();
 
   const me = memberRow(page, ADMIN_EMAIL);
@@ -146,9 +146,11 @@ test('inviting someone without an account emails them the activation link', asyn
   await page.getByTestId('invite-email').fill(MEMBER_EMAIL);
   await page.getByTestId('invite-submit').click();
 
-  await expect(page.getByTestId('invite-outcome')).toContainText(
+  // The outcome is a toast: it does not push the page, and it is not written inside it.
+  await expect(page.getByTestId('toast-success').last()).toContainText(
     'Enviamos la invitación por correo',
   );
+  await expect(page.locator('main')).not.toContainText('Enviamos la invitación por correo');
   expect(await activationLink(MEMBER_EMAIL)).toMatch(new RegExp(`/${TENANT}/activate#t=`));
 });
 
@@ -208,6 +210,9 @@ test('the admin changes the role of the member, and back', async () => {
 
   await member.getByTestId('member-role').selectOption('admin');
   await expect(member.getByTestId('member-role').locator('option:checked')).toHaveText('Scrum Master');
+  await expect(page.getByTestId('toast-success').last()).toContainText(
+    `Rol de ${MEMBER_NAME} actualizado.`,
+  );
   // With a second admin, the first one is no longer the last: their controls turn on.
   await expect(me.getByTestId('member-role')).toBeEnabled();
 
@@ -229,12 +234,15 @@ test('removing the member asks first and warns they stop receiving the meetings'
 
   await expect(page.getByTestId('remove-confirm')).toHaveCount(0);
   await expect(memberRow(page, MEMBER_EMAIL)).toHaveCount(0);
+  await expect(page.getByTestId('toast-success').last()).toContainText(
+    `${MEMBER_NAME} ya no está en el equipo.`,
+  );
 });
 
 test('inviting back someone who has an account adds them at once and notifies them without a link', async () => {
   await invite(page, MEMBER_NAME, MEMBER_EMAIL);
 
-  await expect(page.getByTestId('invite-outcome')).toContainText('ya tenía cuenta en Agilina');
+  await expect(page.getByTestId('toast-success').last()).toContainText('ya tenía cuenta en Agilina');
   await expect(memberRow(page, MEMBER_EMAIL).getByTestId('member-role').locator('option:checked')).toHaveText('Miembro');
 
   const notice = await emailMatching(
