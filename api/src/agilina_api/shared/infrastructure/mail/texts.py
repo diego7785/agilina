@@ -10,7 +10,7 @@ from agilina_shared.enums import Language
 
 LAYOUT: dict[Language, dict[str, str]] = {
     Language.ES: {
-        "tagline": "Tu Scrum Master virtual para la Daily Stand-up",
+        "tagline": "Tu Scrum Master virtual para la reunión diaria",
         "footer": "Este es un mensaje automático de Agilina. No respondas a este correo.",
     },
     Language.EN: {
@@ -60,8 +60,8 @@ TEMPLATES: dict[str, dict[Language, dict[str, str]]] = {
             "preheader": "Activa tu cuenta para entrar al equipo {{ team_name }}.",
             "title": "Te invitaron a {{ team_name }}",
             "greeting": "Hola {{ name }},",
-            "intro": "Te invitaron a unirte al equipo {{ team_name }} en Agilina, el Scrum Master virtual de la daily.",
-            "intro_by": "{{ inviter_name }} te invitó a unirte al equipo {{ team_name }} en Agilina, el Scrum Master virtual de la daily.",
+            "intro": "Te invitaron a unirte al equipo {{ team_name }} en Agilina, el Scrum Master virtual de la reunión diaria.",
+            "intro_by": "{{ inviter_name }} te invitó a unirte al equipo {{ team_name }} en Agilina, el Scrum Master virtual de la reunión diaria.",
             "cta": "Activar mi cuenta",
             "steps": "Elige una contraseña y entrarás directo a tu equipo.",
             "expiry": "El enlace vence el {{ expires_on }} y solo puede usarse una vez.",
@@ -88,8 +88,8 @@ TEMPLATES: dict[str, dict[Language, dict[str, str]]] = {
             "preheader": "Ya puedes entrar al equipo {{ team_name }} con tu cuenta de siempre.",
             "title": "Ahora formas parte de {{ team_name }}",
             "greeting": "Hola {{ name }},",
-            "intro": "Te agregaron al equipo {{ team_name }} en Agilina, el Scrum Master virtual de la daily.",
-            "intro_by": "{{ inviter_name }} te agregó al equipo {{ team_name }} en Agilina, el Scrum Master virtual de la daily.",
+            "intro": "Te agregaron al equipo {{ team_name }} en Agilina, el Scrum Master virtual de la reunión diaria.",
+            "intro_by": "{{ inviter_name }} te agregó al equipo {{ team_name }} en Agilina, el Scrum Master virtual de la reunión diaria.",
             "no_activation": "Como ya tienes una cuenta, no hace falta activar nada: entra con tu correo y tu contraseña de siempre.",
             "cta": "Abrir el equipo",
             "fallback": "Si el botón no funciona, copia y pega este enlace en tu navegador:",

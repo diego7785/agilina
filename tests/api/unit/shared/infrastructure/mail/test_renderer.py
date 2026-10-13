@@ -90,6 +90,25 @@ def test_every_template_exists_in_both_languages_with_the_same_texts():
     assert LAYOUT[Language.ES].keys() == LAYOUT[Language.EN].keys()
 
 
+def test_the_tagline_says_reunion_diaria_in_spanish_and_keeps_the_daily_stand_up_in_english():
+    assert LAYOUT[Language.ES]["tagline"] == "Tu Scrum Master virtual para la reunión diaria"
+    assert LAYOUT[Language.EN]["tagline"] == "Your virtual Scrum Master for the Daily Stand-up"
+    assert "stand-up" not in LAYOUT[Language.ES]["tagline"].lower()
+
+
+def test_no_spanish_email_calls_the_meeting_only_daily():
+    spanish = [
+        text
+        for texts in [LAYOUT, *TEMPLATES.values()]
+        for language, values in texts.items()
+        if language is Language.ES
+        for text in values.values()
+    ]
+
+    assert all("la daily" not in text.lower() for text in spanish)
+    assert any("reunión diaria" in text for text in spanish)
+
+
 def test_every_template_has_an_html_and_a_text_file():
     for name in TEMPLATES:
         assert (TEMPLATES_DIR / f"{name}.html").is_file(), name
