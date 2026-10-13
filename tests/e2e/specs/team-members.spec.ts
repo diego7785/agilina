@@ -79,7 +79,7 @@ async function activateAndSignIn(page: Page, email: string): Promise<void> {
   await page.getByTestId('login-submit').click();
 
   await expect(page).toHaveURL(new RegExp(`/${TENANT}/teams/[0-9a-f-]{36}$`));
-  await expect(page.getByTestId('team-name')).toHaveText(TEAM);
+  await expect(page.getByTestId('header-team')).toHaveText(TEAM);
 }
 
 /** A team starts in support mode (HU-04): its admin is the Scrum Master, in the top bar too. */
@@ -124,7 +124,7 @@ test('the admin opens Settings → Team and sees themself as the only admin', as
   await activateAndSignIn(page, ADMIN_EMAIL);
   await expectHeaderLabel(page, 'Scrum Master');
 
-  await page.getByTestId('team-settings-link').click();
+  await page.getByTestId('nav-settings').click();
   await expect(page).toHaveURL(new RegExp(`/${TENANT}/teams/[0-9a-f-]{36}/settings$`));
   await expect(page.getByTestId('settings-title')).toHaveText('Equipo');
   settingsUrl = page.url();
@@ -157,7 +157,9 @@ test('the invited person activates the account and joins as a member, without ac
 }) => {
   const memberPage = await freshPage(browser);
   await activateAndSignIn(memberPage, MEMBER_EMAIL);
-  await expect(memberPage.getByTestId('team-settings-link')).toHaveCount(0);
+  // The Settings entry does not exist in the navigation of a member, it is not just hidden.
+  await expect(memberPage.getByTestId('nav-dashboard')).toBeVisible();
+  await expect(memberPage.getByTestId('nav-settings')).toHaveCount(0);
   // The top bar names the person and their role in this team: a member, whatever the mode.
   await expect(memberPage.getByTestId('header-team')).toHaveText(TEAM);
   await expect(memberPage.getByTestId('header-role-label')).toHaveText('Miembro');

@@ -128,7 +128,7 @@ for (const tenant of TENANTS) {
       await signInOnKeycloak(page, PASSWORD);
 
       await expect(page).toHaveURL(new RegExp(`/${tenant}/teams/[0-9a-f-]{36}$`));
-      await expect(page.getByTestId('team-name')).toHaveText(teamName(tenant));
+      await expect(page.getByTestId('header-team')).toHaveText(teamName(tenant));
       teamUrl = page.url();
     });
 
@@ -143,7 +143,7 @@ for (const tenant of TENANTS) {
       await expect(page).toHaveURL(keycloakLogin(tenant));
       await signInOnKeycloak(page, PASSWORD);
 
-      await expect(page.getByTestId('team-name')).toHaveText(teamName(tenant));
+      await expect(page.getByTestId('header-team')).toHaveText(teamName(tenant));
       // Read once the team shows, not polled: Keycloak's answer (#state=…&code=…) must not come
       // back to the address bar after a first moment without it.
       expect(page.url()).toBe(teamUrl);
@@ -179,7 +179,7 @@ test.describe('the tenants do not mix', () => {
     await signInOnKeycloak(page, PASSWORD);
 
     await expect(page).toHaveURL(new RegExp(`/ecomoda/teams/${acmeTeamId}$`));
-    await expect(page.getByTestId('team-name')).toHaveCount(0);
+    await expect(page.getByTestId('header-team')).toHaveCount(0);
     await context.close();
   });
 
