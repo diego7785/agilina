@@ -40,7 +40,7 @@ async def test_a_planned_or_closed_sprint_is_not_in_progress(session_factory, st
 async def test_an_active_sprint_is_in_progress(session_factory):
     team = await stored_team(session_factory)
     await stored_sprint(session_factory, SprintBuilder().for_team(team).closed())
-    await stored_sprint(session_factory, SprintBuilder().for_team(team))
+    await stored_sprint(session_factory, SprintBuilder().for_team(team).numbered(2))
 
     assert await _has_active_sprint(session_factory, team.id) is True
 
@@ -69,7 +69,7 @@ async def test_a_team_cannot_have_two_sprints_in_progress(session_factory):
 
     # The repository turns the index's refusal into the domain's error (HU-07).
     with pytest.raises(ActiveSprintExistsError) as refused:
-        await stored_sprint(session_factory, SprintBuilder().for_team(team))
+        await stored_sprint(session_factory, SprintBuilder().for_team(team).numbered(2))
 
     assert isinstance(refused.value.__cause__, IntegrityError)
     assert "sprint_one_active_per_team" in str(refused.value.__cause__)

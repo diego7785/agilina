@@ -403,8 +403,12 @@ Reglas al crear y al editar (si una se incumple, no se guarda nada):
   (`daily_participant_not_a_member`). Un integrante nuevo no se agrega solo, y uno retirado sale
   de los participantes del sprint activo (ver `DELETE …/members/{user_id}`).
 
-La respuesta de las tres rutas es el sprint activo: `{id, start_date, end_date, daily_time,
+La respuesta de las tres rutas es el sprint activo: `{id, number, start_date, end_date, daily_time,
 time_zone, next_daily_at, participants: [{user_id, turn_order}], day: {number, total, phase}}`.
+`number` es el número del sprint en su equipo («Sprint 12»): 1 para el primero y, desde ahí, el mayor
+que el equipo haya tenido más uno, cerrado o no (nunca se reutiliza). Lo asigna la API al guardar el
+sprint y no cambia al editarlo; **no se envía**: crear o editar con un campo `number` es un `422
+validation_error`. No es el día del sprint (`day.number`).
 `daily_time` es el instante de anclaje en UTC; `next_daily_at`, la próxima daily en UTC, calculada
 por la API con el horario de verano incluido (`null` cuando ya empezó la última del sprint), y es
 la que la web muestra en la zona del navegador. `turn_order` va desde 1. `day` es el día N de M en
@@ -433,8 +437,8 @@ Esa comprobación va antes que las reglas del sprint: con un sprint activo, la r
 | 403 | error `not_a_team_member` / `not_a_team_admin` | No es miembro del equipo, o lo es pero no es admin |
 | 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y el cambio (solo una carrera) |
 | 404 | error `no_active_sprint` | El sprint se guardó, pero dejó de estar activo antes de leerlo para responder (solo una carrera) |
-| 409 | error `active_sprint_exists` | El equipo ya tiene un sprint activo; nada se guarda |
-| 422 | error `validation_error` | `team_id` no es un UUID, falta un campo, una fecha o un `user_id` no es válido, `daily_time` no trae desfase o hay un campo desconocido |
+| 409 | error `active_sprint_exists` | El equipo ya tiene un sprint activo, o una alta simultánea tomó el mismo número; nada se guarda |
+| 422 | error `validation_error` | `team_id` no es un UUID, falta un campo, una fecha o un `user_id` no es válido, `daily_time` no trae desfase o hay un campo desconocido (`number` incluido) |
 | 422 | error `sprint_ends_before_start` / `invalid_time_zone` | El fin es anterior al inicio, o la zona no es una zona IANA conocida; nada se guarda |
 | 422 | error `no_daily_participants` / `duplicate_daily_participant` / `daily_participant_not_a_member` | La daily no tiene participantes, uno se repite o uno no es miembro activo del equipo; nada se guarda |
 | 500 | error `internal_error` | Fallo inesperado |
@@ -469,7 +473,7 @@ guarda y participantes con su orden. El sprint sigue activo. Solo para los admin
 | 403 | error `not_a_team_member` / `not_a_team_admin` | No es miembro del equipo, o lo es pero no es admin |
 | 404 | error `no_active_sprint` | El equipo no tiene un sprint activo; nada cambia |
 | 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y el cambio (solo una carrera) |
-| 422 | error `validation_error` | `team_id` no es un UUID, falta un campo, una fecha o un `user_id` no es válido, `daily_time` no trae desfase o hay un campo desconocido |
+| 422 | error `validation_error` | `team_id` no es un UUID, falta un campo, una fecha o un `user_id` no es válido, `daily_time` no trae desfase o hay un campo desconocido (`number` incluido) |
 | 422 | error `sprint_ends_before_start` / `invalid_time_zone` | El fin es anterior al inicio, o la zona no es una zona IANA conocida; nada cambia |
 | 422 | error `no_daily_participants` / `duplicate_daily_participant` / `daily_participant_not_a_member` | La daily no tiene participantes, uno se repite o uno no es miembro activo del equipo; nada cambia |
 | 500 | error `internal_error` | Fallo inesperado |

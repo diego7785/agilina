@@ -87,6 +87,7 @@ def present_active_sprint(view: ActiveSprintView) -> ActiveSprintResponse:
     sprint = view.sprint
     return ActiveSprintResponse(
         id=sprint.sprint_id,
+        number=sprint.number,
         start_date=sprint.start_date,
         end_date=sprint.end_date,
         daily_time=sprint.daily_time,

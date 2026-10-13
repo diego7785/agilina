@@ -63,6 +63,44 @@ async def test_starting_a_sprint_stores_it_active_and_returns_its_id(scenario):
     assert scenario.uow.committed is True
 
 
+async def test_the_first_sprint_of_a_team_is_number_1(scenario):
+    team = await scenario.a_team()
+
+    sprint_id = await scenario.handler.handle(
+        StartSprintBuilder().for_team(team.id).with_participants(scenario.ana).build()
+    )
+
+    assert scenario.uow.sprints.sprints[sprint_id].number == 1
+
+
+async def test_a_new_sprint_takes_the_highest_number_of_the_team_plus_one_closed_ones_included(
+    scenario,
+):
+    team = await scenario.a_team()
+    await SprintBuilder().for_team_id(team.id).numbered(1).closed().saved_in(scenario.uow.sprints)
+    await SprintBuilder().for_team_id(team.id).numbered(4).closed().saved_in(scenario.uow.sprints)
+
+    sprint_id = await scenario.handler.handle(
+        StartSprintBuilder().for_team(team.id).with_participants(scenario.ana).build()
+    )
+
+    assert scenario.uow.sprints.sprints[sprint_id].number == 5
+
+
+async def test_the_numbers_of_other_teams_do_not_count(scenario):
+    team = await scenario.a_team()
+    other_team = next_id()
+    await (
+        SprintBuilder().for_team_id(other_team).numbered(9).closed().saved_in(scenario.uow.sprints)
+    )
+
+    sprint_id = await scenario.handler.handle(
+        StartSprintBuilder().for_team(team.id).with_participants(scenario.ana).build()
+    )
+
+    assert scenario.uow.sprints.sprints[sprint_id].number == 1
+
+
 async def test_the_daily_time_is_stored_in_utc_with_the_time_zone_it_was_captured_in(scenario):
     team = await scenario.a_team()
     nine_in_bogota = datetime(2026, 10, 5, 9, 0, tzinfo=timezone(timedelta(hours=-5)))

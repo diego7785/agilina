@@ -278,6 +278,7 @@ async def test_an_admin_starts_the_sprint_and_gets_201_with_its_day_and_next_dai
     assert response.headers["location"] == f"/v1/teams/{api.atlas}/sprints/active"
     assert response.json() == {
         "id": str(sprint.id),
+        "number": 1,
         "start_date": "2026-10-05",
         "end_date": "2026-10-16",
         "daily_time": "2026-10-05T14:00:00Z",
@@ -324,6 +325,7 @@ async def test_an_admin_edits_the_active_sprint_and_gets_it_back(api):
     assert response.status_code == 200
     assert response.json() == {
         "id": str(sprint.id),
+        "number": 1,
         "start_date": "2026-10-03",
         "end_date": "2026-10-16",
         "daily_time": "2026-10-02T23:00:00Z",
@@ -619,3 +621,37 @@ async def test_the_openapi_documents_each_rule_of_the_sprint_with_its_code(api):
     assert all(f"`{code}`" in request["description"] for code in SPRINT_RULES)
     member = spec["paths"]["/v1/users/{user_id}"]["delete"]
     assert "daily" in member["description"]
+
+
+# ------------------------------------------------------- sprint number (HU-12) --
+async def test_the_first_sprint_of_a_team_is_number_1(api):
+    response = await api.request("POST", f"/{api.atlas}/sprints", TOKEN_ANA, json=_sprint_body(api))
+
+    assert response.status_code == 201 and response.json()["number"] == 1
+
+
+async def test_a_new_sprint_takes_the_highest_number_of_the_team_plus_one(api):
+    await (
+        SprintBuilder()
+        .for_team_id(api.atlas)
+        .numbered(4)
+        .closed()
+        .saved_in(api.members_uow.sprints)
+    )
+
+    response = await api.request("POST", f"/{api.atlas}/sprints", TOKEN_ANA, json=_sprint_body(api))
+
+    assert response.status_code == 201 and response.json()["number"] == 5
+
+
+@pytest.mark.parametrize(("method", "path"), SPRINT_WRITES)
+async def test_the_number_cannot_be_sent_by_the_client(api, method, path):
+    await SprintBuilder().for_team_id(api.atlas).saved_in(api.members_uow.sprints)
+
+    response = await api.request(
+        method, _path(api, path), TOKEN_ANA, json=_sprint_body(api, number=7)
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+    assert "7" not in response.json()["error"]["message"]

@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,7 @@ from agilina_api.teams.infrastructure.persistence.sprint_queries import (
 )
 
 ONE_ACTIVE_PER_TEAM = "sprint_one_active_per_team"
+NUMBER_PER_TEAM = "sprint_number_unique"
 
 
 class SqlAlchemySprintRepository(SprintRepository):
@@ -49,11 +50,17 @@ class SqlAlchemySprintRepository(SprintRepository):
             self._session.add_all(participants_to_rows(sprint))
             await self._session.flush()
         except IntegrityError as error:
-            if violated_constraint(error) == ONE_ACTIVE_PER_TEAM:
+            if violated_constraint(error) in {ONE_ACTIVE_PER_TEAM, NUMBER_PER_TEAM}:
                 raise ActiveSprintExistsError(
                     f"Team {sprint.team_id} already has an active sprint"
                 ) from error
             raise
+
+    async def next_number(self, team_id: UUID) -> int:
+        statement = select(func.coalesce(func.max(SprintRow.number), 0) + 1).where(
+            SprintRow.team_id == team_id
+        )
+        return int((await self._session.execute(statement)).scalar_one())
 
     async def get_active(self, team_id: UUID) -> Sprint | None:
         row = (

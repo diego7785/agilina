@@ -12,8 +12,8 @@ from sqlalchemy import text
 from agilina_api.teams.application.queries.get_active_sprint import GetActiveSprint
 from agilina_api.teams.domain.errors import ActiveSprintExistsError
 from agilina_shared.sprint_calendar import SprintDay, SprintPhase
-from tests.api.builders import DAILY_TIME, StartSprintBuilder, TeamBuilder
-from tests.api.integration.support import stored_team, stored_user
+from tests.api.builders import DAILY_TIME, SprintBuilder, StartSprintBuilder, TeamBuilder
+from tests.api.integration.support import stored_sprint, stored_team, stored_user
 from tests.api.integration.world import World
 
 pytestmark = pytest.mark.integration
@@ -34,8 +34,26 @@ async def test_a_started_sprint_is_read_back_with_its_day_and_next_daily(session
     assert view is not None
     assert view.sprint.sprint_id == sprint_id
     assert view.sprint.participants == (bruno.id, ana.id)
+    assert view.sprint.number == 1
     assert view.day == SprintDay(number=0, total=12, phase=SprintPhase.NOT_STARTED)
     assert view.next_daily_at == DAILY_TIME
+
+
+async def test_a_new_sprint_takes_the_next_number_of_its_team_after_a_closed_one(session_factory):
+    world = World(session_factory)
+    ana = await stored_user(session_factory)
+    team = await stored_team(session_factory, TeamBuilder().with_admin(ana.id))
+    other = await stored_team(session_factory, TeamBuilder().with_admin(ana.id))
+    await stored_sprint(session_factory, SprintBuilder().for_team(team).numbered(1).closed())
+    await stored_sprint(session_factory, SprintBuilder().for_team(team).numbered(2).closed())
+    await stored_sprint(session_factory, SprintBuilder().for_team(other).numbered(9).closed())
+
+    await world.start_sprint.handle(
+        StartSprintBuilder().for_team(team.id).with_participants(ana.id).build()
+    )
+    view = await world.active_sprint.handle(GetActiveSprint(team_id=team.id))
+
+    assert view is not None and view.sprint.number == 3
 
 
 async def test_two_simultaneous_starts_leave_one_sprint_and_a_conflict(session_factory, engine):
@@ -67,9 +85,10 @@ async def test_two_simultaneous_starts_leave_one_sprint_and_a_conflict(session_f
     async with engine.connect() as connection:
         stored = (
             await connection.execute(
-                text("SELECT id, status::text FROM sprint WHERE team_id = :id"), {"id": team.id}
+                text("SELECT id, status::text, number FROM sprint WHERE team_id = :id"),
+                {"id": team.id},
             )
         ).all()
-    assert [tuple(row) for row in stored] == [(started[0], "active")]
+    assert [tuple(row) for row in stored] == [(started[0], "active", 1)]
     view = await world.active_sprint.handle(GetActiveSprint(team_id=team.id))
     assert view is not None and view.sprint.sprint_id == started[0]

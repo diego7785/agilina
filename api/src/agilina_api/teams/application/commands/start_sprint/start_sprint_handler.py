@@ -19,7 +19,8 @@ class StartSprintHandler:
     that transaction. A team has at most one active sprint: the use case asks
     ``ActiveSprints`` once the team is locked and refuses with ``ActiveSprintExistsError``;
     the ``sprint_one_active_per_team`` index backs it, and the repository answers the same
-    error if it is ever reached. The sprint is stored ``active`` in one transaction with its
+    error if it is ever reached. The sprint takes the next number of its team
+    (``next_number``, under the same lock) and is stored ``active`` in one transaction with its
     participants. It returns only the new sprint's id (CQRS).
 
     Once committed, the start is logged with who asked.
@@ -43,6 +44,7 @@ class StartSprintHandler:
             sprint = Sprint.start(
                 sprint_id=self._new_id(),
                 team_id=team.id,
+                number=await uow.sprints.next_number(team.id),
                 period=SprintPeriod(start=command.start_date, end=command.end_date),
                 daily_time=DailyTime(at=command.daily_time, time_zone=command.time_zone),
                 participants=command.participants,

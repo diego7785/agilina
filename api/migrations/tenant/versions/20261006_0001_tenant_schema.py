@@ -157,6 +157,7 @@ UPGRADE = [
     CREATE TABLE sprint (
         id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         team_id          UUID          NOT NULL REFERENCES team(id) ON DELETE CASCADE,
+        number           INTEGER       NOT NULL,
         start_date       DATE          NOT NULL,
         end_date         DATE          NOT NULL,
         status           sprint_status NOT NULL DEFAULT 'planned',
@@ -164,6 +165,8 @@ UPGRADE = [
         daily_time_zone  TEXT          NOT NULL,
         created_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
         updated_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
+        CONSTRAINT sprint_number_positive CHECK (number > 0),
+        CONSTRAINT sprint_number_unique UNIQUE (team_id, number),
         CONSTRAINT sprint_dates_ordered CHECK (end_date >= start_date),
         CONSTRAINT sprint_daily_time_zone_not_blank CHECK (length(btrim(daily_time_zone)) > 0),
         CONSTRAINT sprint_id_team_unique UNIQUE (id, team_id)
@@ -172,6 +175,10 @@ UPGRADE = [
     "COMMENT ON TABLE sprint IS "
     "'A team''s sprint: its calendar dates (every day counts), the daily''s time and status. "
     "HU-06 created it; HU-07 adds the daily''s time and participants (AD-31).'",
+    "COMMENT ON COLUMN sprint.number IS "
+    "'The sprint''s number in its team (\"Sprint 12\"): 1 for the first, then the highest of the "
+    "team plus one. The API assigns it when the sprint is saved; nobody types or changes it "
+    "(HU-12).'",
     "COMMENT ON COLUMN sprint.daily_time_utc IS "
     "'The daily''s wall-clock time as a UTC anchor instant: never a local time (AD-31).'",
     "COMMENT ON COLUMN sprint.daily_time_zone IS "
