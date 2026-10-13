@@ -139,6 +139,10 @@ class FakeUsersPort extends UsersPort {
 
 /** The team of the screen, read for the top bar. */
 class FakeTeamsPort extends TeamsPort {
+  dashboard(): Observable<never> {
+    return NEVER;
+  }
+
   listMine(): Observable<never> {
     return NEVER;
   }
@@ -687,9 +691,11 @@ describe('TeamSprintSettingsPage', () => {
     await open();
 
     expect(TestBed.inject(ShellContext).team()).toEqual({
+      id: 'atlas',
       name: 'Atlas',
       roleLabel: 'scrum_master',
       userName: 'Ana Gil',
+      canConfigure: true,
     });
   });
 });

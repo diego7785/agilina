@@ -3,7 +3,9 @@ import { provideRouter, Router, withComponentInputBinding } from '@angular/route
 import { RouterTestingHarness } from '@angular/router/testing';
 import { NEVER, of, Subject, type Observable } from 'rxjs';
 
+import { aDashboard } from '@testing/dashboard';
 import { provideTestI18n } from '@testing/i18n';
+import { TestClock } from '@testing/now';
 import { aTeam } from '@testing/team';
 import { provideTestTenant } from '@testing/tenant';
 import { provideStubUsersPort } from '@testing/users';
@@ -11,9 +13,9 @@ import { provideStubUsersPort } from '@testing/users';
 import { CreateTeamPage } from './create-team-page';
 import { TeamDashboardPage } from './team-dashboard-page';
 import { TeamSelectorPage } from './team-selector-page';
-import { SprintsPort } from '../application/sprints.port';
 import { TeamsPort } from '../application/teams.port';
 import { type Team } from '../domain/team';
+import { type TeamDashboard } from '../domain/team-dashboard';
 import { TeamFailure } from '../domain/team-failure';
 
 /** Port double: create() waits until the test answers; get() returns what was created. */
@@ -21,6 +23,22 @@ class FakeTeamsPort extends TeamsPort {
   pending = new Subject<string>();
   readonly names: string[] = [];
   readonly created: Team[] = [];
+  readonly dashboardsRead: string[] = [];
+
+  /** The dashboard of a team that was created: an empty one, with no sprint yet. */
+  dashboard(teamId: string): Observable<TeamDashboard> {
+    this.dashboardsRead.push(teamId);
+    const team = this.created.find((candidate) => candidate.id === teamId);
+    return team === undefined
+      ? NEVER
+      : of(
+          aDashboard({
+            team: { id: team.id, name: team.name, mode: team.mode, label: team.label },
+            sprint: null,
+            nextCeremony: null,
+          }),
+        );
+  }
 
   listMine(): Observable<readonly Team[]> {
     return of(this.created);
@@ -69,12 +87,8 @@ describe('CreateTeamPage', () => {
           withComponentInputBinding(),
         ),
         { provide: TeamsPort, useValue: port },
-        // The dashboard also reads the sprint: the team has none here.
-        {
-          provide: SprintsPort,
-          useValue: { active: () => of(null), start: () => NEVER, reconfigure: () => NEVER },
-        },
         provideStubUsersPort(),
+        new TestClock('2026-10-08T12:00:00Z').provide(),
       ],
     });
     harness = await RouterTestingHarness.create('/acme/teams/new');
@@ -180,7 +194,11 @@ describe('CreateTeamPage', () => {
 
     expect(port.names).toEqual(['  Atlas  ']);
     expect(TestBed.inject(Router).url).toBe('/acme/teams/new-id');
-    expect(page.querySelector('h1')?.textContent.trim()).toBe('Atlas');
+    expect(port.dashboardsRead).toContain('new-id');
+    expect(page.querySelector('h1')?.textContent.trim()).toBe('Dashboard');
+    expect(page.querySelector('[data-testid=sprint-day]')?.textContent.trim()).toBe(
+      'Sin sprint activo',
+    );
   });
 
   it('cannot be sent twice while it is saving', async () => {

@@ -1,6 +1,8 @@
 import {
   formatCalendarDate,
   formatLocalDateTime,
+  formatLocalTime,
+  formatShortLocalDate,
   localDateTimeToIso,
   localTimeOf,
 } from './local-date-time';
@@ -80,6 +82,34 @@ describe('local date and time', () => {
     it('never shifts the date to the day before or after, at the edges of a year either', () => {
       expect(formatCalendarDate('2027-01-01', 'en')).toBe('January 1, 2027');
       expect(formatCalendarDate('2026-12-31', 'en')).toBe('December 31, 2026');
+    });
+  });
+
+  describe('formatLocalTime', () => {
+    it('shows the time of an instant in the browser, in the active language', () => {
+      const instant = new Date(2026, 8, 17, 14, 15);
+
+      expect(formatLocalTime(instant.toISOString(), 'es')).toBe(
+        new Intl.DateTimeFormat('es', { timeStyle: 'short' }).format(instant),
+      );
+      expect(formatLocalTime(instant.toISOString(), 'en')).toBe(
+        new Intl.DateTimeFormat('en', { timeStyle: 'short' }).format(instant),
+      );
+    });
+  });
+
+  describe('formatShortLocalDate', () => {
+    it('shows the weekday, day and month of an instant in the browser', () => {
+      const instant = new Date(2026, 8, 17, 9, 15);
+
+      expect(formatShortLocalDate(instant.toISOString(), 'es')).toBe(
+        new Intl.DateTimeFormat('es', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+        }).format(instant),
+      );
+      expect(formatShortLocalDate(instant.toISOString(), 'es')).toContain('17');
     });
   });
 });

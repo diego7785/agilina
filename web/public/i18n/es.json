@@ -5,6 +5,12 @@
       "member": "Miembro",
       "scrum_master": "Scrum Master",
       "admin": "Administrador"
+    },
+    "change_team": "Cambiar de equipo",
+    "nav": {
+      "label": "Navegación del equipo",
+      "dashboard": "Dashboard",
+      "settings": "Configuración"
     }
   },
   "status": {
@@ -55,16 +61,38 @@
     "dashboard": {
       "loading": "Cargando el equipo…",
       "failed": "No se pudo abrir este equipo.",
-      "settings": "Configuración",
       "problems": {
         "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo.",
         "not_a_member": "Este equipo no existe o no perteneces a él."
       },
+      "title": "Dashboard",
+      "time_zone_note": "Las horas se muestran en la zona horaria de tu navegador.",
       "sprint": {
+        "title": "Sprint activo",
         "in_progress": "Día {{ number }} de {{ total }}",
         "not_started": "El sprint empieza el {{ date }}",
         "finished": "Sprint terminado",
-        "none": "Sin sprint activo"
+        "none": "Sin sprint activo",
+        "progress_label": "Avance del sprint",
+        "number": "Sprint {{ number }}"
+      },
+      "ceremony": {
+        "title": "Próxima ceremonia",
+        "daily": "Daily",
+        "none": "No hay ceremonias programadas"
+      },
+      "mode": {
+        "title": "Modo del equipo",
+        "support": "Soporte",
+        "autonomous": "Autónomo",
+        "read_only": "Solo lectura · lo cambia el Administrador en Configuración"
+      },
+      "room": {
+        "title": "Sala de reunión",
+        "description": "Tu Scrum Master virtual para la Daily Stand-up",
+        "join": "Unirse a la sala",
+        "opens_at": "Se habilita a las {{ time }}",
+        "no_ceremony": "No hay ceremonias programadas."
       }
     },
     "settings": {

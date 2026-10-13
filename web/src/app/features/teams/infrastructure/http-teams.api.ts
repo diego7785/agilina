@@ -8,7 +8,9 @@ import { readApiError } from '@core/http/api-error';
 import { toRoleLabel } from './role-label';
 import { toTeamRole } from './team-role';
 import { type TeamsPort } from '../application/teams.port';
+import { type SprintPhase } from '../domain/active-sprint';
 import { type Team, type TeamMode } from '../domain/team';
+import { type TeamDashboard } from '../domain/team-dashboard';
 import { TeamFailure, type TeamFailureKind } from '../domain/team-failure';
 
 /** Item of GET /v1/teams, exactly as the API sends it. */
@@ -38,6 +40,19 @@ interface TeamResponse {
   language: string;
   role: string;
   label: string;
+}
+
+/** Body of GET /v1/teams/{team_id}/dashboard. */
+interface TeamDashboardResponse {
+  team: { id: string; name: string; mode: string; label: string };
+  sprint: {
+    number: number;
+    start_date: string;
+    end_date: string;
+    day: { number: number; total: number; phase: SprintPhase };
+  } | null;
+  next_ceremony: { type: 'daily'; starts_at: string; join_opens_at: string } | null;
+  can_configure: boolean;
 }
 
 const FAILURES: Readonly<Record<string, TeamFailureKind>> = {
@@ -72,6 +87,12 @@ export class HttpTeamsApi implements TeamsPort {
       .get<TeamResponse>(`${this.teamsUrl}/${encodeURIComponent(teamId)}`)
       .pipe(map(toTeam), catchError(failWithDomainError));
   }
+
+  dashboard(teamId: string): Observable<TeamDashboard> {
+    return this.http
+      .get<TeamDashboardResponse>(`${this.teamsUrl}/${encodeURIComponent(teamId)}/dashboard`)
+      .pipe(map(toDashboard), catchError(failWithDomainError));
+  }
 }
 
 /**
@@ -85,6 +106,36 @@ function toTeam(response: MyTeamResponse | TeamResponse): Team {
     role: toTeamRole(response.role),
     label: toRoleLabel(response.label),
     mode: toTeamMode(response.mode),
+  };
+}
+
+/** The API contract stays in this file; the rest of the app sees the domain model. */
+function toDashboard(response: TeamDashboardResponse): TeamDashboard {
+  return {
+    team: {
+      id: response.team.id,
+      name: response.team.name,
+      mode: toTeamMode(response.team.mode),
+      label: toRoleLabel(response.team.label),
+    },
+    sprint:
+      response.sprint === null
+        ? null
+        : {
+            number: response.sprint.number,
+            startDate: response.sprint.start_date,
+            endDate: response.sprint.end_date,
+            day: response.sprint.day,
+          },
+    nextCeremony:
+      response.next_ceremony === null
+        ? null
+        : {
+            type: response.next_ceremony.type,
+            startsAt: response.next_ceremony.starts_at,
+            joinOpensAt: response.next_ceremony.join_opens_at,
+          },
+    canConfigure: response.can_configure,
   };
 }
 

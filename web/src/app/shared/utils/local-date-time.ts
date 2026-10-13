@@ -28,6 +28,20 @@ export function formatLocalDateTime(iso: string, locale: string): string {
   );
 }
 
+/** The time of an instant (`02:15 p. m.`) in the browser's time zone and the active language. */
+export function formatLocalTime(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(iso));
+}
+
+/** The day of an instant, short (`jue, 17 de sept`), in the browser's time zone. */
+export function formatShortLocalDate(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(iso));
+}
+
 /**
  * A calendar date (`YYYY-MM-DD`) as the person reads it. It is built at local midnight and
  * formatted in the same time zone, so it never shifts to the day before or after.

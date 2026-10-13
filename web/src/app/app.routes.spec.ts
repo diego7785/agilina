@@ -23,6 +23,12 @@ import { routes } from './app.routes';
 /** Port double that never answers: these tests only look at which screen opens. */
 class SilentTeamsPort extends TeamsPort {
   readonly requested: string[] = [];
+  readonly dashboardsRequested: string[] = [];
+
+  dashboard(teamId: string): Observable<never> {
+    this.dashboardsRequested.push(teamId);
+    return NEVER;
+  }
 
   listMine(): Observable<readonly Team[]> {
     return NEVER;
@@ -177,11 +183,12 @@ describe('routes', () => {
       expect(TestBed.inject(Router).url).toBe('/acme/teams/team-1/settings/sprint');
     });
 
-    it('reads the sprint of the team on its dashboard', async () => {
+    it('reads the dashboard of the team in a single request, not the team and its sprint apart', async () => {
       await screenAt('/acme/teams/team-1');
       TestBed.tick();
 
-      expect(sprints.requested).toEqual(['team-1']);
+      expect(port.dashboardsRequested).toEqual(['team-1']);
+      expect(sprints.requested).toEqual([]);
     });
 
     it('records the tenant of the address, whichever it is', async () => {

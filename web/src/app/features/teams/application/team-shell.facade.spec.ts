@@ -13,6 +13,10 @@ import { type Team } from '../domain/team';
 import { type MyMembership } from '../domain/team-member';
 
 class FakeTeamsPort extends TeamsPort {
+  dashboard(): Observable<never> {
+    return NEVER;
+  }
+
   failing = false;
 
   listMine(): Observable<readonly Team[]> {
@@ -105,9 +109,11 @@ describe('TeamShellFacade', () => {
     follow('atlas');
 
     expect(shell.team()).toEqual({
+      id: 'atlas',
       name: 'Team atlas',
       roleLabel: 'scrum_master',
       userName: 'Ana Gil',
+      canConfigure: true,
     });
     expect(users.asked).toEqual(['atlas']);
   });
