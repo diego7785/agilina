@@ -12,6 +12,7 @@ import { SprintFailure, type SprintFailureKind } from '../domain/sprint-failure'
 /** The active sprint exactly as the API sends it (docs/api.md, section Sprint). */
 const RESPONSE = {
   id: 'sprint-1',
+  number: 12,
   start_date: '2026-10-05',
   end_date: '2026-10-16',
   daily_time: '2026-10-05T14:00:00Z',
@@ -27,6 +28,7 @@ const RESPONSE = {
 };
 const SPRINT: ActiveSprint = {
   id: 'sprint-1',
+  number: 12,
   startDate: '2026-10-05',
   endDate: '2026-10-16',
   dailyTime: '2026-10-05T14:00:00Z',

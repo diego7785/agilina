@@ -44,6 +44,7 @@ const CARLA = member('carla', 'Carla Ruiz');
  */
 const SPRINT: ActiveSprint = {
   id: 'sprint-1',
+  number: 12,
   startDate: '2026-10-05',
   endDate: '2026-10-16',
   dailyTime: new Date(2026, 9, 5, 9, 0).toISOString(),
@@ -280,23 +281,64 @@ describe('TeamSprintSettingsPage', () => {
     await harness.fixture.whenStable();
   }
 
+  /** The time of the daily the form starts with: 09:00. A different one is something to save. */
+  const dailyTimeLabel = 'Hora de la daily (única para el equipo)';
+
+  async function makeChange(time = '10:30'): Promise<void> {
+    await type(field(dailyTimeLabel), time);
+  }
+
+  /** The sprint the API answers once the daily moved to 10:30. */
+  const savedAtTenThirty: ActiveSprint = {
+    ...SPRINT,
+    nextDailyAt: new Date(2026, 9, 8, 10, 30).toISOString(),
+  };
+
   // --------------------------------------------------------------- the screen --
-  it('is the Sprint tab of the settings, with the active sprint marked and no name', async () => {
+  it('is the Sprint tab of the settings, with the active sprint marked and numbered', async () => {
     await open();
 
     expect(sprints.read).toEqual(['atlas']);
     expect(text(page.querySelector('h1'))).toBe('Configuración');
     expect(text(page.querySelector('nav a[aria-current="page"]'))).toBe('Sprint');
-    expect(text(page.querySelector('h2'))).toBe('Sprint');
+    expect(text(page.querySelector('h2'))).toBe('Sprint 12');
     expect(text(page)).toContain('Sprint activo');
-    expect(text(page)).not.toContain('Sprint 1');
     expect(page.querySelector('a[href="/acme/teams/atlas"]')).not.toBeNull();
   });
 
-  it('configures only the daily: no retro, no review and no way to close the sprint', async () => {
+  it('titles the card with the number of the sprint, and plain "Sprint" while there is none', async () => {
+    await open();
+    expect(text(page.querySelector('[data-testid="sprint-title"]'))).toBe('Sprint 12');
+  });
+
+  it('has no number to show while the team has no sprint: the API gives it on saving', async () => {
+    sprints.current = null;
+
     await open();
 
-    expect(text(page)).not.toMatch(/retro|review|cerrar/i);
+    expect(text(page.querySelector('[data-testid="sprint-title"]'))).toBe('Sprint');
+    expect(text(page)).not.toMatch(/Sprint \d/);
+  });
+
+  it('shows the number of the sprint the API answers after saving it', async () => {
+    sprints.current = null;
+    await open();
+    await pickDate('Inicio', '2026-10-19');
+    await pickDate('Fin', '2026-10-30');
+    await type(field('Hora de la daily (única para el equipo)'), '09:30');
+    await toggle('Ana Gil');
+    await submit();
+
+    sprints.accept({ ...SPRINT, id: 'sprint-2', number: 13 });
+    await settled();
+
+    expect(text(page.querySelector('[data-testid="sprint-title"]'))).toBe('Sprint 13');
+  });
+
+  it('configures only the daily: no retro and no review', async () => {
+    await open();
+
+    expect(text(page)).not.toMatch(/retro|review/i);
   });
 
   it('does not mark the sprint as active while the team has none, and starts empty', async () => {
@@ -437,10 +479,39 @@ describe('TeamSprintSettingsPage', () => {
   it('offers every member of the team as a participant and checks the saved ones', async () => {
     await open();
 
-    expect(text(page.querySelector('legend'))).toBe('Participantes de la daily');
+    expect(text(page.querySelector('#sprint-participants-title'))).toBe(
+      'Participantes por ceremonia',
+    );
+    expect(text(page.querySelector('legend'))).toBe('Daily');
     expect(checkbox('Ana Gil').checked).toBeTrue();
     expect(checkbox('Bruno Díaz').checked).toBeTrue();
     expect(checkbox('Carla Ruiz').checked).toBeFalse();
+  });
+
+  it('groups the participants by ceremony and the daily is the only one', async () => {
+    await open();
+
+    const card = page.querySelector('[data-testid="sprint-participants-card"]')!;
+    expect(card.querySelectorAll('fieldset').length).toBe(1);
+    expect(card.querySelectorAll('legend').length).toBe(1);
+    expect(text(card)).not.toMatch(/retro|review/i);
+    expect(card.querySelectorAll('input[type="checkbox"]').length).toBe(3);
+  });
+
+  it('draws the participants checkboxes round', async () => {
+    await open();
+
+    const boxes = Array.from(
+      page.querySelectorAll<HTMLInputElement>('[data-testid="sprint-participants-card"] input'),
+    );
+    expect(boxes.length).toBe(3);
+    for (const box of boxes) {
+      // A circle: the corners round off at least half the side.
+      expect(box.offsetWidth).toBeGreaterThan(0);
+      expect(parseFloat(getComputedStyle(box).borderTopLeftRadius)).toBeGreaterThanOrEqual(
+        box.offsetWidth / 2,
+      );
+    }
   });
 
   it('adds a checked member at the end of the turns and takes an unchecked one out', async () => {
@@ -567,6 +638,7 @@ describe('TeamSprintSettingsPage', () => {
 
   it('is saving meanwhile: it cannot be sent again nor the turns moved', async () => {
     await open();
+    await makeChange();
 
     await submit();
 
@@ -576,16 +648,18 @@ describe('TeamSprintSettingsPage', () => {
     await submit();
     expect(sprints.reconfigured.length).toBe(1);
 
-    sprints.accept(SPRINT);
+    sprints.accept(savedAtTenThirty);
     await settled();
     expect(text(submitButton())).toBe('Guardar sprint');
-    expect(submitButton().disabled).toBeFalse();
+    // What was in the form is now the saved sprint: nothing is left to save.
+    expect(submitButton().disabled).toBeTrue();
   });
 
   it('stops saying it saved once something changes', async () => {
     await open();
+    await makeChange();
     await submit();
-    sprints.accept(SPRINT);
+    sprints.accept(savedAtTenThirty);
     await settled();
     expect(text(page)).toContain('Sprint guardado.');
 
@@ -621,6 +695,7 @@ describe('TeamSprintSettingsPage', () => {
   refusals.forEach(([kind, message]) => {
     it(`says why the API refused the sprint (${kind}), as an alert`, async () => {
       await open();
+      await makeChange();
 
       await submit();
       sprints.refuse(new SprintFailure(kind as SprintFailure['kind']));
@@ -658,6 +733,7 @@ describe('TeamSprintSettingsPage', () => {
 
   it('shows "no access" when the API refuses the save: the admin lost the role meanwhile', async () => {
     await open();
+    await makeChange();
 
     await submit();
     sprints.refuse(new SprintFailure('forbidden'));
@@ -696,6 +772,145 @@ describe('TeamSprintSettingsPage', () => {
       roleLabel: 'scrum_master',
       userName: 'Ana Gil',
       canConfigure: true,
+    });
+  });
+  describe('the close sprint button', () => {
+    it('is offered, as a card of its own, when the team has an active sprint', async () => {
+      await open();
+
+      expect(text(page.querySelector('[data-testid="sprint-close-title"]'))).toBe(
+        'Cerrar sprint activo',
+      );
+      expect(text(page.querySelector('[data-testid="sprint-close-card"] p'))).toBe(
+        'Se cerrarán las ceremonias pendientes y podrás editar roles y modo.',
+      );
+      const button = page.querySelector<HTMLButtonElement>('[data-testid="sprint-close-open"]');
+      expect(text(button)).toBe('Cerrar sprint activo');
+      expect(button?.type).toBe('button');
+      expect(page.querySelector('form [data-testid="sprint-close-open"]')).toBeNull();
+    });
+
+    it('is not offered when the team has no active sprint: there is nothing to close', async () => {
+      sprints.current = null;
+
+      await open();
+
+      expect(page.querySelector('form')).not.toBeNull();
+      expect(page.querySelector('[data-testid="sprint-close-card"]')).toBeNull();
+      expect(page.querySelector('[data-testid="sprint-close-open"]')).toBeNull();
+    });
+
+    it('does nothing yet when pressed: closing arrives with its own story', async () => {
+      await open();
+      const reads = sprints.read.length;
+
+      page.querySelector<HTMLButtonElement>('[data-testid="sprint-close-open"]')!.click();
+      await settled();
+
+      expect(sprints.started).toEqual([]);
+      expect(sprints.reconfigured).toEqual([]);
+      expect(sprints.read.length).toBe(reads);
+      expect(page.querySelector('[role="dialog"], dialog[open]')).toBeNull();
+      expect(page.querySelector('[data-testid="sprint-active-badge"]')).not.toBeNull();
+    });
+
+    it('does not appear while the sprint is still loading', async () => {
+      await harness.navigateByUrl('/acme/teams/slow/settings/sprint');
+      TestBed.tick();
+      page = harness.routeNativeElement!;
+
+      expect(page.querySelector('[data-testid="sprint-close-card"]')).toBeNull();
+    });
+  });
+  describe('the save button', () => {
+    it('is off while nothing differs from the saved sprint', async () => {
+      await open();
+
+      expect(text(submitButton())).toBe('Guardar sprint');
+      expect(submitButton().disabled).toBeTrue();
+    });
+
+    it('turns on when the daily time changes, and off again when it goes back', async () => {
+      await open();
+
+      await makeChange('10:30');
+      expect(submitButton().disabled).toBeFalse();
+
+      await makeChange('09:00');
+      expect(submitButton().disabled).toBeTrue();
+    });
+
+    it('turns on when a date changes', async () => {
+      await open();
+
+      await pickDate('Fin', '2026-10-20');
+
+      expect(dateIn('Fin')).toBe('2026-10-20');
+      expect(submitButton().disabled).toBeFalse();
+    });
+
+    it('turns on when a participant is added, and off again when they are taken out', async () => {
+      await open();
+
+      await toggle('Carla Ruiz');
+      expect(submitButton().disabled).toBeFalse();
+
+      await toggle('Carla Ruiz');
+      expect(submitButton().disabled).toBeTrue();
+    });
+
+    it('turns on when the turns change places, and off again when they go back', async () => {
+      await open();
+
+      moveButton('Subir', 'Ana Gil').click();
+      await harness.fixture.whenStable();
+      expect(submitButton().disabled).toBeFalse();
+
+      moveButton('Bajar', 'Ana Gil').click();
+      await harness.fixture.whenStable();
+      expect(submitButton().disabled).toBeTrue();
+    });
+
+    it('stays off when the change is not valid', async () => {
+      await open();
+
+      await makeChange('');
+
+      expect(submitButton().disabled).toBeTrue();
+    });
+
+    it('does not send anything when pressed without changes', async () => {
+      await open();
+
+      await submit();
+
+      expect(sprints.started).toEqual([]);
+      expect(sprints.reconfigured).toEqual([]);
+    });
+
+    it('is off again once the change is saved, with the confirmation shown', async () => {
+      await open();
+      await makeChange();
+      await submit();
+      sprints.accept(savedAtTenThirty);
+      await settled();
+
+      expect(text(page.querySelector('[role="status"]'))).toBe('Sprint guardado.');
+      expect(submitButton().disabled).toBeTrue();
+    });
+
+    it('is off for a team with no sprint until the form is complete', async () => {
+      sprints.current = null;
+      await open();
+      expect(submitButton().disabled).toBeTrue();
+
+      await pickDate('Inicio', '2026-10-19');
+      await pickDate('Fin', '2026-10-30');
+      await makeChange('09:30');
+      expect(submitButton().disabled).toBeTrue();
+
+      await toggle('Ana Gil');
+      expect(submitButton().disabled).toBeFalse();
     });
   });
 });

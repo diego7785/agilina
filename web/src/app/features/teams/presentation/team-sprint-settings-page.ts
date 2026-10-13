@@ -23,7 +23,11 @@ import { SettingsTabs } from './settings-tabs';
 import { SprintSettingsFacade } from '../application/sprint-settings.facade';
 import { TeamShellFacade } from '../application/team-shell.facade';
 import { keepMembers, moveDown, moveUp, toggleParticipant } from '../domain/daily-order';
-import { areSprintFieldsValid, sprintFieldsProblems } from '../domain/sprint-draft';
+import {
+  areSprintFieldsValid,
+  sprintFieldsProblems,
+  type SprintFields,
+} from '../domain/sprint-draft';
 
 /** A turn of the daily as the order list shows it. */
 interface Turn {
@@ -77,23 +81,32 @@ export class TeamSprintSettingsPage implements OnInit {
   );
   protected readonly saveMessage = computed(() => problemMessageKey(this.facade.saveProblem()));
 
-  // The form starts from the sprint the API has, and again whenever the API answers another one.
-  protected readonly startDate = linkedSignal(() => this.sprint()?.startDate ?? '');
-  protected readonly endDate = linkedSignal(() => this.sprint()?.endDate ?? '');
-  /** The time the person will see the daily at: the next one, or the anchor once none is left. */
-  protected readonly dailyTime = linkedSignal(() => {
+  /**
+   * The form as the saved sprint fills it (empty when the team has none): the starting point it
+   * goes back to whenever the API answers another sprint, and what "changed" is measured from.
+   */
+  private readonly saved = computed<SprintFields>(() => {
     const sprint = this.sprint();
-    return sprint === undefined || sprint === null
-      ? ''
-      : localTimeOf(sprint.nextDailyAt ?? sprint.dailyTime);
+    return {
+      startDate: sprint?.startDate ?? '',
+      endDate: sprint?.endDate ?? '',
+      // The time the person will see the daily at: the next one, or the anchor once none is left.
+      dailyTime:
+        sprint === undefined || sprint === null
+          ? ''
+          : localTimeOf(sprint.nextDailyAt ?? sprint.dailyTime),
+      // In turn order; someone who is no longer a member is left out.
+      participants: keepMembers(
+        sprint?.participants ?? [],
+        (this.members() ?? []).map((member) => member.userId),
+      ),
+    };
   });
-  /** The participants in turn order; someone who is no longer a member is left out. */
-  protected readonly order = linkedSignal(() =>
-    keepMembers(
-      this.sprint()?.participants ?? [],
-      (this.members() ?? []).map((member) => member.userId),
-    ),
-  );
+  protected readonly startDate = linkedSignal(() => this.saved().startDate);
+  protected readonly endDate = linkedSignal(() => this.saved().endDate);
+  protected readonly dailyTime = linkedSignal(() => this.saved().dailyTime);
+  /** The participants in turn order. */
+  protected readonly order = linkedSignal(() => this.saved().participants);
 
   /** Whether the person already changed each part or left it: errors wait until then. */
   protected readonly startTouched = signal(false);
@@ -109,6 +122,18 @@ export class TeamSprintSettingsPage implements OnInit {
     }),
   );
   protected readonly canSave = computed(() => areSprintFieldsValid(this.problems()));
+  /** Whether the form differs from the saved sprint, in anything that is saved with it. */
+  protected readonly hasChanges = computed(() => {
+    const saved = this.saved();
+    return (
+      this.startDate() !== saved.startDate ||
+      this.endDate() !== saved.endDate ||
+      this.dailyTime() !== saved.dailyTime ||
+      !sameOrder(this.order(), saved.participants)
+    );
+  });
+  /** Saving makes sense with something valid and new to save: no changes, nothing to send. */
+  protected readonly canSubmit = computed(() => this.canSave() && this.hasChanges());
   protected readonly startProblem = computed(() =>
     this.startTouched() ? this.problems().startDate : null,
   );
@@ -183,7 +208,7 @@ export class TeamSprintSettingsPage implements OnInit {
   }
 
   protected async submit(): Promise<void> {
-    if (!this.canSave() || this.saving()) {
+    if (!this.canSubmit() || this.saving()) {
       return;
     }
     const saved = await this.facade.save({
@@ -204,4 +229,9 @@ export class TeamSprintSettingsPage implements OnInit {
   private changed(): void {
     this.justSaved.set(false);
   }
+}
+
+/** Whether two lists of participants hold the same people in the same turn order. */
+function sameOrder(first: readonly string[], second: readonly string[]): boolean {
+  return first.length === second.length && first.every((userId, index) => userId === second[index]);
 }

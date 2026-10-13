@@ -266,7 +266,8 @@
         }
       },
       "participants": {
-        "title": "Daily participants"
+        "title": "Participants per ceremony",
+        "daily": "Daily"
       },
       "order": {
         "title": "Daily turn order",
@@ -298,7 +299,13 @@
         "choose_date": "Choose a date",
         "previous_month": "Previous month",
         "next_month": "Next month"
-      }
+      },
+      "close": {
+        "title": "Close the active sprint",
+        "description": "The pending ceremonies will be closed and you will be able to edit roles and mode.",
+        "button": "Close the active sprint"
+      },
+      "number": "Sprint {{ number }}"
     }
   },
   "identity": {
