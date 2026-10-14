@@ -136,11 +136,7 @@ describe('Notifier', () => {
       }
 
       expect(MAX_NOTIFICATIONS).toBe(3);
-      expect(messages()).toEqual([
-        'Rol de Bruno',
-        'Rol de Carla',
-        'Rol de Dani',
-      ]);
+      expect(messages()).toEqual(['Rol de Bruno', 'Rol de Carla', 'Rol de Dani']);
     });
 
     it('leaves no timer behind for the one that was pushed out', () => {
