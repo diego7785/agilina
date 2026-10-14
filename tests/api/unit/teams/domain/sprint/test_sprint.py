@@ -25,6 +25,7 @@ def _start(participants: Sequence[UUID], active_members: set[UUID]) -> Sprint:
     return Sprint.start(
         sprint_id=next_id(),
         team_id=next_id(),
+        number=1,
         period=PERIOD,
         daily_time=DAILY,
         participants=participants,
@@ -40,13 +41,14 @@ def test_a_started_sprint_is_active_with_its_period_daily_time_and_team():
     sprint = Sprint.start(
         sprint_id=sprint_id,
         team_id=team_id,
+        number=12,
         period=period,
         daily_time=daily,
         participants=[ana],
         active_members={ana},
     )
 
-    assert sprint.id == sprint_id and sprint.team_id == team_id
+    assert sprint.id == sprint_id and sprint.team_id == team_id and sprint.number == 12
     assert sprint.status is SprintStatus.ACTIVE
     assert sprint.period == period and sprint.daily_time == daily
     assert sprint.participants == (ana,)
@@ -67,6 +69,7 @@ def test_the_sprint_keeps_its_own_copy_of_the_participants():
     sprint = Sprint.start(
         sprint_id=next_id(),
         team_id=next_id(),
+        number=1,
         period=SprintPeriod(start=date(2026, 10, 5), end=date(2026, 10, 16)),
         daily_time=DailyTime(
             at=datetime(2026, 10, 5, 14, 0, tzinfo=UTC), time_zone="America/Bogota"
@@ -236,3 +239,35 @@ def test_withdrawing_does_not_touch_the_period_or_the_daily_time():
     sprint.withdraw_participant(ana)
 
     assert (sprint.id, sprint.team_id, sprint.period, sprint.daily_time, sprint.status) == before
+
+
+@pytest.mark.parametrize("number", [0, -1])
+def test_a_sprint_number_below_one_is_a_programming_error(number):
+    with pytest.raises(ValueError, match="starts at 1"):
+        Sprint.start(
+            sprint_id=next_id(),
+            team_id=next_id(),
+            number=number,
+            period=PERIOD,
+            daily_time=DAILY,
+            participants=[],
+            active_members=set(),
+        )
+
+
+def test_a_restored_sprint_keeps_the_number_it_was_stored_with():
+    assert SprintBuilder().numbered(7).build().number == 7
+
+
+def test_reconfiguring_the_sprint_does_not_change_its_number():
+    ana = next_id()
+    sprint = SprintBuilder().numbered(3).with_participants(ana).build()
+
+    sprint.reconfigure(
+        period=SprintPeriod(start=date(2026, 11, 2), end=date(2026, 11, 13)),
+        daily_time=DAILY,
+        participants=[ana],
+        active_members={ana},
+    )
+
+    assert sprint.number == 3

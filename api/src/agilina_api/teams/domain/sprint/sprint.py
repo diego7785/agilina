@@ -42,7 +42,8 @@ class Sprint(AggregateRoot[UUID]):
     and all of them active members. Removing a member afterwards (``withdraw_participant``) may
     leave it with none: the member's removal is not blocked by the daily.
 
-    The constructor restores a stored sprint as it is, with no rule checked again.
+    The constructor restores a stored sprint as it is, with no rule checked again. Its ``number`` is
+    assigned by ``start`` and never changes (``reconfigure`` does not touch it).
     """
 
     def __init__(  # noqa: PLR0913
@@ -50,6 +51,7 @@ class Sprint(AggregateRoot[UUID]):
         *,
         sprint_id: UUID,
         team_id: UUID,
+        number: int,
         period: SprintPeriod,
         daily_time: DailyTime,
         participants: Sequence[UUID],
@@ -57,6 +59,7 @@ class Sprint(AggregateRoot[UUID]):
     ) -> None:
         super().__init__(sprint_id)
         self._team_id = team_id
+        self._number = number
         self._period = period
         self._daily_time = daily_time
         self._participants = tuple(participants)
@@ -68,6 +71,7 @@ class Sprint(AggregateRoot[UUID]):
         *,
         sprint_id: UUID,
         team_id: UUID,
+        number: int,
         period: SprintPeriod,
         daily_time: DailyTime,
         participants: Sequence[UUID],
@@ -79,10 +83,17 @@ class Sprint(AggregateRoot[UUID]):
 
         Whether the team already has an active sprint is not the sprint's to know: the use
         case asks it, and the database backs it with ``sprint_one_active_per_team``.
+
+        ``number`` is the sprint's number in its team, which the use case takes from
+        ``SprintRepository.next_number``; it is never typed by a person, so a number below 1 is
+        a programming error (``ValueError``) and not a business rule.
         """
+        if number < 1:
+            raise ValueError("A sprint number starts at 1")
         return cls(
             sprint_id=sprint_id,
             team_id=team_id,
+            number=number,
             period=period,
             daily_time=daily_time,
             participants=_daily_participants(participants, active_members),
@@ -93,6 +104,12 @@ class Sprint(AggregateRoot[UUID]):
     @property
     def team_id(self) -> UUID:
         return self._team_id
+
+    @property
+    def number(self) -> int:
+        """The sprint's number in its team (the 12 of "Sprint 12"): fixed when it starts, never
+        edited."""
+        return self._number
 
     @property
     def period(self) -> SprintPeriod:

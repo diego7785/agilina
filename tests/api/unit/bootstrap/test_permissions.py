@@ -30,6 +30,7 @@ NEEDED_ROLE = {
     ("post", "/v1/teams"): USER,
     ("get", "/v1/teams"): USER,
     ("get", "/v1/teams/{team_id}"): MEMBER,
+    ("get", "/v1/teams/{team_id}/dashboard"): MEMBER,
     ("post", "/v1/teams/{team_id}/sprints"): ADMIN,
     ("get", "/v1/teams/{team_id}/sprints/active"): MEMBER,
     ("put", "/v1/teams/{team_id}/sprints/active"): ADMIN,

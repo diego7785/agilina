@@ -16,6 +16,7 @@ import { SprintFailure, type SprintFailureKind } from '../domain/sprint-failure'
  */
 interface ActiveSprintResponse {
   id: string;
+  number: number;
   start_date: string;
   end_date: string;
   daily_time: string;
@@ -108,6 +109,7 @@ function toRequest(draft: SprintDraft): SprintRequest {
 function toActiveSprint(response: ActiveSprintResponse): ActiveSprint {
   return {
     id: response.id,
+    number: response.number,
     startDate: response.start_date,
     endDate: response.end_date,
     dailyTime: response.daily_time,

@@ -5,6 +5,15 @@
       "member": "Miembro",
       "scrum_master": "Scrum Master",
       "admin": "Administrador"
+    },
+    "change_team": "Cambiar de equipo",
+    "nav": {
+      "label": "Navegación del equipo",
+      "dashboard": "Dashboard",
+      "settings": "Configuración"
+    },
+    "notifications": {
+      "close": "Cerrar aviso"
     }
   },
   "status": {
@@ -55,21 +64,41 @@
     "dashboard": {
       "loading": "Cargando el equipo…",
       "failed": "No se pudo abrir este equipo.",
-      "settings": "Configuración",
       "problems": {
         "not_authenticated": "Tu sesión no es válida o expiró. Inicia sesión de nuevo.",
         "not_a_member": "Este equipo no existe o no perteneces a él."
       },
+      "title": "Dashboard",
+      "time_zone_note": "Las horas se muestran en la zona horaria de tu navegador.",
       "sprint": {
+        "title": "Sprint activo",
         "in_progress": "Día {{ number }} de {{ total }}",
         "not_started": "El sprint empieza el {{ date }}",
         "finished": "Sprint terminado",
-        "none": "Sin sprint activo"
+        "none": "Sin sprint activo",
+        "progress_label": "Avance del sprint",
+        "number": "Sprint {{ number }}"
+      },
+      "ceremony": {
+        "title": "Próxima ceremonia",
+        "daily": "Reunión diaria",
+        "none": "No hay ceremonias programadas"
+      },
+      "mode": {
+        "title": "Modo del equipo",
+        "support": "Soporte",
+        "autonomous": "Autónomo"
+      },
+      "room": {
+        "title": "Sala de reunión",
+        "description": "Tu Scrum Master virtual para la reunión diaria",
+        "join": "Unirse a la sala",
+        "opens_at": "Se habilita a las {{ time }}",
+        "no_ceremony": "No hay ceremonias programadas."
       }
     },
     "settings": {
-      "title": "Equipo",
-      "subtitle": "Las personas que participan en las ceremonias del equipo y su rol.",
+      "title": "Miembros",
       "back": "Volver al equipo",
       "members": "Integrantes",
       "columns": {
@@ -89,7 +118,6 @@
       "role_of": "Rol de {{ name }}",
       "blocked": {
         "role_change": {
-          "sprint_in_progress": "No se puede cambiar el rol mientras el equipo tiene un sprint activo.",
           "last_admin": "Es el único {{ admin }}: el equipo no puede quedarse sin {{ admin }}."
         },
         "removal": {
@@ -117,7 +145,8 @@
           "not_found": "Esta persona ya no está en el equipo.",
           "last_admin": "No se puede cambiar el rol: el equipo no puede quedarse sin {{ admin }}.",
           "sprint_in_progress": "No se puede cambiar el rol mientras el equipo tiene un sprint activo."
-        }
+        },
+        "success": "Rol de {{ name }} actualizado."
       },
       "invite": {
         "open": "Invitar miembro",
@@ -171,7 +200,8 @@
           "forbidden": "Ya no eres {{ admin }} de este equipo.",
           "not_found": "Esta persona ya no está en el equipo.",
           "last_admin": "No se puede eliminar: el equipo no puede quedarse sin {{ admin }}."
-        }
+        },
+        "success": "{{ name }} ya no está en el equipo."
       },
       "view": {
         "open_label": "Ver a {{ name }}",
@@ -215,12 +245,10 @@
       },
       "start_date": "Inicio",
       "end_date": "Fin",
-      "daily_time": "Hora de la daily (única para el equipo)",
+      "daily_time": "Hora de la reunión diaria",
       "zone_hint": "Las horas se muestran en la zona horaria de tu navegador ({{ zone }}).",
-      "saved_zone": "La hora de la daily está guardada en la zona {{ zone }}.",
-      "zone_change": "Al guardar, la hora de la daily pasará a la zona de tu navegador.",
-      "next_daily": "Próxima daily: {{ when }}.",
-      "no_next_daily": "Ya no quedan dailies en este sprint.",
+      "saved_zone": "La hora de la reunión diaria está guardada en la zona {{ zone }}.",
+      "zone_change": "Al guardar, la hora de la reunión diaria pasará a la zona de tu navegador.",
       "errors": {
         "start_date": {
           "blank": "Elige la fecha de inicio."
@@ -230,24 +258,25 @@
           "before_start": "La fecha de fin no puede ser anterior a la de inicio."
         },
         "daily_time": {
-          "blank": "Elige la hora de la daily."
+          "blank": "Elige la hora de la reunión diaria."
         },
         "participants": {
-          "none": "Elige al menos un participante para la daily.",
+          "none": "Elige al menos un participante para la reunión diaria.",
           "duplicate": "Un participante aparece más de una vez."
         }
       },
       "participants": {
-        "title": "Participantes de la daily"
+        "title": "Participantes por ceremonia",
+        "daily": "Reunión diaria"
       },
       "order": {
-        "title": "Orden de turnos de la daily",
-        "empty": "Marca a los participantes de la daily para ordenar sus turnos.",
+        "title": "Orden de turnos de la reunión diaria",
+        "empty": "Marca a los participantes de la reunión diaria para ordenar sus turnos.",
         "move_up": "Subir a {{ name }}",
         "move_down": "Bajar a {{ name }}",
         "moved": "{{ name }} ahora tiene el turno {{ position }}."
       },
-      "submit": "Guardar sprint",
+      "submit": "Guardar",
       "saving": "Guardando…",
       "saved": "Sprint guardado.",
       "save": {
@@ -258,7 +287,7 @@
           "active_sprint_exists": "Alguien más configuró el sprint del equipo mientras tanto. Revisa los datos y guarda de nuevo.",
           "ends_before_start": "La fecha de fin no puede ser anterior a la de inicio.",
           "invalid_time_zone": "La zona horaria de tu navegador no es una zona válida. Revisa la configuración de tu dispositivo.",
-          "no_participants": "Elige al menos un participante para la daily.",
+          "no_participants": "Elige al menos un participante para la reunión diaria.",
           "duplicate_participant": "Un participante aparece más de una vez.",
           "participant_not_a_member": "Uno de los participantes ya no es integrante del equipo. Recarga la página y vuelve a elegirlos."
         }
@@ -270,7 +299,13 @@
         "choose_date": "Elige una fecha",
         "previous_month": "Mes anterior",
         "next_month": "Mes siguiente"
-      }
+      },
+      "close": {
+        "title": "Cerrar sprint activo",
+        "description": "Se cerrarán las ceremonias pendientes y podrás editar roles y modo.",
+        "button": "Cerrar sprint activo"
+      },
+      "number": "Sprint {{ number }}"
     }
   },
   "identity": {

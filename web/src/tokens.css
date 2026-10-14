@@ -14,6 +14,7 @@
   --agl-accent: oklch(52% 0.19 268);
   --agl-accent-text: oklch(99% 0.005 265);
   --agl-error: oklch(58% 0.21 25);
+  --agl-success: oklch(52% 0.15 150);
 }
 
 /* Tailwind reads the tokens as its theme, so `bg-surface`, `text-muted` or `border-border`
@@ -28,6 +29,7 @@
   --color-accent: var(--agl-accent);
   --color-accent-foreground: var(--agl-accent-text);
   --color-danger: var(--agl-error);
+  --color-success: var(--agl-success);
 
   /* Inter for text, Plus Jakarta Sans for titles (`font-display`). */
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;

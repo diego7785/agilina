@@ -62,8 +62,11 @@ Dentro de `web/`, los scripts de `package.json` son los mismos que usa la CI:
   código ambos son el mismo rol interno `admin` (SM es su etiqueta visible en
   modo soporte, ver el [glosario](../docs/glossary.md)): la interfaz decide con
   el rol interno, nunca con la etiqueta.
-  El dashboard muestra el enlace a Configuración solo si `GET /v1/teams/{id}`
-  devuelve `role: admin`. Configuración tiene dos pestañas, cada una con su ruta:
+  Configuración es una entrada del encabezado, junto a Dashboard, en todas las pantallas
+  del equipo: no existe en el árbol de navegación del Miembro (`@if`, no se oculta con
+  estilos). El encabezado la dibuja según `ShellTeam.canConfigure`, que
+  `TeamShellFacade` saca de `GET /v1/teams/{id}` (`role === 'admin'`) y el dashboard de su
+  propio `can_configure`. Configuración tiene dos pestañas, cada una con su ruta:
   Equipo (`/:tenant/teams/:teamId/settings`) y Sprint (`/:tenant/teams/:teamId/settings/sprint`).
   Ninguna lleva guard de rol: la pantalla pide los integrantes a la API y, si responde 403,
   muestra «sin acceso» (`settings-no-access`; un guard escondería esa respuesta). Las
@@ -95,7 +98,8 @@ web/
         │   ├── i18n/             Transloco, idiomas y manejo de claves faltantes
         │   ├── logging/          Puerto Logger, adaptador de consola, ErrorHandler
         │   ├── tenant/           El tenant de la dirección: contexto, guards y puerto del catálogo (AD-29)
-        │   ├── time/             La zona horaria del navegador (BROWSER_TIME_ZONE)
+        │   ├── notifications/    Notifier: los toasts de la aplicación (ver «Notificaciones»)
+        │   ├── time/             La zona horaria del navegador (BROWSER_TIME_ZONE) y el reloj (NOW)
         │   └── auth/             Sesión: puerto AuthSession, adaptador de keycloak-js, guards e interceptor
         ├── layout/               Marcos de pantalla (@layout/*): app-shell (con la cabecera) y
         │                         centered-layout (las pantallas antes de entrar a un equipo)
@@ -124,7 +128,7 @@ concepto se llame igual en todo el sistema:
 | `status` | Estado del entorno: prueba que la web habla con la API | Existe |
 | `tenancy` | La página «no encontrada» de una dirección sin organización | Existe |
 | `identity` | Activación de la cuenta desde la invitación (`/activate`); inicio y cierre de sesión; la página de cuenta no activa (`/account-not-active`) | Activación existe (HU-02); la página de cuenta no activa con su botón de cerrar sesión, también (AGI-123); el resto llega con HU-03/04 |
-| `teams` | Equipo, integrantes, sprint y pestaña de configuración (solo `admin`) | Existe: selector mínimo, creación y dashboard placeholder (HU-05); Configuración → Equipo en `/:tenant/teams/:teamId/settings` (HU-06): integrantes con su etiqueta de rol, invitar, cambiar el rol y eliminar; Configuración → Sprint en `/:tenant/teams/:teamId/settings/sprint` (HU-07): fechas, hora de la daily en la zona del navegador y participantes ordenados con subir y bajar, y la línea «Día N de M» del dashboard. El resto llega con sus historias |
+| `teams` | Equipo, integrantes, sprint, dashboard y pestaña de configuración (solo `admin`) | Existe: dashboard en `/:tenant/teams/:teamId` (HU-12), que lee `GET /v1/teams/{id}/dashboard` en una sola llamada y muestra el día N de M con su barra y el número del sprint («Sprint 12», que asigna la API), la próxima daily en la hora del navegador, el modo como etiqueta de solo lectura y la sala; «Unirse a la sala» se habilita desde diez minutos antes de la daily (`join-window.ts`, con un temporizador, sin recargar) y por ahora no hace nada: la conexión llega con AGI-60; Configuración → Sprint tiene el botón «Cerrar sprint activo» del mockup, sin función todavía (llega con AGI-81); el encabezado tiene las entradas Dashboard y Configuración y **Cambiar de equipo**, que lleva al selector aunque haya un solo equipo (`{ choose: true }`);  selector mínimo, creación y dashboard placeholder (HU-05); Configuración → Equipo en `/:tenant/teams/:teamId/settings` (HU-06): integrantes con su etiqueta de rol, invitar, cambiar el rol y eliminar; Configuración → Sprint en `/:tenant/teams/:teamId/settings/sprint` (HU-07): fechas, hora de la daily en la zona del navegador y participantes ordenados con subir y bajar, y la línea «Día N de M» del dashboard. El resto llega con sus historias |
 | `ceremonies` | La sala de la Daily: LiveKit, turnos y controles hacia el agente | Llega con las historias de la ceremonia |
 
 ### Capas dentro de una funcionalidad
@@ -329,6 +333,10 @@ web es el **primer segmento de la dirección**: `/acme/teams`, `/acme/activate#t
   `localDateTimeToIso` (una hora de pared en una fecha, al instante UTC), `localTimeOf`,
   `formatLocalDateTime` y `formatCalendarDate` (una fecha de calendario se arma a medianoche
   local y se formatea en la misma zona, así nunca se corre un día).
+- Lo que cambia con la hora (la sala abierta, la daily que ya empezó) lee el instante del token
+  `NOW` (`core/time/now.ts`), que una prueba fija con `TestClock` (`@testing/now`) en vez de
+  depender de la hora de la máquina. `formatLocalTime` y `formatShortLocalDate` dan la hora y el
+  día corto («02:15 p. m.», «jue, 17 de sept») de un instante en la zona del navegador.
 - No se guarda ni se calcula con zonas horarias por equipo: no existen. La única excepción es la
   **zona de captura de la hora de la daily**
   ([AD-31](../docs/adr/0031-guardar-la-hora-de-la-daily-en-utc-con-su-zona-de-captura.md)): al
@@ -360,6 +368,51 @@ web es el **primer segmento de la dirección**: `/acme/teams`, `/acme/activate#t
   misma: un error visible, no un hueco en blanco.
 - Una prueba falla si una clave existe en un idioma y no en el otro, o si un
   texto está vacío.
+- **La interfaz sigue el idioma activo, aunque el mockup no lo haga.** Los mockups (Lovable)
+  mezclan inglés en la versión en español: «Daily», «Retro», «Review», «Daily Stand-up». No se
+  copian: cada texto va en el idioma de la persona y, en español, la ceremonia es **la reunión
+  diaria** («Hora de la reunión diaria», «Orden de turnos de la reunión diaria»), no «la daily».
+  Lo mismo vale para los nombres de ceremonias, estados y acciones. Se quedan igual en todos los
+  idiomas los nombres propios y las marcas (Agilina, Scrum Master, Slack, Jira, Keycloak). En
+  inglés el término es «daily» o «daily stand-up». Cuando el mockup y esta regla no coinciden,
+  manda la regla (ver «Diferencias con el backlog» en `context/mockups.md`).
+
+## Notificaciones (toasts)
+
+Un **toast** es un aviso corto que confirma que una acción salió bien o que no funcionó. Aparece
+abajo a la derecha (en el móvil, abajo y a todo el ancho) **sin mover lo que hay en la pantalla**.
+Es la única forma de confirmar una acción; ninguna pantalla pinta su propio «Guardado.» dentro de
+la página.
+
+| Tipo | Cuándo | Aspecto | Dura |
+| --- | --- | --- | --- |
+| `success` | La acción salió bien: «Sprint guardado.», «Rol de Ana Gil actualizado.» | Verde (`success`), ícono `circle-check` | 5 s; no se va mientras el puntero o el foco estén sobre él |
+| `error` | La acción falló y hay algo que leer o reintentar | Rojo (`danger`), ícono `circle-alert` | Hasta que se cierra con la X |
+
+- **Cómo se pide:** `inject(Notifier)` (`@core/notifications/notifier`) y
+  `notifier.success('teams.sprint.saved')` o `notifier.error('teams.sprint.save.failed', {…})`. Se
+  le da la **clave** del texto y sus parámetros, nunca el texto: se traduce al idioma activo en el
+  momento. Los dos textos (ES y EN) se agregan a los catálogos como cualquier otro.
+- **Dónde se dibuja:** una sola vez, en el componente raíz (`agl-toast-list`, de `shared/ui`), así
+  que un aviso sobrevive a un cambio de pantalla y sale por encima de cualquier marco. Muestra
+  hasta 3 a la vez: uno nuevo desplaza al más antiguo.
+- **Colores:** solo de los tokens (`success` y `danger`, en `tokens.css`), con su ícono: el color
+  no es la única señal. No se escriben colores sueltos.
+- **Accesibilidad:** las dos regiones (`role="status"` para los éxitos y `role="alert"` para los
+  errores) existen siempre en la página, vacías si no hay avisos, porque un lector de pantalla
+  anuncia lo que se agrega a una región que ya estaba, no una región que aparece con su mensaje. El
+  foco no se mueve al aviso. El botón de cerrar tiene nombre (`app.notifications.close`).
+- **Qué NO es un toast:**
+  - un error de **validación** va junto a su campo, con `aria-describedby`, porque señala qué
+    corregir;
+  - un error **dentro de un diálogo** (invitar, eliminar a alguien) se queda en el diálogo: el
+    diálogo modal tapa cualquier toast y la persona sigue ahí para corregir o reintentar;
+  - un estado de **carga** («Cargando…») o de **página** («No tienes acceso», la cuenta activada)
+    es contenido de la página.
+- **Cómo se prueba:** el servicio con `jasmine.clock()` (ver `notifier.spec.ts`); una pantalla
+  comprueba lo que pidió con `TestBed.inject(Notifier).notifications()` y no busca el texto en
+  su plantilla; en los e2e se busca por `data-testid` (`toast-success`, `toast-error`,
+  `toast-message`).
 
 ## Errores y registro
 
@@ -421,7 +474,7 @@ estilos de una pantalla son **clases de utilidad en su plantilla**.
 
 - Los colores salen de los tokens `--agl-*` de `styles.css`, que Tailwind lee como tema:
   `bg-surface`, `bg-background`, `text-foreground`, `text-muted`, `text-accent`,
-  `text-accent`, `text-accent-foreground` (texto sobre el color de acento), `text-danger`,
+  `text-accent`, `text-accent-foreground` (texto sobre el color de acento), `text-danger`, `text-success`,
   `border-border`; con opacidad cuando hace falta un tono suave (`bg-accent/10`). **No se
   escriben colores sueltos** (`#fff`, `bg-blue-500`): un tema nuevo cambia los valores de las
   variables y nada más. Los valores son la paleta clara de los mockups (prototipo de Lovable).
@@ -431,7 +484,8 @@ estilos de una pantalla son **clases de utilidad en su plantilla**.
 - El marco de cada pantalla lo elige su ruta en `app.routes.ts`: `AppShell` (cabecera arriba)
   o `CenteredLayout` (marca centrada sobre una sola tarjeta, para el selector de equipo y su
   formulario).
-- Lo que se repite no se copia: es una pieza de `shared/ui`. Hoy hay `aglButton`
+- Lo que se repite no se copia: es una pieza de `shared/ui`. Hoy hay `agl-toast-list` (los
+  avisos, ver «Notificaciones»), `aglButton`
   (con `variant="primary" | "secondary" | "danger"`; `danger` para lo que no se deshace, como
   eliminar a alguien del equipo), que va sobre un `<button>` o, si navega, sobre un
   `<a routerLink>` (un enlace sigue siendo enlace), `button[aglIconButton]` (solo ícono, con

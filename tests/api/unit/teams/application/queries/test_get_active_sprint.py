@@ -59,6 +59,7 @@ async def test_the_view_carries_the_sprint_as_it_is_stored(scenario):
     assert view is not None
     assert view.sprint == ActiveSprintRecord(
         sprint_id=sprint.id,
+        number=1,
         start_date=date(2026, 10, 5),
         end_date=date(2026, 10, 16),
         daily_time=_at(5, 14),

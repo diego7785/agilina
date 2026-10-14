@@ -5,7 +5,7 @@ from agilina_api.teams.application.queries.get_active_sprint.get_active_sprint i
     GetActiveSprint,
 )
 from agilina_api.teams.domain.sprint import DailyTime
-from agilina_shared.sprint_calendar import daily_occurrences, sprint_day_at
+from agilina_shared.sprint_calendar import daily_occurrences, next_daily_at, sprint_day_at
 
 
 class GetActiveSprintHandler:
@@ -38,5 +38,5 @@ class GetActiveSprintHandler:
             day=sprint_day_at(
                 start=sprint.start_date, end=sprint.end_date, time_zone=daily_time.zone, now=now
             ),
-            next_daily_at=next((at for at in occurrences if at >= now), None),
+            next_daily_at=next_daily_at(occurrences, now),
         )

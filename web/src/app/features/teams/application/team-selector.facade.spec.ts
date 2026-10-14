@@ -11,6 +11,10 @@ import { TeamFailure } from '../domain/team-failure';
 
 /** Port double: listMine() answers what the test chose. */
 class FakeTeamsPort extends TeamsPort {
+  dashboard(): Observable<never> {
+    return NEVER;
+  }
+
   mine: Observable<readonly Team[]> = of([]);
 
   listMine(): Observable<readonly Team[]> {

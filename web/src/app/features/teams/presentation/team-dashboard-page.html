@@ -1,23 +1,108 @@
 <section
-  class="mx-auto w-full max-w-5xl"
+  class="mx-auto w-full max-w-6xl"
   *transloco="let t; prefix: 'teams.dashboard'; currentLang as language"
 >
   @if (team(); as team) {
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <h1
-        class="font-display text-3xl font-bold tracking-tight break-words"
-        data-testid="team-name"
-      >
-        {{ team.name }}
+    <div>
+      <h1 class="font-display text-3xl font-bold tracking-tight" data-testid="dashboard-title">
+        {{ t('title') }}
       </h1>
-      @if (team.role === 'admin') {
-        <a
-          aglButton
-          variant="secondary"
-          data-testid="team-settings-link"
-          [routerLink]="tenant.path('teams', team.id, 'settings')"
+      <p class="mt-1 text-sm text-muted">{{ t('time_zone_note') }}</p>
+    </div>
+
+    <div class="mt-6 grid gap-4 md:grid-cols-3">
+      <article
+        class="rounded-xl border border-border bg-surface p-6 shadow-sm"
+        data-testid="sprint-card"
+      >
+        <h2 class="text-sm font-medium text-muted">{{ t('sprint.title') }}</h2>
+        @if (sprint(); as sprint) {
+          @switch (sprint.day.phase) {
+            @case ('in_progress') {
+              <p class="mt-2 font-display text-3xl font-bold" data-testid="sprint-day">
+                {{
+                  t('sprint.in_progress', { number: sprint.day.number, total: sprint.day.total })
+                }}
+              </p>
+            }
+            @case ('not_started') {
+              <p class="mt-2 font-display text-xl font-bold" data-testid="sprint-day">
+                {{ t('sprint.not_started', { date: formatDate(sprint.startDate, language) }) }}
+              </p>
+            }
+            @case ('finished') {
+              <p class="mt-2 font-display text-xl font-bold" data-testid="sprint-day">
+                {{ t('sprint.finished') }}
+              </p>
+            }
+          }
+          <p class="mt-1 text-sm text-muted" data-testid="sprint-number">
+            {{ t('sprint.number', { number: sprint.number }) }}
+          </p>
+          @if (sprint.day.phase === 'in_progress') {
+            <progress
+              class="mt-4 h-2 w-full appearance-none overflow-hidden rounded-full [&::-moz-progress-bar]:bg-accent [&::-webkit-progress-bar]:bg-accent/20 [&::-webkit-progress-value]:bg-accent"
+              data-testid="sprint-progress"
+              [attr.aria-label]="t('sprint.progress_label')"
+              [max]="sprint.day.total"
+              [value]="sprint.day.number"
+            ></progress>
+          }
+        } @else {
+          <p class="mt-2 font-display text-xl font-bold" data-testid="sprint-day">
+            {{ t('sprint.none') }}
+          </p>
+        }
+      </article>
+
+      <article
+        class="rounded-xl border border-border bg-surface p-6 shadow-sm"
+        data-testid="ceremony-card"
+      >
+        <h2 class="text-sm font-medium text-muted">{{ t('ceremony.title') }}</h2>
+        @if (nextCeremony(); as ceremony) {
+          <p class="mt-2 font-display text-3xl font-bold" data-testid="ceremony-time">
+            {{ formatTime(ceremony.startsAt, language) }}
+          </p>
+          <p class="mt-1 flex items-center gap-2 text-sm text-muted" data-testid="ceremony-day">
+            <!-- Lucide "calendar-clock" icon. -->
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="size-4"
+              aria-hidden="true"
+            >
+              <path d="M16 14v2.2l1.6 1" />
+              <path d="M16 2v4" />
+              <path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5" />
+              <path d="M3 10h5" />
+              <path d="M8 2v4" />
+              <circle cx="16" cy="16" r="6" />
+            </svg>
+            {{ t('ceremony.daily') }} · {{ formatDay(ceremony.startsAt, language) }}
+          </p>
+        } @else {
+          <p class="mt-2 font-display text-xl font-bold" data-testid="ceremony-none">
+            {{ t('ceremony.none') }}
+          </p>
+        }
+      </article>
+
+      <article
+        class="rounded-xl border border-border bg-surface p-6 shadow-sm"
+        data-testid="mode-card"
+      >
+        <h2 class="text-sm font-medium text-muted">{{ t('mode.title') }}</h2>
+        <p
+          class="mt-2 inline-flex items-center gap-2 rounded-md bg-accent/10 px-2.5 py-0.5 text-base font-semibold text-accent"
+          data-testid="team-mode"
         >
-          <!-- Lucide "settings" icon. -->
+          <!-- Lucide "circle-dot" icon. -->
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -29,33 +114,65 @@
             class="size-4"
             aria-hidden="true"
           >
-            <path
-              d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"
-            />
-            <circle cx="12" cy="12" r="3" />
+            <circle cx="12" cy="12" r="10" />
+            <circle cx="12" cy="12" r="1" />
           </svg>
-          {{ t('settings') }}
-        </a>
-      }
+          {{ t('mode.' + team.mode) }}
+        </p>
+      </article>
     </div>
-    @if (sprintKnown()) {
-      <p class="mt-2 text-sm font-medium text-muted" data-testid="sprint-day">
-        @if (sprint(); as sprint) {
-          @switch (sprint.day.phase) {
-            @case ('in_progress') {
-              {{ t('sprint.in_progress', { number: sprint.day.number, total: sprint.day.total }) }}
+
+    @if (sprint()) {
+      <section
+        class="mt-6 rounded-xl border border-accent/30 bg-accent/5 p-6 shadow-sm"
+        aria-labelledby="room-title"
+        data-testid="room-card"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 id="room-title" class="font-display text-xl font-semibold">
+              {{ t('room.title') }}
+            </h2>
+            <p class="text-sm text-muted">{{ t('room.description') }}</p>
+            @if (joinState() === 'not_yet' && nextCeremony(); as ceremony) {
+              <p id="room-hint" class="mt-2 text-sm font-medium" data-testid="join-hint">
+                {{ t('room.opens_at', { time: formatTime(ceremony.joinOpensAt, language) }) }}
+              </p>
+            } @else if (nextCeremony() === null) {
+              <p id="room-hint" class="mt-2 text-sm font-medium" data-testid="join-hint">
+                {{ t('room.no_ceremony') }}
+              </p>
             }
-            @case ('not_started') {
-              {{ t('sprint.not_started', { date: formatDate(sprint.startDate, language) }) }}
-            }
-            @case ('finished') {
-              {{ t('sprint.finished') }}
-            }
-          }
-        } @else {
-          {{ t('sprint.none') }}
-        }
-      </p>
+          </div>
+          <!-- Joining the room arrives with its own story (AGI-60): until then it does nothing. -->
+          <button
+            aglButton
+            type="button"
+            class="w-full sm:w-auto"
+            data-testid="join-room"
+            [disabled]="joinState() !== 'open'"
+            [attr.aria-describedby]="joinState() === 'open' ? null : 'room-hint'"
+          >
+            <!-- Lucide "mic" icon. -->
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="size-4"
+              aria-hidden="true"
+            >
+              <path d="M12 19v3" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <rect x="9" y="2" width="6" height="13" rx="3" />
+            </svg>
+            {{ t('room.join') }}
+          </button>
+        </div>
+      </section>
     }
   } @else if (loading()) {
     <p role="status" class="text-sm text-muted">{{ t('loading') }}</p>

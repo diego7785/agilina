@@ -108,7 +108,7 @@ async def test_the_daily_time_is_stored_as_an_instant_and_the_turns_from_one(
 async def test_a_team_without_an_active_sprint_has_none(session_factory, atlas):
     other = await stored_team(session_factory, TeamBuilder().with_admin(atlas.ana))
     await stored_sprint(session_factory, SprintBuilder().for_team(atlas.team).closed())
-    await stored_sprint(session_factory, SprintBuilder().for_team(atlas.team).planned())
+    await stored_sprint(session_factory, SprintBuilder().for_team(atlas.team).numbered(2).planned())
     await stored_sprint(session_factory, SprintBuilder().for_team(other))
 
     assert await _active(session_factory, atlas.team.id) is None
@@ -214,7 +214,7 @@ async def test_a_second_active_sprint_that_skips_the_check_gets_the_domains_erro
     first = await stored_sprint(
         session_factory, SprintBuilder().for_team(atlas.team).with_participants(atlas.ana)
     )
-    second = SprintBuilder().for_team(atlas.team).with_participants(atlas.bruno).build()
+    second = SprintBuilder().for_team(atlas.team).numbered(2).with_participants(atlas.bruno).build()
 
     async with SqlAlchemyUnitOfWork(session_factory) as uow:
         with pytest.raises(ActiveSprintExistsError) as refused:
@@ -232,10 +232,10 @@ async def test_a_closed_sprint_does_not_stop_a_new_active_one_from_being_added(
 ):
     await stored_sprint(session_factory, SprintBuilder().for_team(atlas.team).closed())
 
-    added = await stored_sprint(session_factory, SprintBuilder().for_team(atlas.team))
+    added = await stored_sprint(session_factory, SprintBuilder().for_team(atlas.team).numbered(2))
 
     loaded = await _active(session_factory, atlas.team.id)
-    assert loaded is not None and loaded.id == added.id
+    assert loaded is not None and loaded.id == added.id and loaded.number == 2
 
 
 async def test_another_violation_on_add_goes_up_as_it_is(session_factory, atlas):
@@ -249,3 +249,74 @@ async def test_another_violation_on_add_goes_up_as_it_is(session_factory, atlas)
             await SqlAlchemySprintRepository(uow.session).add(sprint)
 
     assert await _active(session_factory, atlas.team.id) is None
+
+
+async def test_a_sprint_that_takes_a_number_the_team_already_has_gets_the_domains_error(
+    session_factory, atlas
+):
+    """``next_number`` is called with the team locked, so two sprints never get the same number;
+    if one does reach the database, ``sprint_number_unique`` refuses it the same way as a second
+    active sprint: the sprint was not saved because another one got there first."""
+    await stored_sprint(session_factory, SprintBuilder().for_team(atlas.team).numbered(3).closed())
+    clash = SprintBuilder().for_team(atlas.team).numbered(3).build()
+
+    async with SqlAlchemyUnitOfWork(session_factory) as uow:
+        with pytest.raises(ActiveSprintExistsError) as refused:
+            await SqlAlchemySprintRepository(uow.session).add(clash)
+
+    assert "sprint_number_unique" in str(refused.value.__cause__)
+
+
+async def test_a_stored_sprint_keeps_its_number(session_factory, atlas):
+    await stored_sprint(session_factory, SprintBuilder().for_team(atlas.team).numbered(8))
+
+    loaded = await _active(session_factory, atlas.team.id)
+
+    assert loaded is not None and loaded.number == 8
+
+
+async def test_saving_changes_does_not_touch_the_number(session_factory, atlas):
+    await stored_sprint(session_factory, SprintBuilder().for_team(atlas.team).numbered(8))
+
+    async with SqlAlchemyUnitOfWork(session_factory) as uow:
+        repository = SqlAlchemySprintRepository(uow.session)
+        loaded = await repository.get_active(atlas.team.id)
+        assert loaded is not None
+        loaded.reconfigure(
+            period=SprintPeriod(start=date(2026, 10, 12), end=date(2026, 10, 23)),
+            daily_time=loaded.daily_time,
+            participants=[atlas.ana],
+            active_members=atlas.team.active_member_ids,
+        )
+        await repository.save(loaded)
+        await uow.commit()
+
+    edited = await _active(session_factory, atlas.team.id)
+    assert edited is not None and edited.number == 8
+
+
+async def _next_number(session_factory, team_id) -> int:
+    async with SqlAlchemyUnitOfWork(session_factory) as uow:
+        return await SqlAlchemySprintRepository(uow.session).next_number(team_id)
+
+
+async def test_the_first_number_of_a_team_is_one(session_factory, atlas):
+    assert await _next_number(session_factory, atlas.team.id) == 1
+    assert await _next_number(session_factory, next_id()) == 1
+
+
+async def test_the_next_number_is_the_highest_plus_one_whatever_the_status(session_factory, atlas):
+    await stored_sprint(session_factory, SprintBuilder().for_team(atlas.team).numbered(1).closed())
+    await stored_sprint(session_factory, SprintBuilder().for_team(atlas.team).numbered(5).closed())
+    await stored_sprint(session_factory, SprintBuilder().for_team(atlas.team).numbered(3).planned())
+
+    assert await _next_number(session_factory, atlas.team.id) == 6
+
+
+async def test_the_numbers_of_each_team_are_counted_apart(session_factory, atlas):
+    other = await stored_team(session_factory, TeamBuilder().with_admin(atlas.bruno))
+    await stored_sprint(session_factory, SprintBuilder().for_team(atlas.team).numbered(7).closed())
+    await stored_sprint(session_factory, SprintBuilder().for_team(other).numbered(2))
+
+    assert await _next_number(session_factory, atlas.team.id) == 8
+    assert await _next_number(session_factory, other.id) == 3

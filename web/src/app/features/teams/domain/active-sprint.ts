@@ -21,6 +21,8 @@ export interface SprintDay {
  */
 export interface ActiveSprint {
   readonly id: string;
+  /** The sprint's number in its team (the 12 of "Sprint 12"), assigned by the API. */
+  readonly number: number;
   /** First day of the sprint, `YYYY-MM-DD`. */
   readonly startDate: string;
   /** Last day of the sprint, included, `YYYY-MM-DD`. */

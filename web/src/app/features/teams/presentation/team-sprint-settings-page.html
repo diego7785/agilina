@@ -38,7 +38,11 @@
         <div class="rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-6">
           <div class="flex flex-wrap items-center gap-2">
             <h2 class="font-display text-xl font-semibold" data-testid="sprint-title">
-              {{ t('title') }}
+              @if (sprint(); as sprint) {
+                {{ t('number', { number: sprint.number }) }}
+              } @else {
+                {{ t('title') }}
+              }
             </h2>
             @if (sprint()) {
               <span
@@ -147,53 +151,75 @@
                   {{ t('zone_change') }}
                 }
               </p>
-              <p data-testid="sprint-next-daily">
-                @if (sprint.nextDailyAt; as next) {
-                  {{ t('next_daily', { when: formatInstant(next, language) }) }}
-                } @else {
-                  {{ t('no_next_daily') }}
-                }
-              </p>
             }
           </div>
         </div>
 
         <div class="grid gap-6 md:grid-cols-2">
-          <fieldset
+          <section
             class="rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-6"
-            aria-describedby="sprint-participants-problem"
+            aria-labelledby="sprint-participants-title"
+            data-testid="sprint-participants-card"
           >
-            <legend class="float-left w-full font-display text-lg font-semibold">
+            <h2 id="sprint-participants-title" class="font-display text-lg font-semibold">
               {{ t('participants.title') }}
-            </legend>
-            <ul class="clear-both grid gap-x-4 gap-y-2 pt-4 sm:grid-cols-2">
-              @for (member of members(); track member.userId) {
-                <li>
-                  <label
-                    class="flex min-h-11 cursor-pointer items-center gap-3 text-sm"
-                    [attr.data-testid]="'sprint-participant-' + member.email"
-                  >
-                    <input
-                      type="checkbox"
-                      class="size-4 shrink-0 cursor-pointer accent-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                      [checked]="isParticipant(member.userId)"
-                      (change)="toggle(member.userId)"
-                    />
-                    <span class="break-words">{{ member.fullName }}</span>
-                  </label>
-                </li>
-              }
-            </ul>
-            <p
-              id="sprint-participants-problem"
-              class="mt-2 text-xs text-danger empty:hidden"
-              aria-live="polite"
-            >
-              @if (participantsProblem(); as problem) {
-                {{ t('errors.participants.' + problem) }}
-              }
-            </p>
-          </fieldset>
+            </h2>
+            <!-- One group per ceremony; only the daily exists in Agilina. -->
+            <div class="mt-4 space-y-5">
+              <fieldset aria-describedby="sprint-participants-problem">
+                <legend
+                  class="float-left w-full text-sm font-medium"
+                  data-testid="sprint-participants-ceremony"
+                >
+                  {{ t('participants.daily') }}
+                </legend>
+                <ul class="clear-both mt-2 grid gap-x-4 gap-y-2 sm:grid-cols-2">
+                  @for (member of members(); track member.userId) {
+                    <li>
+                      <label
+                        class="flex min-h-11 cursor-pointer items-center gap-3 text-sm"
+                        [attr.data-testid]="'sprint-participant-' + member.email"
+                      >
+                        <!-- A round checkbox: the native input, drawn by hand, with its check on top. -->
+                        <span class="relative flex size-5 shrink-0">
+                          <input
+                            type="checkbox"
+                            class="peer absolute inset-0 size-5 cursor-pointer appearance-none rounded-full border border-accent bg-surface checked:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                            [checked]="isParticipant(member.userId)"
+                            (change)="toggle(member.userId)"
+                          />
+                          <!-- Lucide "check" icon. -->
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="3"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            class="pointer-events-none absolute inset-0 m-auto hidden size-3 text-accent-foreground peer-checked:block"
+                            aria-hidden="true"
+                          >
+                            <path d="M20 6 9 17l-5-5" />
+                          </svg>
+                        </span>
+                        <span class="break-words">{{ member.fullName }}</span>
+                      </label>
+                    </li>
+                  }
+                </ul>
+                <p
+                  id="sprint-participants-problem"
+                  class="mt-2 text-xs text-danger empty:hidden"
+                  aria-live="polite"
+                >
+                  @if (participantsProblem(); as problem) {
+                    {{ t('errors.participants.' + problem) }}
+                  }
+                </p>
+              </fieldset>
+            </div>
+          </section>
 
           <div class="rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-6">
             <h2 id="sprint-order-title" class="font-display text-lg font-semibold">
@@ -277,28 +303,64 @@
           </div>
         </div>
 
-        @if (saveMessage(); as message) {
-          <p role="alert" class="text-sm text-danger" data-testid="sprint-save-problem">
-            {{ t('save.' + message) }}
-          </p>
-        }
-        @if (justSaved()) {
-          <p role="status" class="text-sm text-muted" data-testid="sprint-saved">
-            {{ t('saved') }}
-          </p>
-        }
-
         <div class="flex justify-end">
           <button
             aglButton
             type="submit"
+            class="w-full sm:w-auto"
             data-testid="sprint-submit"
-            [disabled]="!canSave() || saving()"
+            [disabled]="!canSubmit() || saving()"
           >
             {{ saving() ? t('saving') : t('submit') }}
           </button>
         </div>
       </form>
+
+      @if (sprint()) {
+        <section
+          class="mt-12 rounded-xl border border-danger/30 bg-surface p-6 shadow-sm"
+          aria-labelledby="sprint-close-title"
+          data-testid="sprint-close-card"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2
+                id="sprint-close-title"
+                class="font-display text-lg font-semibold"
+                data-testid="sprint-close-title"
+              >
+                {{ t('close.title') }}
+              </h2>
+              <p class="text-sm text-muted">{{ t('close.description') }}</p>
+            </div>
+            <!-- Closing the sprint arrives with its own story (AGI-81): until then it does nothing. -->
+            <button
+              aglButton
+              variant="danger"
+              type="button"
+              class="w-full sm:w-auto"
+              data-testid="sprint-close-open"
+            >
+              <!-- Lucide "lock" icon. -->
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="size-4"
+                aria-hidden="true"
+              >
+                <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              {{ t('close.button') }}
+            </button>
+          </div>
+        </section>
+      }
     } @else if (loading()) {
       <p role="status" class="mt-6 text-sm text-muted">{{ t('loading') }}</p>
     } @else if (problemMessage(); as message) {

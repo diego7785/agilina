@@ -18,7 +18,7 @@ from tests.api.builders.identifiers import next_id
 
 @dataclass(frozen=True)
 class SprintBuilder:
-    """An active sprint from Monday 2026-10-05 to Friday 2026-10-16 (12 calendar days), with
+    """Sprint number 1, active, from Monday 2026-10-05 to Friday 2026-10-16 (12 calendar days), with
     the daily at 09:00 in America/Bogota (the anchor 2026-10-05T14:00Z) and no participants.
 
     ``for_team(team)`` takes the team's active members, in the order they joined, as the
@@ -28,6 +28,7 @@ class SprintBuilder:
 
     sprint_id: UUID = field(default_factory=next_id)
     team_id: UUID = field(default_factory=next_id)
+    number: int = 1
     start: date = SPRINT_START
     end: date = SPRINT_END
     daily_at: datetime = DAILY_TIME
@@ -42,6 +43,10 @@ class SprintBuilder:
         """A sprint of ``team``, with its active members as the daily's participants."""
         members = tuple(m.user_id for m in team.memberships if m.is_active)
         return replace(self, team_id=team.id, participants=members)
+
+    def numbered(self, number: int) -> Self:
+        """The sprint's number in its team (1 unless said otherwise)."""
+        return replace(self, number=number)
 
     def for_team_id(self, team_id: UUID) -> Self:
         """A sprint of the team ``team_id``; the participants stay as they are."""
@@ -70,6 +75,7 @@ class SprintBuilder:
         return Sprint(
             sprint_id=self.sprint_id,
             team_id=self.team_id,
+            number=self.number,
             period=SprintPeriod(start=self.start, end=self.end),
             daily_time=DailyTime(at=self.daily_at, time_zone=self.time_zone),
             participants=self.participants,

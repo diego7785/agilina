@@ -1,0 +1,98 @@
+<div
+  class="pointer-events-none fixed inset-x-4 bottom-4 z-40 flex flex-col gap-2 sm:inset-x-auto sm:right-4 sm:w-96"
+  data-testid="toasts"
+>
+  <div role="alert" class="flex flex-col gap-2" data-testid="toasts-errors">
+    @for (toast of errors(); track toast.id) {
+      <ng-container *ngTemplateOutlet="item; context: { $implicit: toast }" />
+    }
+  </div>
+  <div role="status" aria-live="polite" class="flex flex-col gap-2" data-testid="toasts-successes">
+    @for (toast of successes(); track toast.id) {
+      <ng-container *ngTemplateOutlet="item; context: { $implicit: toast }" />
+    }
+  </div>
+</div>
+
+<ng-template #item let-toast>
+  <!-- The surface under the tint keeps the text readable over whatever is behind. -->
+  <div
+    class="pointer-events-auto rounded-xl bg-surface shadow-lg"
+    [attr.data-testid]="'toast-' + toast.kind"
+    (mouseenter)="paused.emit(toast.id)"
+    (mouseleave)="resumed.emit(toast.id)"
+    (focusin)="paused.emit(toast.id)"
+    (focusout)="resumed.emit(toast.id)"
+  >
+    <div
+      class="flex items-start gap-3 rounded-xl border p-3"
+      [class]="
+        toast.kind === 'error' ? 'border-danger/40 bg-danger/10' : 'border-success/40 bg-success/10'
+      "
+    >
+      @if (toast.kind === 'error') {
+        <!-- Lucide "circle-alert" icon. -->
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="mt-0.5 size-5 shrink-0 text-danger"
+          aria-hidden="true"
+          data-testid="toast-icon-error"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" x2="12" y1="8" y2="12" />
+          <line x1="12" x2="12.01" y1="16" y2="16" />
+        </svg>
+      } @else {
+        <!-- Lucide "circle-check" icon. -->
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="mt-0.5 size-5 shrink-0 text-success"
+          aria-hidden="true"
+          data-testid="toast-icon-success"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <path d="m9 12 2 2 4-4" />
+        </svg>
+      }
+      <p class="min-w-0 flex-1 pt-0.5 text-sm break-words" data-testid="toast-message">
+        {{ toast.message }}
+      </p>
+      <button
+        aglIconButton
+        type="button"
+        class="-mt-1 -mr-1 size-8"
+        data-testid="toast-close"
+        [attr.aria-label]="closeLabel()"
+        (click)="dismissed.emit(toast.id)"
+      >
+        <!-- Lucide "x" icon. -->
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="size-4"
+          aria-hidden="true"
+        >
+          <path d="M18 6 6 18" />
+          <path d="m6 6 12 12" />
+        </svg>
+      </button>
+    </div>
+  </div>
+</ng-template>

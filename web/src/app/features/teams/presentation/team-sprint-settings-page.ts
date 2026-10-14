@@ -11,11 +11,12 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
+import { Notifier } from '@core/notifications/notifier';
 import { TenantContext } from '@core/tenant/tenant-context';
 import { Button } from '@shared/ui/button';
 import { DatePicker } from '@shared/ui/date-picker';
 import { TextField } from '@shared/ui/text-field';
-import { formatLocalDateTime, localTimeOf } from '@shared/utils/local-date-time';
+import { localTimeOf } from '@shared/utils/local-date-time';
 
 import { problemMessageKey } from './problem-message';
 import { SettingsNoAccess } from './settings-no-access';
@@ -23,7 +24,11 @@ import { SettingsTabs } from './settings-tabs';
 import { SprintSettingsFacade } from '../application/sprint-settings.facade';
 import { TeamShellFacade } from '../application/team-shell.facade';
 import { keepMembers, moveDown, moveUp, toggleParticipant } from '../domain/daily-order';
-import { areSprintFieldsValid, sprintFieldsProblems } from '../domain/sprint-draft';
+import {
+  areSprintFieldsValid,
+  sprintFieldsProblems,
+  type SprintFields,
+} from '../domain/sprint-draft';
 
 /** A turn of the daily as the order list shows it. */
 interface Turn {
@@ -60,6 +65,7 @@ export class TeamSprintSettingsPage implements OnInit {
 
   private readonly facade = inject(SprintSettingsFacade);
   private readonly shell = inject(TeamShellFacade);
+  private readonly notifier = inject(Notifier);
   protected readonly tenant = inject(TenantContext);
 
   protected readonly sprint = this.facade.sprint;
@@ -77,23 +83,32 @@ export class TeamSprintSettingsPage implements OnInit {
   );
   protected readonly saveMessage = computed(() => problemMessageKey(this.facade.saveProblem()));
 
-  // The form starts from the sprint the API has, and again whenever the API answers another one.
-  protected readonly startDate = linkedSignal(() => this.sprint()?.startDate ?? '');
-  protected readonly endDate = linkedSignal(() => this.sprint()?.endDate ?? '');
-  /** The time the person will see the daily at: the next one, or the anchor once none is left. */
-  protected readonly dailyTime = linkedSignal(() => {
+  /**
+   * The form as the saved sprint fills it (empty when the team has none): the starting point it
+   * goes back to whenever the API answers another sprint, and what "changed" is measured from.
+   */
+  private readonly saved = computed<SprintFields>(() => {
     const sprint = this.sprint();
-    return sprint === undefined || sprint === null
-      ? ''
-      : localTimeOf(sprint.nextDailyAt ?? sprint.dailyTime);
+    return {
+      startDate: sprint?.startDate ?? '',
+      endDate: sprint?.endDate ?? '',
+      // The time the person will see the daily at: the next one, or the anchor once none is left.
+      dailyTime:
+        sprint === undefined || sprint === null
+          ? ''
+          : localTimeOf(sprint.nextDailyAt ?? sprint.dailyTime),
+      // In turn order; someone who is no longer a member is left out.
+      participants: keepMembers(
+        sprint?.participants ?? [],
+        (this.members() ?? []).map((member) => member.userId),
+      ),
+    };
   });
-  /** The participants in turn order; someone who is no longer a member is left out. */
-  protected readonly order = linkedSignal(() =>
-    keepMembers(
-      this.sprint()?.participants ?? [],
-      (this.members() ?? []).map((member) => member.userId),
-    ),
-  );
+  protected readonly startDate = linkedSignal(() => this.saved().startDate);
+  protected readonly endDate = linkedSignal(() => this.saved().endDate);
+  protected readonly dailyTime = linkedSignal(() => this.saved().dailyTime);
+  /** The participants in turn order. */
+  protected readonly order = linkedSignal(() => this.saved().participants);
 
   /** Whether the person already changed each part or left it: errors wait until then. */
   protected readonly startTouched = signal(false);
@@ -109,6 +124,18 @@ export class TeamSprintSettingsPage implements OnInit {
     }),
   );
   protected readonly canSave = computed(() => areSprintFieldsValid(this.problems()));
+  /** Whether the form differs from the saved sprint, in anything that is saved with it. */
+  protected readonly hasChanges = computed(() => {
+    const saved = this.saved();
+    return (
+      this.startDate() !== saved.startDate ||
+      this.endDate() !== saved.endDate ||
+      this.dailyTime() !== saved.dailyTime ||
+      !sameOrder(this.order(), saved.participants)
+    );
+  });
+  /** Saving makes sense with something valid and new to save: no changes, nothing to send. */
+  protected readonly canSubmit = computed(() => this.canSave() && this.hasChanges());
   protected readonly startProblem = computed(() =>
     this.startTouched() ? this.problems().startDate : null,
   );
@@ -132,8 +159,6 @@ export class TeamSprintSettingsPage implements OnInit {
   });
   /** The last move, announced to screen readers: who now has which turn. */
   protected readonly lastMove = signal<Turn | null>(null);
-  /** Whether the last save worked and nothing changed since. */
-  protected readonly justSaved = signal(false);
 
   ngOnInit(): void {
     this.facade.follow(this.teamId);
@@ -147,26 +172,22 @@ export class TeamSprintSettingsPage implements OnInit {
   protected changeStartDate(value: string): void {
     this.startDate.set(value);
     this.startTouched.set(true);
-    this.changed();
   }
 
   protected changeEndDate(value: string): void {
     this.endDate.set(value);
     this.endTouched.set(true);
-    this.changed();
   }
 
   protected changeDailyTime(value: string): void {
     this.dailyTime.set(value);
     this.timeTouched.set(true);
-    this.changed();
   }
 
   protected toggle(userId: string): void {
     this.order.update((order) => toggleParticipant(order, userId));
     this.participantsTouched.set(true);
     this.lastMove.set(null);
-    this.changed();
   }
 
   protected moveUp(userId: string): void {
@@ -177,13 +198,8 @@ export class TeamSprintSettingsPage implements OnInit {
     this.move(moveDown(this.order(), userId), userId);
   }
 
-  /** An instant, in the browser's time zone and the active language. */
-  protected formatInstant(instant: string, language: string): string {
-    return formatLocalDateTime(instant, language);
-  }
-
   protected async submit(): Promise<void> {
-    if (!this.canSave() || this.saving()) {
+    if (!this.canSubmit() || this.saving()) {
       return;
     }
     const saved = await this.facade.save({
@@ -192,16 +208,24 @@ export class TeamSprintSettingsPage implements OnInit {
       dailyTime: this.dailyTime(),
       participants: this.order(),
     });
-    this.justSaved.set(saved);
+    if (saved) {
+      this.notifier.success('teams.sprint.saved');
+      return;
+    }
+    // A refusal for lack of access replaces the screen with "no access"; any other says why.
+    const message = this.saveMessage();
+    if (!this.forbidden() && message !== null) {
+      this.notifier.error(`teams.sprint.save.${message}`);
+    }
   }
 
   private move(order: readonly string[], userId: string): void {
     this.order.set(order);
     this.lastMove.set(this.turns().find((turn) => turn.userId === userId) ?? null);
-    this.changed();
   }
+}
 
-  private changed(): void {
-    this.justSaved.set(false);
-  }
+/** Whether two lists of participants hold the same people in the same turn order. */
+function sameOrder(first: readonly string[], second: readonly string[]): boolean {
+  return first.length === second.length && first.every((userId, index) => userId === second[index]);
 }

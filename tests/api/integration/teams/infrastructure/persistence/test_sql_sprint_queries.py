@@ -22,6 +22,7 @@ async def test_the_active_sprint_is_read_with_its_participants_in_turn_order(ses
         session_factory,
         SprintBuilder()
         .for_team(team)
+        .numbered(12)
         .with_daily_time(datetime(2026, 10, 4, 23, 0, tzinfo=UTC), "Asia/Tokyo")
         .with_participants(bruno.id, ana.id),
     )
@@ -30,6 +31,7 @@ async def test_the_active_sprint_is_read_with_its_participants_in_turn_order(ses
 
     assert record == ActiveSprintRecord(
         sprint_id=sprint.id,
+        number=12,
         start_date=date(2026, 10, 5),
         end_date=date(2026, 10, 16),
         daily_time=datetime(2026, 10, 4, 23, 0, tzinfo=UTC),
@@ -50,8 +52,8 @@ async def test_a_sprint_without_participants_is_read_with_none(session_factory):
 async def test_only_the_active_sprint_of_the_team_is_read(session_factory):
     team, other = await stored_team(session_factory), await stored_team(session_factory)
     await stored_sprint(session_factory, SprintBuilder().for_team(team).closed())
-    await stored_sprint(session_factory, SprintBuilder().for_team(team).planned())
-    active = await stored_sprint(session_factory, SprintBuilder().for_team(team))
+    await stored_sprint(session_factory, SprintBuilder().for_team(team).numbered(2).planned())
+    active = await stored_sprint(session_factory, SprintBuilder().for_team(team).numbered(3))
     await stored_sprint(session_factory, SprintBuilder().for_team(other))
 
     record = await SqlSprintQueries(session_factory).active_sprint_of(team.id)

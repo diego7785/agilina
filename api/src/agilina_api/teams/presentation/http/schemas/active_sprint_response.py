@@ -11,6 +11,13 @@ from agilina_api.teams.presentation.http.schemas.sprint_day_response import Spri
 
 class ActiveSprintResponse(BaseModel):
     id: UUID
+    number: int = Field(
+        description=(
+            "The sprint's number in its team (the 12 of \"Sprint 12\"): 1 for the team's first "
+            "sprint, then the highest the team has had plus one. The API assigns it when the "
+            "sprint is saved and it never changes; it is not the day of the sprint (`day`)."
+        )
+    )
     start_date: date
     end_date: date
     daily_time: datetime = Field(

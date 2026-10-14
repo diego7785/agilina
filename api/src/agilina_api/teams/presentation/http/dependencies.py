@@ -11,6 +11,7 @@ from agilina_api.teams.application.commands.remove_member import RemoveMemberHan
 from agilina_api.teams.application.commands.start_sprint import StartSprintHandler
 from agilina_api.teams.application.queries.get_active_sprint import GetActiveSprintHandler
 from agilina_api.teams.application.queries.get_team import GetTeamHandler
+from agilina_api.teams.application.queries.get_team_dashboard import GetTeamDashboardHandler
 from agilina_api.teams.application.queries.get_team_user import GetTeamUserHandler
 from agilina_api.teams.application.queries.list_my_teams import ListMyTeamsHandler
 from agilina_api.teams.application.queries.list_team_members import ListTeamMembersHandler
@@ -53,4 +54,8 @@ def get_get_active_sprint_handler() -> GetActiveSprintHandler:
 
 
 def get_get_team_user_handler() -> GetTeamUserHandler:
+    raise NotImplementedError("Wired by the composition root")
+
+
+def get_get_team_dashboard_handler() -> GetTeamDashboardHandler:
     raise NotImplementedError("Wired by the composition root")

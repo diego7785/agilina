@@ -28,6 +28,7 @@ const MEMBERS: TeamMembers = { roles: [], members: [ANA, BRUNO] };
 
 const SPRINT: ActiveSprint = {
   id: 'sprint-1',
+  number: 12,
   startDate: '2026-10-05',
   endDate: '2026-10-16',
   dailyTime: '2026-10-05T14:00:00Z',

@@ -2,18 +2,23 @@ import { ApplicationRef, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { NEVER, of, throwError, type Observable } from 'rxjs';
 
-import { aTeam } from '@testing/team';
+import { aDashboard } from '@testing/dashboard';
+import { TestClock } from '@testing/now';
 
 import { TeamDashboardFacade } from './team-dashboard.facade';
 import { TeamsPort } from './teams.port';
 import { type Team } from '../domain/team';
+import { type TeamDashboard } from '../domain/team-dashboard';
+import { TeamFailure } from '../domain/team-failure';
 
-/** Port double: get() answers the team of each known id and fails for any other. */
+/** Port double: dashboard() answers what the test chose for each team id. */
 class FakeTeamsPort extends TeamsPort {
   readonly requested: string[] = [];
-  readonly teams: Record<string, Team> = {
-    atlas: aTeam('atlas', 'Atlas', 'admin'),
-    boreal: aTeam('boreal', 'Boreal', 'admin'),
+  readonly answers: Record<string, Observable<TeamDashboard>> = {
+    atlas: of(aDashboard()),
+    boreal: of(
+      aDashboard({ team: { id: 'boreal', name: 'Boreal', mode: 'autonomous', label: 'admin' } }),
+    ),
   };
 
   listMine(): Observable<readonly Team[]> {
@@ -24,63 +29,190 @@ class FakeTeamsPort extends TeamsPort {
     return NEVER;
   }
 
-  get(teamId: string): Observable<Team> {
+  get(): Observable<Team> {
+    return NEVER;
+  }
+
+  dashboard(teamId: string): Observable<TeamDashboard> {
     this.requested.push(teamId);
-    const team = this.teams[teamId];
-    return team === undefined ? throwError(() => new Error('403')) : of(team);
+    return this.answers[teamId] ?? throwError(() => new TeamFailure('not_a_member'));
   }
 }
 
 describe('TeamDashboardFacade', () => {
   let port: FakeTeamsPort;
+  let clock: TestClock;
   let facade: TeamDashboardFacade;
 
-  beforeEach(() => {
+  /** The daily of `aDashboard()` starts at 14:00 UTC and its room opens at 13:50. */
+  function start(now: string): void {
     port = new FakeTeamsPort();
+    clock = new TestClock(now);
     TestBed.configureTestingModule({
-      providers: [TeamDashboardFacade, { provide: TeamsPort, useValue: port }],
+      providers: [TeamDashboardFacade, { provide: TeamsPort, useValue: port }, clock.provide()],
     });
     facade = TestBed.inject(TeamDashboardFacade);
-  });
+  }
 
   async function stable(): Promise<void> {
     await TestBed.inject(ApplicationRef).whenStable();
   }
 
-  it('asks for nothing until it knows which team to follow', async () => {
-    await stable();
+  describe('reading', () => {
+    beforeEach(() => {
+      start('2026-10-08T12:00:00Z');
+    });
 
-    expect(port.requested).toEqual([]);
-    expect(facade.team()).toBeNull();
-    expect(facade.failed()).toBeFalse();
+    it('asks for nothing until it knows which team to follow', async () => {
+      await stable();
+
+      expect(port.requested).toEqual([]);
+      expect(facade.team()).toBeNull();
+      expect(facade.known()).toBeFalse();
+      expect(facade.failed()).toBeFalse();
+    });
+
+    it('loads the dashboard of the id it receives, in a single read', async () => {
+      facade.follow(signal('atlas'));
+      await stable();
+
+      expect(port.requested).toEqual(['atlas']);
+      expect(facade.team()?.name).toBe('Atlas');
+      expect(facade.sprint()?.day).toEqual({ number: 3, total: 10, phase: 'in_progress' });
+      expect(facade.nextCeremony()?.startsAt).toBe('2026-10-08T14:00:00Z');
+      expect(facade.canConfigure()).toBeTrue();
+      expect(facade.known()).toBeTrue();
+      expect(facade.loading()).toBeFalse();
+    });
+
+    it('loads the dashboard again when the id changes', async () => {
+      const teamId = signal('atlas');
+      facade.follow(teamId);
+      await stable();
+
+      teamId.set('boreal');
+      await stable();
+
+      expect(port.requested).toEqual(['atlas', 'boreal']);
+      expect(facade.team()?.name).toBe('Boreal');
+    });
+
+    it('has no sprint and no ceremony when the team has none, and does not configure for a member', async () => {
+      port.answers['atlas'] = of(
+        aDashboard({ sprint: null, nextCeremony: null, canConfigure: false }),
+      );
+      facade.follow(signal('atlas'));
+      await stable();
+
+      expect(facade.known()).toBeTrue();
+      expect(facade.sprint()).toBeNull();
+      expect(facade.nextCeremony()).toBeNull();
+      expect(facade.canConfigure()).toBeFalse();
+      expect(facade.joinState()).toBe('none');
+    });
+
+    it('turns a refused team into the failed state with its problem', async () => {
+      facade.follow(signal('someone-elses'));
+      await stable();
+
+      expect(facade.failed()).toBeTrue();
+      expect(facade.problem()).toBe('not_a_member');
+      expect(facade.team()).toBeNull();
+    });
+
+    it('says there is no problem while the team opens', async () => {
+      facade.follow(signal('atlas'));
+      await stable();
+
+      expect(facade.problem()).toBeNull();
+    });
+
+    it('tells the room is not yet open before the window', async () => {
+      facade.follow(signal('atlas'));
+      await stable();
+
+      expect(facade.joinState()).toBe('not_yet');
+    });
   });
 
-  it('loads the team of the id it receives', async () => {
-    facade.follow(signal('atlas'));
-    await stable();
+  describe('the window to join', () => {
+    beforeEach(() => {
+      jasmine.clock().install();
+    });
 
-    expect(port.requested).toEqual(['atlas']);
-    expect(facade.team()).toEqual(aTeam('atlas', 'Atlas', 'admin'));
-    expect(facade.loading()).toBeFalse();
-  });
+    afterEach(() => {
+      jasmine.clock().uninstall();
+    });
 
-  it('loads the team again when the id changes', async () => {
-    const teamId = signal('atlas');
-    facade.follow(teamId);
-    await stable();
+    /** Lets the resource and the effects run with the mocked timers. */
+    async function settle(): Promise<void> {
+      for (let round = 0; round < 5; round++) {
+        TestBed.tick();
+        jasmine.clock().tick(0);
+        await Promise.resolve();
+      }
+    }
 
-    teamId.set('boreal');
-    await stable();
+    it('opens the room by itself when the window starts', async () => {
+      start('2026-10-08T13:49:00Z');
+      facade.follow(signal('atlas'));
+      await settle();
+      expect(facade.joinState()).toBe('not_yet');
 
-    expect(port.requested).toEqual(['atlas', 'boreal']);
-    expect(facade.team()).toEqual(aTeam('boreal', 'Boreal', 'admin'));
-  });
+      clock.now = new Date('2026-10-08T13:50:00Z');
+      jasmine.clock().tick(60_000);
+      await settle();
 
-  it('turns a refused team into the failed state', async () => {
-    facade.follow(signal('someone-elses'));
-    await stable();
+      expect(facade.joinState()).toBe('open');
+    });
 
-    expect(facade.failed()).toBeTrue();
-    expect(facade.team()).toBeNull();
+    it('asks for the next ceremony by itself when the current one starts', async () => {
+      start('2026-10-08T13:59:00Z');
+      facade.follow(signal('atlas'));
+      await settle();
+      expect(facade.joinState()).toBe('open');
+      expect(port.requested).toEqual(['atlas']);
+      port.answers['atlas'] = of(
+        aDashboard({
+          nextCeremony: {
+            type: 'daily',
+            startsAt: '2026-10-09T14:00:00Z',
+            joinOpensAt: '2026-10-09T13:50:00Z',
+          },
+        }),
+      );
+
+      clock.now = new Date('2026-10-08T14:00:00Z');
+      jasmine.clock().tick(60_000);
+      await settle();
+
+      expect(port.requested).toEqual(['atlas', 'atlas']);
+      expect(facade.nextCeremony()?.startsAt).toBe('2026-10-09T14:00:00Z');
+      expect(facade.joinState()).toBe('not_yet');
+    });
+
+    it('sets no timer when the team has no ceremony', async () => {
+      start('2026-10-08T13:00:00Z');
+      port.answers['atlas'] = of(aDashboard({ sprint: null, nextCeremony: null }));
+      facade.follow(signal('atlas'));
+      await settle();
+
+      jasmine.clock().tick(24 * 60 * 60 * 1000);
+      await settle();
+
+      expect(port.requested).toEqual(['atlas']);
+    });
+
+    it('stops its timer when it is destroyed', async () => {
+      start('2026-10-08T13:59:00Z');
+      facade.follow(signal('atlas'));
+      await settle();
+
+      TestBed.resetTestingModule();
+      clock.now = new Date('2026-10-08T14:00:00Z');
+      jasmine.clock().tick(60_000);
+
+      expect(port.requested).toEqual(['atlas']);
+    });
   });
 });

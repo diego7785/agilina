@@ -8,6 +8,10 @@ import { TeamFailure } from '../domain/team-failure';
 
 /** Port double: each create() waits until the test answers it. */
 class FakeTeamsPort extends TeamsPort {
+  dashboard(): Observable<never> {
+    return NEVER;
+  }
+
   pending = new Subject<string>();
   readonly names: string[] = [];
 

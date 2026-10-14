@@ -26,6 +26,7 @@ class SqlSprintQueries(SprintQueries):
         statement = (
             select(
                 SprintRow.id,
+                SprintRow.number,
                 SprintRow.start_date,
                 SprintRow.end_date,
                 SprintRow.daily_time_utc,
@@ -43,6 +44,7 @@ class SqlSprintQueries(SprintQueries):
         sprint = rows[0]
         return ActiveSprintRecord(
             sprint_id=sprint.id,
+            number=sprint.number,
             start_date=sprint.start_date,
             end_date=sprint.end_date,
             daily_time=sprint.daily_time_utc,

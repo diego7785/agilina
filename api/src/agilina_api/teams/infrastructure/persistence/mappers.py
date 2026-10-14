@@ -15,6 +15,7 @@ def sprint_to_domain(row: SprintRow, participants: Sequence[UUID]) -> Sprint:
     return Sprint(
         sprint_id=row.id,
         team_id=row.team_id,
+        number=row.number,
         period=SprintPeriod(start=row.start_date, end=row.end_date),
         daily_time=DailyTime(at=row.daily_time_utc, time_zone=row.daily_time_zone),
         participants=participants,
@@ -26,6 +27,7 @@ def sprint_to_row(sprint: Sprint) -> SprintRow:
     return SprintRow(
         id=sprint.id,
         team_id=sprint.team_id,
+        number=sprint.number,
         start_date=sprint.period.start,
         end_date=sprint.period.end,
         status=sprint.status,

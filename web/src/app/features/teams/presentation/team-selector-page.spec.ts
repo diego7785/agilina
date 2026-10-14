@@ -3,7 +3,9 @@ import { provideRouter, Router, withComponentInputBinding } from '@angular/route
 import { RouterTestingHarness } from '@angular/router/testing';
 import { NEVER, of, Subject, throwError, type Observable } from 'rxjs';
 
+import { aDashboard } from '@testing/dashboard';
 import { provideTestI18n } from '@testing/i18n';
+import { TestClock } from '@testing/now';
 import { aTeam } from '@testing/team';
 import { provideTestTenant } from '@testing/tenant';
 import { provideStubUsersPort } from '@testing/users';
@@ -11,9 +13,9 @@ import { provideStubUsersPort } from '@testing/users';
 import { CreateTeamPage } from './create-team-page';
 import { TeamDashboardPage } from './team-dashboard-page';
 import { TeamSelectorPage } from './team-selector-page';
-import { SprintsPort } from '../application/sprints.port';
 import { TeamsPort } from '../application/teams.port';
 import { type Team } from '../domain/team';
+import { type TeamDashboard } from '../domain/team-dashboard';
 
 /** Port double: listMine() answers what the test chose; get() finds the team by id. */
 class FakeTeamsPort extends TeamsPort {
@@ -31,6 +33,17 @@ class FakeTeamsPort extends TeamsPort {
   get(teamId: string): Observable<Team> {
     const team = this.known.find((candidate) => candidate.id === teamId);
     return team === undefined ? throwError(() => new Error('403')) : of(team);
+  }
+
+  dashboard(teamId: string): Observable<TeamDashboard> {
+    const team = this.known.find((candidate) => candidate.id === teamId);
+    return team === undefined
+      ? throwError(() => new Error('403'))
+      : of(
+          aDashboard({
+            team: { id: team.id, name: team.name, mode: team.mode, label: team.label },
+          }),
+        );
   }
 }
 
@@ -53,12 +66,8 @@ describe('TeamSelectorPage', () => {
           withComponentInputBinding(),
         ),
         { provide: TeamsPort, useValue: port },
-        // The dashboard also reads the sprint: the team has none here.
-        {
-          provide: SprintsPort,
-          useValue: { active: () => of(null), start: () => NEVER, reconfigure: () => NEVER },
-        },
         provideStubUsersPort(),
+        new TestClock('2026-10-08T12:00:00Z').provide(),
       ],
     });
     harness = await RouterTestingHarness.create();
@@ -97,7 +106,8 @@ describe('TeamSelectorPage', () => {
     await harness.fixture.whenStable();
 
     expect(TestBed.inject(Router).url).toBe('/acme/teams/b');
-    expect(harness.routeNativeElement?.querySelector('h1')?.textContent.trim()).toBe('Boreal');
+    expect(harness.routeNativeElement?.querySelector('h1')?.textContent.trim()).toBe('Dashboard');
+    expect(harness.routeNativeElement?.querySelector('[data-testid=team-mode]')).not.toBeNull();
   });
 
   it('with no team shows the empty list and the button to create one', async () => {
@@ -116,7 +126,34 @@ describe('TeamSelectorPage', () => {
     await open(of([aTeam('a', 'Atlas', 'admin')]));
 
     expect(TestBed.inject(Router).url).toBe('/acme/teams/a');
-    expect(harness.routeNativeElement?.querySelector('h1')?.textContent.trim()).toBe('Atlas');
+    expect(harness.routeNativeElement?.querySelector('h1')?.textContent.trim()).toBe('Dashboard');
+  });
+
+  it('shows the only team and the way to create another when the person asks to choose', async () => {
+    port.known = [aTeam('a', 'Atlas', 'admin')];
+    port.mine = of([aTeam('a', 'Atlas', 'admin')]);
+
+    await TestBed.inject(Router).navigateByUrl('/acme/teams', { state: { choose: true } });
+    await harness.fixture.whenStable();
+    const page = harness.routeNativeElement!;
+
+    expect(TestBed.inject(Router).url).toBe('/acme/teams');
+    expect(links(page)).toEqual([{ text: 'Atlas', href: '/acme/teams/a' }]);
+    expect(page.querySelector('a[href="/acme/teams/new"]')?.textContent.trim()).toBe(
+      'Crear equipo nuevo',
+    );
+  });
+
+  it('still enters the team it is shown when the person clicks it', async () => {
+    port.known = [aTeam('a', 'Atlas', 'admin')];
+    port.mine = of([aTeam('a', 'Atlas', 'admin')]);
+    await TestBed.inject(Router).navigateByUrl('/acme/teams', { state: { choose: true } });
+    await harness.fixture.whenStable();
+
+    harness.routeNativeElement!.querySelector<HTMLAnchorElement>('ul a')!.click();
+    await harness.fixture.whenStable();
+
+    expect(TestBed.inject(Router).url).toBe('/acme/teams/a');
   });
 
   it('always offers to create a team', async () => {

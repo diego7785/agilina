@@ -16,6 +16,7 @@ from agilina_api.teams.application.commands.start_sprint import StartSprintHandl
 from agilina_api.teams.application.dtos import MemberContact, MemberRecord, TeamView, UserTeamView
 from agilina_api.teams.application.queries.get_active_sprint import GetActiveSprintHandler
 from agilina_api.teams.application.queries.get_team import GetTeamHandler
+from agilina_api.teams.application.queries.get_team_dashboard import GetTeamDashboardHandler
 from agilina_api.teams.application.queries.get_team_user import GetTeamUserHandler
 from agilina_api.teams.application.queries.list_my_teams import ListMyTeamsHandler
 from agilina_api.teams.application.queries.list_team_members import ListTeamMembersHandler
@@ -50,6 +51,7 @@ class Api:
     def __init__(self) -> None:
         self.ana, self.bruno, self.carla = next_id(), next_id(), next_id()
         self.atlas, self.boreal = next_id(), next_id()
+        self.clock = FakeClock()
         self.uow = FakeTeamsUnitOfWork()
         self.members_uow = FakeTeamsUnitOfWork(active_sprints=FakeActiveSprints())
         self.queries = FakeTeamQueries(
@@ -106,6 +108,9 @@ class Api:
         users = FakeAuthenticatedUsers(
             {TOKEN_ANA: self.ana, TOKEN_BRUNO: self.bruno, TOKEN_CARLA: self.carla}
         )
+        active_sprint = GetActiveSprintHandler(
+            FakeSprintQueries(self.members_uow.sprints), self.clock
+        )
         app = create_app()
         overrides = {
             deps.get_create_team_as_admin_handler: CreateTeamAsAdminHandler(
@@ -119,8 +124,9 @@ class Api:
                 lambda: self.members_uow, new_id=next_id
             ),
             deps.get_reconfigure_sprint_handler: ReconfigureSprintHandler(lambda: self.members_uow),
-            deps.get_get_active_sprint_handler: GetActiveSprintHandler(
-                FakeSprintQueries(self.members_uow.sprints), FakeClock()
+            deps.get_get_active_sprint_handler: active_sprint,
+            deps.get_get_team_dashboard_handler: GetTeamDashboardHandler(
+                self.queries, active_sprint
             ),
             deps.get_change_member_role_handler: ChangeMemberRoleHandler(
                 lambda: self.members_uow, FakeClock()

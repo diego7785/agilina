@@ -51,6 +51,10 @@ class InMemorySprintRepository:
     async def add(self, sprint: Sprint) -> None:
         self.sprints[sprint.id] = copy.deepcopy(sprint)
 
+    async def next_number(self, team_id: UUID) -> int:
+        numbers = [sprint.number for sprint in self.sprints.values() if sprint.team_id == team_id]
+        return max(numbers, default=0) + 1
+
     async def get_active(self, team_id: UUID) -> Sprint | None:
         found = self.active_of(team_id)
         return copy.deepcopy(found) if found is not None else None
@@ -86,6 +90,7 @@ class FakeSprintQueries:
             return None
         return ActiveSprintRecord(
             sprint_id=sprint.id,
+            number=sprint.number,
             start_date=sprint.period.start,
             end_date=sprint.period.end,
             daily_time=sprint.daily_time.at,

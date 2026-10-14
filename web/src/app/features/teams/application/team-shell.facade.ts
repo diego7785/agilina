@@ -8,7 +8,8 @@ import { UsersPort } from './users.port';
 
 /**
  * What the top bar says about the team of a screen: the team's name and how the user is
- * called in it (their label in this team) and the person's own name, both from `GET /v1/users/me`. It is put in the bar while
+ * called in it (their label in this team) and the person's own name, both from `GET /v1/users/me`,
+ * and whether to draw the Settings entry (the user is an admin of the team). It is put in the bar while
  * the screen lives and taken out when the screen goes away. If either cannot be read the bar
  * simply says nothing about the team: the screen already tells what went wrong. Provided by
  * the page, so it lives and dies with it.
@@ -30,9 +31,11 @@ export class TeamShellFacade {
   private readonly entry = computed<ShellTeam | null>(() =>
     this.team.hasValue() && this.me.hasValue()
       ? {
+          id: this.team.value().id,
           name: this.team.value().name,
           roleLabel: this.me.value().label,
           userName: this.me.value().fullName,
+          canConfigure: this.team.value().role === 'admin',
         }
       : null,
   );

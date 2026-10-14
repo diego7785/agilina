@@ -1,6 +1,7 @@
 """The teams HTTP API, with in-memory doubles behind the use cases and the access ports."""
 
 import logging
+from datetime import UTC, datetime
 
 import pytest
 
@@ -193,7 +194,12 @@ async def test_a_malformed_team_id_answers_422(api):
 
 
 # -------------------------------------------------------------- authentication --
-ROUTES = [("POST", "", {"json": {"name": "Cielo"}}), ("GET", "", {}), ("GET", "/{atlas}", {})]
+ROUTES = [
+    ("POST", "", {"json": {"name": "Cielo"}}),
+    ("GET", "", {}),
+    ("GET", "/{atlas}", {}),
+    ("GET", "/{atlas}/dashboard", {}),
+]
 
 
 @pytest.mark.parametrize(("method", "path", "kwargs"), ROUTES)
@@ -243,6 +249,10 @@ async def test_the_openapi_documents_support_and_en_as_defaults_and_the_401_422_
     assert "`support`" in team["mode"]["description"]
     assert "`en`" in team["language"]["description"]
 
+    dashboard = spec["paths"]["/v1/teams/{team_id}/dashboard"]["get"]
+    assert {"200", "401", "403", "404", "422"} <= set(dashboard["responses"])
+    assert [p["name"] for p in dashboard["parameters"]] == ["team_id"]
+
     assert spec["components"]["securitySchemes"]["HTTPBearer"]["scheme"] == "bearer"
     assert "ErrorEnvelope" in spec["components"]["schemas"]
 
@@ -278,6 +288,7 @@ async def test_an_admin_starts_the_sprint_and_gets_201_with_its_day_and_next_dai
     assert response.headers["location"] == f"/v1/teams/{api.atlas}/sprints/active"
     assert response.json() == {
         "id": str(sprint.id),
+        "number": 1,
         "start_date": "2026-10-05",
         "end_date": "2026-10-16",
         "daily_time": "2026-10-05T14:00:00Z",
@@ -324,6 +335,7 @@ async def test_an_admin_edits_the_active_sprint_and_gets_it_back(api):
     assert response.status_code == 200
     assert response.json() == {
         "id": str(sprint.id),
+        "number": 1,
         "start_date": "2026-10-03",
         "end_date": "2026-10-16",
         "daily_time": "2026-10-02T23:00:00Z",
@@ -619,3 +631,214 @@ async def test_the_openapi_documents_each_rule_of_the_sprint_with_its_code(api):
     assert all(f"`{code}`" in request["description"] for code in SPRINT_RULES)
     member = spec["paths"]["/v1/users/{user_id}"]["delete"]
     assert "daily" in member["description"]
+
+
+# ------------------------------------------------------- sprint number (HU-12) --
+async def test_the_first_sprint_of_a_team_is_number_1(api):
+    response = await api.request("POST", f"/{api.atlas}/sprints", TOKEN_ANA, json=_sprint_body(api))
+
+    assert response.status_code == 201 and response.json()["number"] == 1
+
+
+async def test_a_new_sprint_takes_the_highest_number_of_the_team_plus_one(api):
+    await (
+        SprintBuilder()
+        .for_team_id(api.atlas)
+        .numbered(4)
+        .closed()
+        .saved_in(api.members_uow.sprints)
+    )
+
+    response = await api.request("POST", f"/{api.atlas}/sprints", TOKEN_ANA, json=_sprint_body(api))
+
+    assert response.status_code == 201 and response.json()["number"] == 5
+
+
+async def test_the_number_of_the_sprint_is_the_same_wherever_it_is_read_and_after_editing(api):
+    created = await api.request("POST", f"/{api.atlas}/sprints", TOKEN_ANA, json=_sprint_body(api))
+
+    read = await api.request("GET", f"/{api.atlas}/sprints/active", TOKEN_CARLA)
+    edited = await api.request(
+        "PUT",
+        f"/{api.atlas}/sprints/active",
+        TOKEN_ANA,
+        json=_sprint_body(api, end_date="2026-10-20"),
+    )
+    dashboard = await api.request("GET", f"/{api.atlas}/dashboard", TOKEN_CARLA)
+
+    numbers = [
+        created.json()["number"],
+        read.json()["number"],
+        edited.json()["number"],
+        dashboard.json()["sprint"]["number"],
+    ]
+    assert numbers == [1, 1, 1, 1]
+
+
+@pytest.mark.parametrize(("method", "path"), SPRINT_WRITES)
+async def test_the_number_cannot_be_sent_by_the_client(api, method, path):
+    await SprintBuilder().for_team_id(api.atlas).saved_in(api.members_uow.sprints)
+
+    response = await api.request(
+        method, _path(api, path), TOKEN_ANA, json=_sprint_body(api, number=7)
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+    assert "7" not in response.json()["error"]["message"]
+
+
+# ------------------------------------------------------------- dashboard (HU-12) --
+def _at(day: int, hour: int, minute: int = 0) -> datetime:
+    return datetime(2026, 10, day, hour, minute, tzinfo=UTC)
+
+
+async def test_an_admin_reads_the_dashboard_of_a_team_whose_sprint_has_not_started(api):
+    """The default sprint runs 2026-10-05 to 2026-10-16 with the daily at 09:00 in Bogota
+    (14:00 UTC); the clock is at ``NOW``, the Sunday before it starts."""
+    await SprintBuilder().for_team_id(api.atlas).saved_in(api.members_uow.sprints)
+
+    response = await api.request("GET", f"/{api.atlas}/dashboard", TOKEN_ANA)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "team": {
+            "id": str(api.atlas),
+            "name": "Atlas",
+            "mode": "support",
+            "label": "scrum_master",
+        },
+        "sprint": {
+            "number": 1,
+            "start_date": "2026-10-05",
+            "end_date": "2026-10-16",
+            "day": {"number": 0, "total": 12, "phase": "not_started"},
+        },
+        "next_ceremony": {
+            "type": "daily",
+            "starts_at": "2026-10-05T14:00:00Z",
+            "join_opens_at": "2026-10-05T13:50:00Z",
+        },
+        "can_configure": True,
+    }
+
+
+async def test_a_member_gets_the_same_dashboard_without_the_settings_entry(api):
+    await SprintBuilder().for_team_id(api.atlas).saved_in(api.members_uow.sprints)
+
+    admin = await api.request("GET", f"/{api.atlas}/dashboard", TOKEN_ANA)
+    member = await api.request("GET", f"/{api.atlas}/dashboard", TOKEN_CARLA)
+
+    assert member.status_code == 200
+    assert member.json()["can_configure"] is False
+    assert member.json()["team"]["label"] == "member"
+    assert member.json()["sprint"] == admin.json()["sprint"]
+    assert member.json()["next_ceremony"] == admin.json()["next_ceremony"]
+
+
+async def test_while_the_sprint_is_in_progress_it_shows_the_day_and_the_next_daily(api):
+    await SprintBuilder().for_team_id(api.atlas).saved_in(api.members_uow.sprints)
+    api.clock.current = _at(7, 15)  # after the daily of Wednesday the 7th
+
+    response = await api.request("GET", f"/{api.atlas}/dashboard", TOKEN_CARLA)
+
+    assert response.json()["sprint"]["day"] == {"number": 3, "total": 12, "phase": "in_progress"}
+    assert response.json()["next_ceremony"] == {
+        "type": "daily",
+        "starts_at": "2026-10-08T14:00:00Z",
+        "join_opens_at": "2026-10-08T13:50:00Z",
+    }
+
+
+async def test_the_daily_that_starts_in_ten_minutes_has_its_room_open_right_now(api):
+    await SprintBuilder().for_team_id(api.atlas).saved_in(api.members_uow.sprints)
+    api.clock.current = _at(7, 13, 50)
+
+    ceremony = (await api.request("GET", f"/{api.atlas}/dashboard", TOKEN_CARLA)).json()[
+        "next_ceremony"
+    ]
+
+    assert ceremony["join_opens_at"] == "2026-10-07T13:50:00Z"
+    assert ceremony["starts_at"] == "2026-10-07T14:00:00Z"
+
+
+async def test_a_team_without_an_active_sprint_has_no_sprint_and_no_ceremony(api):
+    response = await api.request("GET", f"/{api.atlas}/dashboard", TOKEN_CARLA)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "team": {"id": str(api.atlas), "name": "Atlas", "mode": "support", "label": "member"},
+        "sprint": None,
+        "next_ceremony": None,
+        "can_configure": False,
+    }
+
+
+async def test_a_closed_sprint_does_not_count_as_the_active_one(api):
+    await SprintBuilder().for_team_id(api.atlas).closed().saved_in(api.members_uow.sprints)
+
+    response = await api.request("GET", f"/{api.atlas}/dashboard", TOKEN_ANA)
+
+    assert response.json()["sprint"] is None and response.json()["next_ceremony"] is None
+
+
+async def test_once_the_last_daily_started_the_sprint_stays_but_there_is_no_next_ceremony(api):
+    await SprintBuilder().for_team_id(api.atlas).saved_in(api.members_uow.sprints)
+    api.clock.current = _at(16, 15)
+
+    response = await api.request("GET", f"/{api.atlas}/dashboard", TOKEN_ANA)
+
+    assert response.json()["sprint"]["day"] == {"number": 12, "total": 12, "phase": "in_progress"}
+    assert response.json()["next_ceremony"] is None
+
+
+async def test_a_finished_sprint_that_is_still_open_has_no_next_ceremony(api):
+    await SprintBuilder().for_team_id(api.atlas).saved_in(api.members_uow.sprints)
+    api.clock.current = _at(18, 12)
+
+    response = await api.request("GET", f"/{api.atlas}/dashboard", TOKEN_ANA)
+
+    assert response.json()["sprint"]["day"]["phase"] == "finished"
+    assert response.json()["next_ceremony"] is None
+
+
+async def test_the_label_of_the_admin_follows_the_mode_of_the_team(api):
+    api.queries.views[api.atlas] = TeamView(
+        team_id=api.atlas, name="Atlas", mode=OperationMode.AUTONOMOUS, language=Language.EN
+    )
+
+    response = await api.request("GET", f"/{api.atlas}/dashboard", TOKEN_ANA)
+
+    team = response.json()["team"]
+    assert (team["mode"], team["label"]) == ("autonomous", "admin")
+    assert response.json()["can_configure"] is True
+
+
+async def test_a_non_member_gets_403_when_reading_a_dashboard(api):
+    response = await api.request("GET", f"/{api.atlas}/dashboard", TOKEN_BRUNO)
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "not_a_team_member"
+    assert "Atlas" not in response.text
+
+
+async def test_a_dashboard_of_a_team_that_does_not_exist_answers_403_like_a_foreign_one(api):
+    response = await api.request("GET", f"/{next_id()}/dashboard", TOKEN_ANA)
+
+    assert response.status_code == 403 and response.json()["error"]["code"] == "not_a_team_member"
+
+
+async def test_a_member_of_a_team_that_vanished_gets_404_team_not_found_on_the_dashboard(api):
+    """A membership without its team cannot exist (foreign key): only a race gets here."""
+    del api.queries.views[api.atlas]
+
+    response = await api.request("GET", f"/{api.atlas}/dashboard", TOKEN_ANA)
+
+    assert response.status_code == 404 and response.json()["error"]["code"] == "team_not_found"
+
+
+async def test_a_malformed_team_id_on_the_dashboard_answers_422(api):
+    response = await api.request("GET", "/not-a-uuid/dashboard", TOKEN_ANA)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"

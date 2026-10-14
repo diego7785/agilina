@@ -5,6 +5,15 @@
       "member": "Member",
       "scrum_master": "Scrum Master",
       "admin": "Administrator"
+    },
+    "change_team": "Switch team",
+    "nav": {
+      "label": "Team navigation",
+      "dashboard": "Dashboard",
+      "settings": "Settings"
+    },
+    "notifications": {
+      "close": "Dismiss notification"
     }
   },
   "status": {
@@ -55,21 +64,41 @@
     "dashboard": {
       "loading": "Loading the team…",
       "failed": "This team could not be opened.",
-      "settings": "Settings",
       "problems": {
         "not_authenticated": "Your session is not valid or has expired. Sign in again.",
         "not_a_member": "This team does not exist or you do not belong to it."
       },
+      "title": "Dashboard",
+      "time_zone_note": "Times are shown in your browser's time zone.",
       "sprint": {
+        "title": "Active sprint",
         "in_progress": "Day {{ number }} of {{ total }}",
         "not_started": "The sprint starts on {{ date }}",
         "finished": "Sprint finished",
-        "none": "No active sprint"
+        "none": "No active sprint",
+        "progress_label": "Sprint progress",
+        "number": "Sprint {{ number }}"
+      },
+      "ceremony": {
+        "title": "Next ceremony",
+        "daily": "Daily",
+        "none": "No ceremonies scheduled"
+      },
+      "mode": {
+        "title": "Team mode",
+        "support": "Support",
+        "autonomous": "Autonomous"
+      },
+      "room": {
+        "title": "Meeting room",
+        "description": "Your virtual Scrum Master for the Daily Stand-up",
+        "join": "Join the room",
+        "opens_at": "Opens at {{ time }}",
+        "no_ceremony": "No ceremonies scheduled."
       }
     },
     "settings": {
-      "title": "Team",
-      "subtitle": "The people who take part in the team's ceremonies, and their role.",
+      "title": "Members",
       "back": "Back to the team",
       "members": "Members",
       "columns": {
@@ -89,7 +118,6 @@
       "role_of": "Role of {{ name }}",
       "blocked": {
         "role_change": {
-          "sprint_in_progress": "The role cannot change while the team has a sprint in progress.",
           "last_admin": "This is the only {{ admin }}: the team cannot be left without one."
         },
         "removal": {
@@ -117,7 +145,8 @@
           "not_found": "This person is no longer in the team.",
           "last_admin": "The role cannot change: the team cannot be left without its {{ admin }}.",
           "sprint_in_progress": "The role cannot change while the team has a sprint in progress."
-        }
+        },
+        "success": "{{ name }}'s role updated."
       },
       "invite": {
         "open": "Invite member",
@@ -171,7 +200,8 @@
           "forbidden": "You are no longer the {{ admin }} of this team.",
           "not_found": "This person is no longer in the team.",
           "last_admin": "They cannot be removed: the team cannot be left without its {{ admin }}."
-        }
+        },
+        "success": "{{ name }} is no longer on the team."
       },
       "view": {
         "open_label": "View {{ name }}",
@@ -219,8 +249,6 @@
       "zone_hint": "Times are shown in your browser's time zone ({{ zone }}).",
       "saved_zone": "The daily time is saved in the {{ zone }} time zone.",
       "zone_change": "When you save, the daily time will move to your browser's time zone.",
-      "next_daily": "Next daily: {{ when }}.",
-      "no_next_daily": "There are no dailies left in this sprint.",
       "errors": {
         "start_date": {
           "blank": "Choose the start date."
@@ -238,7 +266,8 @@
         }
       },
       "participants": {
-        "title": "Daily participants"
+        "title": "Participants per ceremony",
+        "daily": "Daily"
       },
       "order": {
         "title": "Daily turn order",
@@ -247,7 +276,7 @@
         "move_down": "Move {{ name }} down",
         "moved": "{{ name }} now has turn {{ position }}."
       },
-      "submit": "Save sprint",
+      "submit": "Save",
       "saving": "Saving…",
       "saved": "Sprint saved.",
       "save": {
@@ -270,7 +299,13 @@
         "choose_date": "Choose a date",
         "previous_month": "Previous month",
         "next_month": "Next month"
-      }
+      },
+      "close": {
+        "title": "Close the active sprint",
+        "description": "The pending ceremonies will be closed and you will be able to edit roles and mode.",
+        "button": "Close the active sprint"
+      },
+      "number": "Sprint {{ number }}"
     }
   },
   "identity": {

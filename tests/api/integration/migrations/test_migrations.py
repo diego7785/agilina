@@ -135,10 +135,12 @@ async def _a_team(engine: AsyncEngine) -> str:
         )
 
 
-# The daily's time is required (HU-07); its value does not matter to these tests.
+# The daily's time is required (HU-07); its value does not matter to these tests. The number is
+# required too (HU-12): a test that stores several sprints of a team gives each its own.
 _SPRINT = text(
-    "INSERT INTO sprint (team_id, start_date, end_date, status, daily_time_utc, daily_time_zone) "
-    "VALUES (:team, :start, :end, CAST(:status AS sprint_status), "
+    "INSERT INTO sprint (team_id, number, start_date, end_date, status, daily_time_utc, "
+    "daily_time_zone) "
+    "VALUES (:team, :number, :start, :end, CAST(:status AS sprint_status), "
     "'2026-10-05T14:00:00Z', 'America/Bogota')"
 )
 
@@ -148,8 +150,8 @@ async def test_a_new_sprint_is_planned_and_cannot_end_before_it_starts(engine: A
     async with engine.begin() as connection:
         await connection.execute(
             text(
-                "INSERT INTO sprint (team_id, start_date, end_date, daily_time_utc, "
-                "daily_time_zone) VALUES (:t, :d, :d, '2026-10-05T14:00:00Z', 'America/Bogota')"
+                "INSERT INTO sprint (team_id, number, start_date, end_date, daily_time_utc, "
+                "daily_time_zone) VALUES (:t, 1, :d, :d, '2026-10-05T14:00:00Z', 'America/Bogota')"
             ),
             {"t": team, "d": date(2026, 10, 5)},
         )
@@ -162,6 +164,7 @@ async def test_a_new_sprint_is_planned_and_cannot_end_before_it_starts(engine: A
                 _SPRINT,
                 {
                     "team": team,
+                    "number": 2,
                     "start": date(2026, 10, 5),
                     "end": date(2026, 10, 4),
                     "status": "planned",
@@ -175,12 +178,16 @@ async def test_a_team_has_at_most_one_active_sprint_but_any_number_of_closed_one
     team = await _a_team(engine)
     dates = {"start": date(2026, 10, 5), "end": date(2026, 10, 16)}
     async with engine.begin() as connection:
-        for status in ("closed", "closed", "active"):
-            await connection.execute(_SPRINT, {"team": team, "status": status, **dates})
+        for number, status in enumerate(("closed", "closed", "active"), start=1):
+            await connection.execute(
+                _SPRINT, {"team": team, "number": number, "status": status, **dates}
+            )
 
     with pytest.raises(IntegrityError, match="sprint_one_active_per_team"):
         async with engine.begin() as connection:
-            await connection.execute(_SPRINT, {"team": team, "status": "active", **dates})
+            await connection.execute(
+                _SPRINT, {"team": team, "number": 4, "status": "active", **dates}
+            )
 
 
 async def test_deleting_a_team_deletes_its_sprints(engine: AsyncEngine):
@@ -190,6 +197,7 @@ async def test_deleting_a_team_deletes_its_sprints(engine: AsyncEngine):
             _SPRINT,
             {
                 "team": team,
+                "number": 1,
                 "start": date(2026, 10, 5),
                 "end": date(2026, 10, 16),
                 "status": "active",
@@ -207,9 +215,9 @@ async def test_a_sprint_keeps_its_updated_at_current(engine: AsyncEngine):
     async with engine.begin() as connection:
         await connection.execute(
             text(
-                "INSERT INTO sprint (team_id, start_date, end_date, updated_at, daily_time_utc, "
-                "daily_time_zone) "
-                "VALUES (:t, :d, :d, '2000-01-01', '2026-10-05T14:00:00Z', 'America/Bogota')"
+                "INSERT INTO sprint (team_id, number, start_date, end_date, updated_at, "
+                "daily_time_utc, daily_time_zone) "
+                "VALUES (:t, 1, :d, :d, '2000-01-01', '2026-10-05T14:00:00Z', 'America/Bogota')"
             ),
             {"t": team, "d": date(2026, 10, 5)},
         )
@@ -219,6 +227,42 @@ async def test_a_sprint_keeps_its_updated_at_current(engine: AsyncEngine):
         ).scalar_one()
 
     assert updated is True
+
+
+# ------------------------------------------------------- HU-12: the sprint number --
+async def test_a_sprint_has_a_positive_number_that_is_unique_within_its_team(engine: AsyncEngine):
+    team = await _a_team(engine)
+    other_team = await _a_team(engine)
+    dates = {"start": date(2026, 10, 5), "end": date(2026, 10, 16), "status": "closed"}
+    async with engine.begin() as connection:
+        await connection.execute(_SPRINT, {"team": team, "number": 1, **dates})
+        # The same number in another team is another sprint number.
+        await connection.execute(_SPRINT, {"team": other_team, "number": 1, **dates})
+
+    refused = [
+        (1, "sprint_number_unique"),
+        (0, "sprint_number_positive"),
+        (-3, "sprint_number_positive"),
+    ]
+    for number, constraint in refused:
+        with pytest.raises(IntegrityError, match=constraint):
+            async with engine.begin() as connection:
+                await connection.execute(_SPRINT, {"team": team, "number": number, **dates})
+
+
+async def test_a_sprint_cannot_be_stored_without_its_number(engine: AsyncEngine):
+    team = await _a_team(engine)
+
+    with pytest.raises(IntegrityError, match="not-null"):
+        async with engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "INSERT INTO sprint (team_id, start_date, end_date, daily_time_utc, "
+                    "daily_time_zone) VALUES (:team, :d, :d, '2026-10-05T14:00:00Z', "
+                    "'America/Bogota')"
+                ),
+                {"team": team, "d": date(2026, 10, 5)},
+            )
 
 
 # ------------------------------------------------------------ HU-07: the daily --
@@ -254,8 +298,8 @@ async def test_a_sprint_needs_the_daily_time_and_a_time_zone_that_is_not_blank(
 ):
     team = await _a_team(engine)
     insert = text(
-        "INSERT INTO sprint (team_id, start_date, end_date, daily_time_utc, daily_time_zone) "
-        "VALUES (:team, :d, :d, :at, :zone)"
+        "INSERT INTO sprint (team_id, number, start_date, end_date, daily_time_utc, "
+        "daily_time_zone) VALUES (:team, 1, :d, :d, :at, :zone)"
     )
     day = date(2026, 10, 5)
 
@@ -297,6 +341,7 @@ async def _an_active_sprint(engine: AsyncEngine, team: str) -> str:
                     text(f"{_SPRINT.text} RETURNING id"),
                     {
                         "team": team,
+                        "number": 1,
                         "start": date(2026, 10, 5),
                         "end": date(2026, 10, 16),
                         "status": "active",
