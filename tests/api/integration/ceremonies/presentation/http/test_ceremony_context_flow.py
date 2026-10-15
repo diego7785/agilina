@@ -118,6 +118,14 @@ async def _scheduled_daily(session_factory):
     return ceremony_id, team, sprint, ana, carla
 
 
+def _assert_reveals_nothing_of(response, team, sprint, *people) -> None:
+    """The error is the generic one, and nothing of the ceremony's tenant shows in it."""
+    values = ["acme", team.id, team.name, sprint.id]
+    values += [value for person in people for value in (person.id, person.full_name)]
+    assert set(response.json()["error"]) == {"status", "code", "message", "request_id"}
+    assert [value for value in values if str(value) in response.text] == []
+
+
 async def test_one_call_gives_the_worker_the_whole_context_of_the_ceremony(api, session_factory):
     ceremony_id, team, sprint, ana, carla = await _scheduled_daily(session_factory)
 
@@ -170,8 +178,9 @@ async def test_a_worker_token_of_another_tenant_answers_401(api, session_factory
 
 
 async def test_a_ceremony_lives_only_in_the_database_of_its_tenant(api, session_factory):
-    """Ecomoda's worker, with its own valid token, does not find a ceremony of acme."""
-    ceremony_id, *_ = await _scheduled_daily(session_factory)
+    """Ecomoda's worker, with its own valid token, does not find a ceremony of acme, and the
+    answer says nothing of it."""
+    ceremony_id, team, sprint, ana, carla = await _scheduled_daily(session_factory)
 
     response = await api.get(
         f"/v1/ceremonies/{ceremony_id}/context",
@@ -180,6 +189,21 @@ async def test_a_ceremony_lives_only_in_the_database_of_its_tenant(api, session_
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "ceremony_not_found"
+    _assert_reveals_nothing_of(response, team, sprint, ana, carla)
+
+
+async def test_the_context_carries_the_tenant_of_the_header(api, ecomoda_session_factory):
+    """Ecomoda's worker gets its own ceremony with ecomoda as the tenant (acme's is above)."""
+    ceremony_id, *_ = await _scheduled_daily(ecomoda_session_factory)
+
+    response = await api.get(
+        f"/v1/ceremonies/{ceremony_id}/context",
+        headers=_headers(_worker_token("ecomoda"), "ecomoda"),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["tenant"] == "ecomoda"
+    assert response.json()["room"] == f"ecomoda-{ceremony_id}"
 
 
 async def test_a_person_of_the_tenant_cannot_ask_for_the_context(api, session_factory):
@@ -264,7 +288,7 @@ async def test_a_result_with_someone_outside_the_sprint_is_refused_and_not_store
 
 async def test_a_result_reaches_only_the_database_of_its_tenant(api, session_factory):
     """Ecomoda's worker cannot deliver to a ceremony of acme, and its token is no good in acme."""
-    ceremony_id, _, _, ana, _ = await _scheduled_daily(session_factory)
+    ceremony_id, team, sprint, ana, carla = await _scheduled_daily(session_factory)
     url = f"/v1/ceremonies/{ceremony_id}/result"
     body = _result_of(ceremony_id, ana)
 
@@ -275,6 +299,7 @@ async def test_a_result_reaches_only_the_database_of_its_tenant(api, session_fac
 
     assert elsewhere.status_code == 404
     assert elsewhere.json()["error"]["code"] == "ceremony_not_found"
+    _assert_reveals_nothing_of(elsewhere, team, sprint, ana, carla)
     assert crossed.status_code == 401
     assert crossed.json()["error"]["code"] == "not_authenticated"
     assert await _count(session_factory, CeremonyResultRow, ceremony_id) == 0
