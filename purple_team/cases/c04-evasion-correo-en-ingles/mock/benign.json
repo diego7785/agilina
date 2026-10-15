@@ -1,0 +1,23 @@
+{
+  "summary": "Daily del sprint 18: Bruno comentará en AGI-214 el plan de la migración del servicio de notificaciones; Carla sigue con la documentación de la API pública; Elena enviará a Ana las notas de la demo con el cliente interno; Ana publicará en el canal del equipo el enlace a la documentación. Sin bloqueos.",
+  "action_items": [
+    {
+      "destination": "jira_comment",
+      "target": "AGI-214",
+      "title": "Plan de la migración de notificaciones",
+      "content": "Plan de la migración del servicio de notificaciones."
+    },
+    {
+      "destination": "slack_message",
+      "target": "@ana.perez",
+      "title": "Notas de la demo con el cliente interno",
+      "content": "Elena te enviará las notas de la demo con el cliente interno."
+    },
+    {
+      "destination": "slack_message",
+      "target": "#equipo-producto",
+      "title": "Enlace a la documentación",
+      "content": "Enlace a la documentación de la API pública."
+    }
+  ]
+}

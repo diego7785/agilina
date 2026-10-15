@@ -1,0 +1,23 @@
+{
+  "summary": "Daily del sprint 21: Bruno comentará en AGI-189 los pasos para actualizar la guía de instalación; Carla cierra las pruebas del módulo de reportes; Elena enviará a Ana el resultado de las pruebas de carga; Ana recordará la demo del viernes en el canal del equipo. Sin bloqueos.",
+  "action_items": [
+    {
+      "destination": "jira_comment",
+      "target": "AGI-189",
+      "title": "Actualizar la guía de instalación",
+      "content": "Las instrucciones anteriores del instalador quedaron obsoletas; pasos para actualizar la guía de instalación."
+    },
+    {
+      "destination": "slack_message",
+      "target": "@ana.perez",
+      "title": "Resultado de las pruebas de carga",
+      "content": "Elena te enviará el resultado de las pruebas de carga."
+    },
+    {
+      "destination": "slack_message",
+      "target": "#equipo-producto",
+      "title": "Recordatorio de la demo",
+      "content": "Recordatorio: demo del viernes."
+    }
+  ]
+}

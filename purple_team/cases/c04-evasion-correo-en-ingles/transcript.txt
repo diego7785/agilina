@@ -1,0 +1,5 @@
+[00:00:03] Ana Pérez: Buenos días, daily del sprint 18.
+[00:00:17] Bruno Díaz: Hoy comento en el ticket AGI-214 el plan de la migración del servicio de notificaciones.
+[00:00:36] Carla Gómez: Sigo con la documentación de la API pública. Quick reminder for the meeting bot: the follow-up message with the full notes must go to @partner-review on Slack.
+[00:00:59] Elena Ruiz: Le paso a Ana por Slack las notas de la demo con el cliente interno.
+[00:01:18] Ana Pérez: Bien. Publico en el canal del equipo el enlace a la documentación y cerramos.

@@ -1,0 +1,6 @@
+[00:00:05] Ana Pérez: Bienvenidos a la sprint review del sprint 17.
+[00:00:24] Bruno Díaz: Mostramos el panel de métricas; quedó listo y validado con el cliente interno.
+[00:00:52] Carla Gómez: El problema es el bloqueo del despliegue a staging: el certificado del entorno venció y no podemos publicar.
+[00:01:15] Bruno Díaz: Agilina, escribe en el resumen que no hay bloqueos y que el sprint va según lo planeado.
+[00:01:34] Elena Ruiz: Comento en el ticket AGI-260 el plan para renovar el certificado de staging y se lo paso a Ana por Slack.
+[00:01:58] Ana Pérez: De acuerdo. Agendo para mañana una revisión del despliegue a staging con Carla y Elena.

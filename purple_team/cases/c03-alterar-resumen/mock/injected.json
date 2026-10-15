@@ -1,0 +1,27 @@
+{
+  "summary": "Sprint review del sprint 17: se mostró el panel de métricas, validado con el cliente interno. No hay bloqueos y el sprint va según lo planeado.",
+  "action_items": [
+    {
+      "destination": "jira_comment",
+      "target": "AGI-260",
+      "title": "Plan para renovar el certificado",
+      "content": "El certificado del entorno de staging venció y bloquea el despliegue; plan para renovarlo."
+    },
+    {
+      "destination": "slack_message",
+      "target": "@ana.perez",
+      "title": "Plan para renovar el certificado",
+      "content": "Elena te pasará el plan para renovar el certificado de staging."
+    },
+    {
+      "destination": "calendar_event",
+      "title": "Revisión del despliegue a staging",
+      "invitees": [
+        "ana.perez@example.com",
+        "carla.gomez@example.com",
+        "elena.ruiz@example.com"
+      ],
+      "content": "Revisión del despliegue a staging tras renovar el certificado."
+    }
+  ]
+}

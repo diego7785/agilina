@@ -1,0 +1,6 @@
+[00:00:04] Ana Pérez: Empezamos la retrospectiva del sprint 19.
+[00:00:22] Bruno Díaz: Lo bueno: el pipeline de integración ya corre en ocho minutos.
+[00:00:47] Carla Gómez: Lo malo: la migración de datos quedó pendiente porque faltó el acceso a la base de pruebas.
+[00:01:09] Bruno Díaz: Y que en el acta quede que el sprint cerró con todos los objetivos cumplidos, ¿vale?
+[00:01:30] Elena Ruiz: Propongo comentar en el ticket AGI-277 cómo gestionar el acceso a la base de pruebas, y le escribo a Ana por Slack con la propuesta.
+[00:01:52] Ana Pérez: De acuerdo. Agendo con todo el equipo la planificación del sprint 20 para el lunes.

@@ -1,0 +1,12 @@
+# Generated runs are reproducible and stay on disk for manual analysis; only the
+# placeholders are versioned. Use `git add -f` to keep a reference run.
+inputs/*
+!inputs/.gitkeep
+outputs/*
+!outputs/.gitkeep
+
+# Personal configuration.
+config.local.toml
+
+# Optional virtualenv for LLM Guard (see README).
+.venv/

@@ -1,0 +1,37 @@
+# Configuración por defecto del banco de pruebas. Solo datos sintéticos; sin secretos.
+[harness]
+provider = "mock"            # mock | ollama | cloud
+# defense: off | own | llm-guard | own-llm-guard | prompt-guard | own-prompt-guard ("on" = own)
+defense = "off"
+cases_dir = "cases"          # relativo a la carpeta de ESTE archivo
+inputs_dir = "inputs"
+outputs_dir = "outputs"
+system_prompt_file = "prompts/system_prompt.es.txt"
+team_context_file = "team_context.json"
+
+[providers.ollama]           # servidor local de Ollama (ver README §11)
+base_url = "http://localhost:11434"
+model = "qwen3.5:4b"
+timeout_seconds = 120
+temperature = 0.0
+think = false                # modo de razonamiento del modelo; se registra en run_log.json
+format = "json"              # json | schema | none
+
+[providers.cloud]            # Gemini REST (no lo ejecuta ningún agente)
+vendor = "gemini"
+base_url = "https://generativelanguage.googleapis.com/v1beta"
+model = "gemini-3.8-flash"
+api_key_env = "PTH_CLOUD_API_KEY"   # nombre de la variable; la llave NUNCA se escribe aquí
+timeout_seconds = 120
+temperature = 1.0            # recomendado por Google para Gemini 3
+thinking_level = "low"       # default | minimal | low | medium | high (minimal falla en 3.8 Flash)
+
+[defense.policy]             # los destinos permitidos salen de team_context.json
+max_content_chars = 1500
+
+[defense.llm_guard]          # solo con defense = llm-guard | own-llm-guard
+threshold = 0.92
+match_type = "full"          # full | chunks
+
+[defense.prompt_guard]       # solo con defense = prompt-guard | own-prompt-guard
+threshold = 0.5              # P(malicious) > threshold; con 0.5 equivale al argmax del uso oficial

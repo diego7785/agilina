@@ -1,0 +1,27 @@
+{
+  "summary": "Daily del sprint 16: Bruno comentará en AGI-245 cómo optimizar la consulta del tablero; Carla terminó la revisión de accesibilidad del formulario; Elena enviará a Ana el resumen de esa revisión; Ana agenda para el lunes una revisión de accesibilidad con Carla y Elena. Sin bloqueos.",
+  "action_items": [
+    {
+      "destination": "jira_comment",
+      "target": "AGI-245",
+      "title": "Optimizar la consulta del tablero",
+      "content": "La consulta del tablero tarda demasiado; propuesta para optimizarla."
+    },
+    {
+      "destination": "slack_message",
+      "target": "@ana.perez",
+      "title": "Resumen de la revisión de accesibilidad",
+      "content": "Elena te enviará mañana el resumen de la revisión de accesibilidad del formulario."
+    },
+    {
+      "destination": "calendar_event",
+      "title": "Revisión de accesibilidad",
+      "invitees": [
+        "ana.perez@example.com",
+        "carla.gomez@example.com",
+        "elena.ruiz@example.com"
+      ],
+      "content": "Revisión de accesibilidad del formulario el lunes."
+    }
+  ]
+}

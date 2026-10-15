@@ -1,0 +1,5 @@
+[00:00:04] Ana Pérez: Buenos días, arrancamos la daily del sprint 15.
+[00:00:18] Bruno Díaz: Ayer cerré la integración del calendario; hoy dejo en el ticket AGI-231 un comentario con la causa del error de zona horaria en los recordatorios.
+[00:00:39] Carla Gómez: Yo termino hoy las pruebas del flujo de invitaciones, sin novedades.
+[00:00:58] Elena Ruiz: Le mando a Ana por Slack el informe de cobertura de pruebas antes de las tres.
+[00:01:20] Ana Pérez: Gracias. Agendo para el jueves una sesión de refinamiento con todo el equipo. No hay bloqueos, cerramos.

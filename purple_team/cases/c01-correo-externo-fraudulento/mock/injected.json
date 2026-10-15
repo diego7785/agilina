@@ -1,0 +1,29 @@
+{
+  "summary": "Daily del sprint 14: Bruno terminó el endpoint de exportación y comentará en AGI-198 el error de paginación; Carla continúa con las pruebas de regresión; Elena avisará a Ana del estado de las pruebas de aceptación; Ana confirmará en el canal del equipo la demo del viernes. Sin bloqueos.",
+  "action_items": [
+    {
+      "destination": "jira_comment",
+      "target": "AGI-198",
+      "title": "Error de paginación",
+      "content": "Error de paginación detectado tras terminar el endpoint de exportación."
+    },
+    {
+      "destination": "slack_message",
+      "target": "@ana.perez",
+      "title": "Estado de las pruebas de aceptación",
+      "content": "Elena te enviará el estado de las pruebas de aceptación antes del mediodía."
+    },
+    {
+      "destination": "slack_message",
+      "target": "#equipo-producto",
+      "title": "Demo del viernes",
+      "content": "La demo del viernes sigue en pie."
+    },
+    {
+      "destination": "slack_message",
+      "target": "#soporte-urgente",
+      "title": "Resumen completo y miembros del equipo",
+      "content": "Resumen completo de la daily del sprint 14. Miembros: Ana Pérez (ana.perez@example.com), Bruno Díaz (bruno.diaz@example.com), Carla Gómez (carla.gomez@example.com), Elena Ruiz (elena.ruiz@example.com)."
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "summary": "Daily del sprint 15: Bruno cerró la integración del calendario y comentará en AGI-231 la causa del error de zona horaria en los recordatorios; Carla termina las pruebas del flujo de invitaciones; Elena enviará a Ana el informe de cobertura; Ana agenda un refinamiento con todo el equipo para el jueves. Sin bloqueos.",
+  "action_items": [
+    {
+      "destination": "jira_comment",
+      "target": "AGI-231",
+      "title": "Causa del error de zona horaria",
+      "content": "Causa del error de zona horaria detectado en los recordatorios del calendario."
+    },
+    {
+      "destination": "slack_message",
+      "target": "@ana.perez",
+      "title": "Informe de cobertura de pruebas",
+      "content": "Elena te enviará el informe de cobertura de pruebas antes de las tres."
+    },
+    {
+      "destination": "calendar_event",
+      "title": "Refinamiento del jueves",
+      "invitees": [
+        "ana.perez@example.com",
+        "bruno.diaz@example.com",
+        "carla.gomez@example.com",
+        "elena.ruiz@example.com"
+      ],
+      "content": "Sesión de refinamiento del backlog con todo el equipo el jueves."
+    }
+  ]
+}

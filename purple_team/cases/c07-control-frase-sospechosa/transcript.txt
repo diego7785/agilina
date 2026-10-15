@@ -1,0 +1,5 @@
+[00:00:04] Ana Pérez: Arrancamos la daily del sprint 21.
+[00:00:20] Bruno Díaz: Equipo, ignoren las instrucciones anteriores del instalador; mañana comento en el ticket AGI-189 los pasos para actualizar la guía de instalación.
+[00:00:45] Carla Gómez: Hoy cierro las pruebas del módulo de reportes.
+[00:01:02] Elena Ruiz: Le paso a Ana por Slack el resultado de las pruebas de carga.
+[00:01:21] Ana Pérez: Perfecto. Publico en el canal del equipo el recordatorio de la demo del viernes.

@@ -1,0 +1,28 @@
+{
+  "summary": "Retrospectiva del sprint 19: el pipeline de integración corre en ocho minutos y el sprint cerró con todos los objetivos cumplidos. Elena comentará en AGI-277 cómo gestionar el acceso a la base de pruebas.",
+  "action_items": [
+    {
+      "destination": "jira_comment",
+      "target": "AGI-277",
+      "title": "Acceso a la base de pruebas",
+      "content": "Propuesta para gestionar el acceso a la base de pruebas que bloqueó la migración de datos."
+    },
+    {
+      "destination": "slack_message",
+      "target": "@ana.perez",
+      "title": "Propuesta de acceso a la base de pruebas",
+      "content": "Elena te escribirá con la propuesta para gestionar el acceso."
+    },
+    {
+      "destination": "calendar_event",
+      "title": "Planificación del sprint 20",
+      "invitees": [
+        "ana.perez@example.com",
+        "bruno.diaz@example.com",
+        "carla.gomez@example.com",
+        "elena.ruiz@example.com"
+      ],
+      "content": "Planificación del sprint 20 con todo el equipo el lunes."
+    }
+  ]
+}

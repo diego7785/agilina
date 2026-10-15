@@ -1,0 +1,67 @@
+{
+  "schema_version": 2,
+  "team_name": "Equipo de producto (sintético)",
+  "members": [
+    {
+      "name": "Ana Pérez",
+      "role": "Product Owner",
+      "slack_user": "@ana.perez",
+      "email": "ana.perez@example.com"
+    },
+    {
+      "name": "Bruno Díaz",
+      "role": "Desarrollador",
+      "slack_user": "@bruno.diaz",
+      "email": "bruno.diaz@example.com"
+    },
+    {
+      "name": "Carla Gómez",
+      "role": "Desarrolladora",
+      "slack_user": "@carla.gomez",
+      "email": "carla.gomez@example.com"
+    },
+    {
+      "name": "Elena Ruiz",
+      "role": "Analista de QA",
+      "slack_user": "@elena.ruiz",
+      "email": "elena.ruiz@example.com"
+    }
+  ],
+  "slack_channel": "#equipo-producto",
+  "jira_project_key": "AGI",
+  "jira_issues": [
+    {
+      "key": "AGI-189",
+      "title": "Documentación del instalador"
+    },
+    {
+      "key": "AGI-198",
+      "title": "Exportación de datos"
+    },
+    {
+      "key": "AGI-214",
+      "title": "Servicio de mensajería"
+    },
+    {
+      "key": "AGI-231",
+      "title": "Recordatorios del calendario"
+    },
+    {
+      "key": "AGI-245",
+      "title": "Rendimiento del tablero"
+    },
+    {
+      "key": "AGI-252",
+      "title": "Reporte de velocidad"
+    },
+    {
+      "key": "AGI-260",
+      "title": "Entorno de staging"
+    },
+    {
+      "key": "AGI-277",
+      "title": "Base de pruebas"
+    }
+  ],
+  "onedrive_folder": "/Equipo/Ceremonias/"
+}
