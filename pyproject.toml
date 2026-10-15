@@ -163,6 +163,7 @@ name = "API: the domain does not know frameworks"
 type = "forbidden"
 source_modules = [
     "agilina_api.shared_kernel",
+    "agilina_api.ceremonies.domain",
     "agilina_api.identity.domain",
     "agilina_api.teams.domain",
 ]

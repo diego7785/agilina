@@ -29,5 +29,4 @@ class SharedErrors:
     NOT_FOUND = ApiError(404, "not_found", "The resource does not exist.")
     METHOD_NOT_ALLOWED = ApiError(405, "method_not_allowed", "The method is not allowed here.")
     MAIL_UNAVAILABLE = ApiError(502, "mail_unavailable", "The email could not be sent.")
-    NOT_IMPLEMENTED = ApiError(501, "not_implemented", "The operation is not implemented yet.")
     INTERNAL = ApiError(500, "internal_error", "Something went wrong on our side.")

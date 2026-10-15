@@ -15,7 +15,7 @@ y ejecutable está en `/docs` (OpenAPI); este archivo es el resumen que se lee d
 
 | Cabecera | Sentido | Dónde |
 | --- | --- | --- |
-| `X-Agilina-Tenant` | La organización a la que se refiere la petición ([AD-29](adr/0029-un-tenant-es-una-organizacion-con-su-base-y-su-realm.md)) | Toda ruta salvo `/health*`, `POST /v1/ceremonies/{ceremony_id}/result` (hasta AGI-126) y la documentación |
+| `X-Agilina-Tenant` | La organización a la que se refiere la petición ([AD-29](adr/0029-un-tenant-es-una-organizacion-con-su-base-y-su-realm.md)) | Toda ruta salvo `/health*` y la documentación |
 | `Authorization: Bearer <token>` | Token de acceso del tenant (Keycloak): el de la persona, o el del worker del agente en las rutas de ceremonias | Las rutas «con sesión» |
 | `X-Request-ID` | Identificador de la petición. Se acepta el que envíe el cliente si tiene de 8 a 64 caracteres `A-Za-z0-9._-`; si no, la API genera uno. Siempre vuelve en la respuesta | Todas |
 
@@ -65,7 +65,7 @@ Toda respuesta de error lleva `Cache-Control: no-store`.
 | 403 | `not_a_team_member` | El usuario no es miembro activo del equipo (ajeno, retirado o inexistente: la misma respuesta) | — |
 | 403 | `not_a_team_admin` | El usuario es miembro del equipo, pero no uno de sus admins (según el rol guardado) | — |
 | 403 | `not_a_worker` | El token es válido, pero no es del worker del agente: la ruta es solo suya (`azp` distinto de `agilina-worker`) | — |
-| 422 | `validation_error` | El cuerpo, un parámetro o una cabecera no es válido | `fields[]`: `{field, reason}` |
+| 422 | `validation_error` | El cuerpo, un parámetro o una cabecera no es válido | `fields[]`: `{field, reason}` (en el resultado de una ceremonia, `reason` también puede ser `not_a_participant` o `does_not_match_path`) |
 | 404 | `invitation_not_found` | El enlace se alteró o nunca existió | — |
 | 410 | `invitation_used` | La invitación ya se usó | — |
 | 410 | `invitation_expired` | La invitación venció | — |
@@ -95,7 +95,7 @@ Toda respuesta de error lleva `Cache-Control: no-store`.
 | 409 | `account_disabled` | La persona tiene cuenta, pero está desactivada | — |
 | 409 | `pending_invitation_exists` | Otra invitación a la misma persona se emitía en ese mismo instante | — |
 | 404 | `ceremony_not_found` | La ceremonia no existe, su sprint ya no es el activo del equipo o está agendada antes de que empiece (la misma respuesta) | — |
-| 501 | `not_implemented` | La operación está definida pero aún no se implementa | — |
+| 409 | `result_already_received` | La ceremonia ya tiene otro resultado: se cierra una sola vez | — |
 
 ## Salud
 
@@ -526,8 +526,7 @@ guarda y participantes con su orden. El sprint sigue activo. Solo para los admin
 Las dos operaciones del worker del agente ([contrato](contrato-worker-api.md)). Las usa solo él,
 con el token que el cliente `agilina-worker` del realm del tenant obtiene por *client credentials*:
 un token válido de una persona es `403 not_a_worker`, y uno del worker de otra organización no lo
-firma el realm del tenant, así que es `401 not_authenticated`. La entrega del resultado responde
-`501` hasta AGI-126 y, hasta entonces, no exige tenant ni sesión.
+firma el realm del tenant, así que es `401 not_authenticated`.
 
 ### `GET /v1/ceremonies/{ceremony_id}/context`
 
@@ -551,11 +550,18 @@ del contrato.
 
 ### `POST /v1/ceremonies/{ceremony_id}/result`
 
-El resultado que el worker entrega al cerrar la ceremonia. Cuerpo: `CeremonyResult`.
+El resultado que el worker entrega al cerrar la ceremonia (cuerpo: `CeremonyResult`): la
+transcripción atribuida y los eventos, que se guardan en una sola transacción. La entrega se
+reconoce por el SHA-256 del JSON canónico del `CeremonyResult`, así que el worker puede reintentar
+la misma sin duplicar nada. No dispara el post-procesamiento (AGI-26) ni cierra la sala (AGI-63).
 
 | Estado | Cuerpo | Cuándo |
 | --- | --- | --- |
-| 200 | — | Aún no ocurre |
-| 422 | error `validation_error` | `ceremony_id` no es un UUID o el cuerpo no cumple el contrato |
-| 501 | error `not_implemented` | Siempre, hasta HU-56 |
+| 202 | `ResultReceipt` (`{"status": "received"}`) | Resultado guardado, o el mismo que ya se había recibido (no se escribe nada) |
+| 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
+| 401 | error `not_authenticated` | Sin token, o no es válido para el realm del tenant (también el del worker de otra organización) |
+| 403 | error `not_a_worker` | Token válido, pero no es del worker del agente |
+| 404 | error `ceremony_not_found` | La ceremonia no existe, su sprint ya no es el activo del equipo o está agendada antes de que empiece |
+| 409 | error `result_already_received` | La ceremonia ya tiene otro resultado; nada cambia |
+| 422 | error `validation_error` | `ceremony_id` no es un UUID, el cuerpo no cumple el contrato, su `ceremony_id` no es el del camino (`reason`: `does_not_match_path`) o un segmento o un evento es de alguien que no es participante del sprint (`reason`: `not_a_participant`, sin el valor); nada cambia |
 | 500 | error `internal_error` | Fallo inesperado |

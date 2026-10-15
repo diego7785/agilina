@@ -29,7 +29,7 @@ el orden de turnos).
 | 404 | `ceremony_not_found` | La ceremonia no existe en ese tenant, su sprint ya no es el activo del equipo o está agendada antes de que empiece |
 
 **Resultado.** Al cerrar, el worker entrega la transcripción atribuida
-(`segments`) y los eventos de la ceremonia (`events`, que puede venir vacía).
+(`segments`, cada uno con `end_ms >= start_ms`; si no, 422 `validation_error`) y los eventos de la ceremonia (`events`, que puede venir vacía).
 Cada `CeremonyEvent` tiene su tipo (`CeremonyEventType`: `ceremony_started`,
 `turn_started`, `turn_ended`, `degraded`, `ceremony_closed`), su instante en
 UTC (`at`) y, si es de un participante, su `user_id`.
@@ -37,8 +37,9 @@ UTC (`at`) y, si es de un participante, su `user_id`.
 | Estado | Código | Cuándo |
 | --- | --- | --- |
 | 202 | — | Resultado recibido, también cuando llega de nuevo el mismo |
+| 404 | `ceremony_not_found` | Como en el contexto: la ceremonia no existe, su sprint ya no es el activo del equipo o está agendada antes de que empiece |
 | 409 | `result_already_received` | La ceremonia ya tiene otro resultado |
-| 422 | `validation_error` | Un segmento es de alguien que no es participante, o el cuerpo no cumple el contrato |
+| 422 | `validation_error` | Un segmento o un evento es de alguien que no es participante, el `ceremony_id` del cuerpo no es el del camino, o el cuerpo no cumple el contrato |
 
 Las dos rutas comparten los errores de toda ruta con tenant, con el formato
 único de error ([AD-30](adr/0030-un-solo-formato-de-error-http-y-un-catalogo-de-la-api.md)):
@@ -66,7 +67,7 @@ de cada ruta está en [api.md](api.md).
   facilita.
 - **Idempotencia y reintento.** Entregar el mismo resultado otra vez responde
   `202` sin duplicar nada; otro resultado para la misma ceremonia responde
-  `409`. La entrega guarda el resultado en disco antes del primer intento y
+  `409`. «El mismo» es el mismo SHA-256 del JSON canónico del `CeremonyResult`. La entrega guarda el resultado en disco antes del primer intento y
   reintenta con espera creciente hasta lograrlo: perder una ceremonia por un
   reinicio de la API no es aceptable. El archivo se borra solo con el `202`.
 - **Campos desconocidos.** Los modelos los rechazan. Una incompatibilidad entre

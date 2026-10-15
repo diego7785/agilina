@@ -184,6 +184,9 @@ def create_app() -> FastAPI:
         ceremonies_dependencies.get_get_ceremony_context_handler: from_container(
             lambda container: container.get_ceremony_context
         ),
+        ceremonies_dependencies.get_deliver_ceremony_result_handler: from_container(
+            lambda container: container.deliver_ceremony_result
+        ),
         get_authenticated_users: from_container(lambda container: container.authenticated_users),
         get_authenticated_workers: from_container(
             lambda container: container.authenticated_workers

@@ -49,6 +49,9 @@ async def test_every_table_the_story_needs_exists(engine: AsyncEngine):
         "sprint",
         "sprint_participant",
         "ceremony",
+        "ceremony_result",
+        "transcript_segment",
+        "ceremony_event",
         "alembic_version",
     } <= tables
 
@@ -73,6 +76,8 @@ async def test_citext_and_the_enums_exist(engine: AsyncEngine):
         "membership_status",
         "invitation_status",
         "sprint_status",
+        "ceremony_status",
+        "ceremony_event_type",
     } <= enums
 
 
@@ -85,7 +90,18 @@ async def test_created_by_accepts_null_for_the_platform_operator_ad_22(
 
 @pytest.mark.parametrize(
     "table",
-    ["app_user", "team", "team_member", "invitation", "sprint", "sprint_participant", "ceremony"],
+    [
+        "app_user",
+        "team",
+        "team_member",
+        "invitation",
+        "sprint",
+        "sprint_participant",
+        "ceremony",
+        "ceremony_result",
+        "transcript_segment",
+        "ceremony_event",
+    ],
 )
 async def test_every_orm_column_exists_in_the_database_with_the_same_nullability(
     engine: AsyncEngine, table: str
@@ -445,10 +461,22 @@ def test_the_migrations_go_down_and_up_again_cleanly(admin_dsn: str):
                 "sprint",
                 "sprint_participant",
                 "ceremony",
+                "ceremony_result",
+                "transcript_segment",
+                "ceremony_event",
             }
             & tables
         )
-        assert not {"team_role", "invitation_status", "sprint_status"} & enums
+        assert (
+            not {
+                "team_role",
+                "invitation_status",
+                "sprint_status",
+                "ceremony_status",
+                "ceremony_event_type",
+            }
+            & enums
+        )
 
         command.upgrade(alembic_config("tenant", url), "head")
     finally:

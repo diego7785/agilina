@@ -10,6 +10,7 @@ from agilina_api.ceremonies.application.dtos import (
     RosterParticipant,
     RosterRecord,
 )
+from agilina_api.ceremonies.domain.ceremony import Ceremony
 from agilina_api.teams.domain.sprint import Sprint
 from agilina_shared.enums import Language, OperationMode, TeamRole
 from tests.api.builders.defaults import DAILY_TIME, DAILY_TIME_ZONE, SPRINT_END, SPRINT_START
@@ -22,12 +23,14 @@ class CeremonyBuilder:
     sprint). ``for_sprint(sprint)`` puts it in that sprint of that sprint's team.
 
     No behavior creates ceremonies yet (AGI-59): ``build()`` is the record as stored, and
-    ``tests/api/integration/support.py::stored_ceremony`` writes its row."""
+    ``tests/api/integration/support.py::stored_ceremony`` writes its row. ``aggregate()`` is
+    the ``Ceremony`` the commands work on, with the result ``with_result_received`` gave it."""
 
     ceremony_id: UUID = field(default_factory=next_id)
     team_id: UUID = field(default_factory=next_id)
     sprint_id: UUID = field(default_factory=next_id)
     scheduled_at: datetime = DAILY_TIME
+    result_digest: str | None = None
 
     def with_id(self, ceremony_id: UUID) -> Self:
         return replace(self, ceremony_id=ceremony_id)
@@ -40,6 +43,23 @@ class CeremonyBuilder:
 
     def scheduled_at_instant(self, instant: datetime) -> Self:
         return replace(self, scheduled_at=instant)
+
+    def with_result_received(self, digest: str) -> Self:
+        return replace(self, result_digest=digest)
+
+    def aggregate(self) -> Ceremony:
+        """The ceremony, without a result or with the one it received through
+        ``Ceremony.receive_result`` (nobody spoke in it)."""
+        ceremony = Ceremony(
+            ceremony_id=self.ceremony_id,
+            team_id=self.team_id,
+            sprint_id=self.sprint_id,
+            scheduled_at=self.scheduled_at,
+            result_digest=None,
+        )
+        if self.result_digest is not None:
+            ceremony.receive_result(self.result_digest, {}, ())
+        return ceremony
 
     def build(self) -> CeremonyRecord:
         return CeremonyRecord(

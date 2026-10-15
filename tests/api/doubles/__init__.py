@@ -6,9 +6,11 @@ from tests.api.doubles.access import (
     FakeTeamAccess,
 )
 from tests.api.doubles.ceremonies import (
+    FakeCeremoniesUnitOfWork,
     FakeCeremonyQueries,
     FakeCeremonyRoster,
     FakeParticipantNames,
+    InMemoryCeremonyRepository,
 )
 from tests.api.doubles.clock import FakeClock
 from tests.api.doubles.identity import (
@@ -39,6 +41,7 @@ __all__ = [
     "FakeAuthenticatedUsers",
     "FakeAuthenticatedWorkers",
     "JWKS_URL",
+    "FakeCeremoniesUnitOfWork",
     "FakeCeremonyQueries",
     "FakeCeremonyRoster",
     "FakeClock",
@@ -58,6 +61,7 @@ __all__ = [
     "FakeTeamsUnitOfWork",
     "FakeTenantDirectory",
     "FakeTokenGenerator",
+    "InMemoryCeremonyRepository",
     "InMemoryInvitationRepository",
     "InMemorySprintRepository",
     "InMemoryTeamRepository",

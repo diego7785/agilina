@@ -14,7 +14,6 @@ from tests.api.builders import next_id
 NO_TENANT = {
     ("get", "/health"): "liveness probe",
     ("get", "/health/ready"): "readiness probe",
-    ("post", "/v1/ceremonies/{ceremony_id}/result"): "worker contract, not implemented (HU-55)",
 }
 # A tenant's, but with no session: the person invited has no account yet.
 TENANT_ONLY = {

@@ -1,1 +1,1 @@
-"""Ceremonies persistence: ORM models and the read queries."""
+"""Ceremonies persistence: ORM models, the read queries, the repository and the unit of work."""

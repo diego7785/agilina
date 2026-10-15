@@ -16,10 +16,16 @@ from agilina_api.bootstrap.context_adapters import (
     TeamsBackedContacts,
     team_membership_factory,
 )
+from agilina_api.ceremonies.application.commands.deliver_ceremony_result import (
+    DeliverCeremonyResultHandler,
+)
 from agilina_api.ceremonies.application.queries.get_ceremony_context import (
     GetCeremonyContextHandler,
 )
 from agilina_api.ceremonies.infrastructure.persistence.ceremony_queries import SqlCeremonyQueries
+from agilina_api.ceremonies.infrastructure.persistence.unit_of_work import (
+    ceremonies_unit_of_work_factory,
+)
 from agilina_api.identity.application.commands.activate_account import ActivateAccountHandler
 from agilina_api.identity.application.commands.invite_to_team import InviteToTeamHandler
 from agilina_api.identity.application.commands.issue_invitation import IssueInvitationHandler
@@ -99,6 +105,7 @@ class Container:
     get_active_sprint: GetActiveSprintHandler
     get_team_dashboard: GetTeamDashboardHandler
     get_ceremony_context: GetCeremonyContextHandler
+    deliver_ceremony_result: DeliverCeremonyResultHandler
     team_queries: TeamQueries
     authenticated_users: AuthenticatedUsers
     authenticated_workers: AuthenticatedWorkers
@@ -154,6 +161,7 @@ def build_container(settings: Settings, tenant: Tenant) -> Container:
     get_active_sprint = GetActiveSprintHandler(sprint_queries, clock)
     user_contacts = SqlUserContacts(session_factory)
     team_contacts = TeamsBackedContacts(team_queries, user_contacts)
+    ceremony_roster = TeamsBackedCeremonyRoster(team_queries, sprint_queries)
     # The web lives under the tenant's name (``/<tenant>/…``): its first segment decides
     # which realm signs the person in.
     tenant_web_url = f"{settings.web_public_url.rstrip('/')}/{tenant.slug}"
@@ -201,8 +209,11 @@ def build_container(settings: Settings, tenant: Tenant) -> Container:
         get_team_dashboard=GetTeamDashboardHandler(team_queries, get_active_sprint),
         get_ceremony_context=GetCeremonyContextHandler(
             SqlCeremonyQueries(session_factory),
-            TeamsBackedCeremonyRoster(team_queries, sprint_queries),
+            ceremony_roster,
             IdentityBackedParticipantNames(user_contacts),
+        ),
+        deliver_ceremony_result=DeliverCeremonyResultHandler(
+            ceremonies_unit_of_work_factory(session_factory), ceremony_roster, clock
         ),
         team_queries=team_queries,
         authenticated_users=KeycloakAuthenticatedUsers(access_token_verifier, session_factory),

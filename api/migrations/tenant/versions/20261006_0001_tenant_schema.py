@@ -1,7 +1,8 @@
 """tenant schema: what a tenant's database holds (identity, teams and ceremonies)
 
 The whole schema of the database of one tenant, in one initial migration (AD-29): ``app_user``,
-``team``, ``team_member``, ``invitation``, ``sprint``, ``sprint_participant`` and ``ceremony``, as
+``team``, ``team_member``, ``invitation``, ``sprint``, ``sprint_participant``, ``ceremony``,
+``ceremony_result``, ``transcript_segment`` and ``ceremony_event``, as
 the reference schema (``agilina_schema.sql``) defines them, with the changes the stories made:
 ``team.created_by`` and ``invitation.created_by`` accept NULL, meaning "created by the platform
 operator" (AD-22), and a team's name has at most 80 characters, which backs the ``TeamName``
@@ -23,7 +24,12 @@ active sprint at most.
 ``ceremony`` is minimal (AGI-64): the team, the sprint and the scheduled instant, enough for the
 agent worker to ask for a ceremony's context. Its foreign key shares ``team_id`` with the sprint's,
 so a ceremony always belongs to a sprint of its own team. Nothing creates ceremonies yet but the
-tests (AGI-59 does).
+tests (AGI-59 does). What the worker delivers when the ceremony closes (AGI-126) is
+``ceremony_result``, one per ceremony (its primary key) with the SHA-256 of the delivery, which
+tells a retry of the same delivery from another one, and its ``transcript_segment`` and
+``ceremony_event`` rows in the order they came (``position``, from 0). They all share the
+ceremony's ``team_id`` through their foreign keys. ``ceremony_status`` and
+``ceremony_event_type`` hold the values of the shared contract's enums.
 
 Development is local, so this migration is rewritten, not added to, while nobody else holds
 data that depends on it: ``make clean`` and ``make up`` build every database from it. From the
@@ -57,6 +63,10 @@ UPGRADE = [
     "CREATE TYPE membership_status AS ENUM ('active', 'removed')",
     "CREATE TYPE invitation_status AS ENUM ('pending', 'accepted', 'expired', 'revoked')",
     "CREATE TYPE sprint_status AS ENUM ('planned', 'active', 'closed')",
+    "CREATE TYPE ceremony_status AS ENUM "
+    "('scheduled', 'in_progress', 'completed', 'cancelled', 'degraded')",
+    "CREATE TYPE ceremony_event_type AS ENUM "
+    "('ceremony_started', 'turn_started', 'turn_ended', 'degraded', 'ceremony_closed')",
     # --------------------------------------------------- updated_at maintenance --
     """
     CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $$
@@ -228,7 +238,8 @@ UPGRADE = [
         scheduled_at  TIMESTAMPTZ NOT NULL,
         created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
         CONSTRAINT ceremony_sprint_fk FOREIGN KEY (sprint_id, team_id)
-            REFERENCES sprint(id, team_id) ON DELETE CASCADE
+            REFERENCES sprint(id, team_id) ON DELETE CASCADE,
+        CONSTRAINT ceremony_id_team_unique UNIQUE (id, team_id)
     )
     """,
     "COMMENT ON TABLE ceremony IS "
@@ -237,9 +248,83 @@ UPGRADE = [
     "COMMENT ON COLUMN ceremony.scheduled_at IS "
     "'The instant the ceremony is scheduled, in UTC: it gives the sprint''s day N of M "
     "(AD-31).'",
+    # -------------------------------------------------------- ceremony_result --
+    """
+    CREATE TABLE ceremony_result (
+        ceremony_id           UUID            NOT NULL,
+        team_id               UUID            NOT NULL,
+        status                ceremony_status NOT NULL,
+        started_at            TIMESTAMPTZ     NOT NULL,
+        closed_at             TIMESTAMPTZ     NOT NULL,
+        present_participants  UUID[]          NOT NULL,
+        absent_participants   UUID[]          NOT NULL,
+        degraded              BOOLEAN         NOT NULL,
+        degradation_detail    TEXT,
+        payload_sha256        TEXT            NOT NULL,
+        received_at           TIMESTAMPTZ     NOT NULL,
+        CONSTRAINT ceremony_result_pkey PRIMARY KEY (ceremony_id),
+        CONSTRAINT ceremony_result_ceremony_fk FOREIGN KEY (ceremony_id, team_id)
+            REFERENCES ceremony(id, team_id) ON DELETE CASCADE,
+        CONSTRAINT ceremony_result_id_team_unique UNIQUE (ceremony_id, team_id),
+        CONSTRAINT ceremony_result_payload_sha256_hex CHECK (payload_sha256 ~ '^[0-9a-f]{64}$')
+    )
+    """,
+    "COMMENT ON TABLE ceremony_result IS "
+    "'What the agent worker delivered when the ceremony closed (AGI-126): one per ceremony. "
+    "Its segments and events are in transcript_segment and ceremony_event.'",
+    "COMMENT ON COLUMN ceremony_result.payload_sha256 IS "
+    "'SHA-256 of the canonical JSON of the delivery: the same delivery again is accepted "
+    "without storing anything, another one is refused.'",
+    "COMMENT ON COLUMN ceremony_result.received_at IS 'When the API stored it, in UTC.'",
+    # ----------------------------------------------------- transcript_segment --
+    """
+    CREATE TABLE transcript_segment (
+        id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        ceremony_id  UUID    NOT NULL,
+        team_id      UUID    NOT NULL,
+        position     INTEGER NOT NULL,
+        user_id      UUID    NOT NULL,
+        text         TEXT    NOT NULL,
+        start_ms     INTEGER NOT NULL,
+        end_ms       INTEGER NOT NULL,
+        CONSTRAINT transcript_segment_result_fk FOREIGN KEY (ceremony_id, team_id)
+            REFERENCES ceremony_result(ceremony_id, team_id) ON DELETE CASCADE,
+        CONSTRAINT transcript_segment_position_unique UNIQUE (ceremony_id, position),
+        CONSTRAINT transcript_segment_position_not_negative CHECK (position >= 0),
+        CONSTRAINT transcript_segment_times_ordered CHECK (end_ms >= start_ms)
+    )
+    """,
+    "COMMENT ON TABLE transcript_segment IS "
+    "'The attributed transcript of a ceremony, one final fragment per row, in the order the "
+    "worker delivered it (position, from 0).'",
+    "COMMENT ON COLUMN transcript_segment.user_id IS "
+    "'Who said it: a participant of the ceremony''s sprint, checked by the application.'",
+    # --------------------------------------------------------- ceremony_event --
+    """
+    CREATE TABLE ceremony_event (
+        id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        ceremony_id  UUID                NOT NULL,
+        team_id      UUID                NOT NULL,
+        position     INTEGER             NOT NULL,
+        type         ceremony_event_type NOT NULL,
+        at           TIMESTAMPTZ         NOT NULL,
+        user_id      UUID,
+        CONSTRAINT ceremony_event_result_fk FOREIGN KEY (ceremony_id, team_id)
+            REFERENCES ceremony_result(ceremony_id, team_id) ON DELETE CASCADE,
+        CONSTRAINT ceremony_event_position_unique UNIQUE (ceremony_id, position),
+        CONSTRAINT ceremony_event_position_not_negative CHECK (position >= 0)
+    )
+    """,
+    "COMMENT ON TABLE ceremony_event IS "
+    "'What happened in a ceremony, in the order the worker saw it (position, from 0).'",
+    "COMMENT ON COLUMN ceremony_event.user_id IS "
+    "'The participant the event is about (a turn); NULL for the ceremony itself.'",
 ]
 
 DOWNGRADE = [
+    "DROP TABLE ceremony_event",
+    "DROP TABLE transcript_segment",
+    "DROP TABLE ceremony_result",
     "DROP TABLE ceremony",
     "DROP TABLE sprint_participant",
     "DROP TABLE sprint",
@@ -248,6 +333,8 @@ DOWNGRADE = [
     "DROP TABLE team",
     "DROP TABLE app_user",
     "DROP FUNCTION set_updated_at()",
+    "DROP TYPE ceremony_event_type",
+    "DROP TYPE ceremony_status",
     "DROP TYPE sprint_status",
     "DROP TYPE invitation_status",
     "DROP TYPE membership_status",

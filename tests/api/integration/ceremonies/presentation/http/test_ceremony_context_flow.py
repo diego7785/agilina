@@ -1,10 +1,12 @@
-"""AGI-64 / AGI-125 end to end over HTTP: the real wiring against PostgreSQL, with the worker's
-token signed for real by a simulated realm of each tenant.
+"""AGI-64 / AGI-125 / AGI-126 end to end over HTTP: the real wiring against PostgreSQL, with the
+worker's token signed for real by a simulated realm of each tenant.
 
 One call gives the worker the tenant, the sprint and its day, the participants in turn order,
 the language and the mode (the story's first test case). A worker token of another tenant's
-realm is a 401 (the fourth one). Nothing but the realm's key set is doubled: the container of
-each tenant, its database and the token's verification are the ones the API runs with.
+realm is a 401 (the fourth one). On close the worker delivers the attributed transcript and the
+events once, however many times it retries (CA2, CA6). Nothing but the realm's key set is
+doubled: the container of each tenant, its database and the token's verification are the ones
+the API runs with.
 """
 
 from collections.abc import AsyncIterator
@@ -13,10 +15,15 @@ from datetime import UTC, datetime
 import pytest
 from fastapi import Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import func, select
 
 from agilina_api.bootstrap.app import create_app
 from agilina_api.bootstrap.container import Container
 from agilina_api.bootstrap.tenants import current_container
+from agilina_api.ceremonies.infrastructure.persistence.orm_models import (
+    CeremonyResultRow,
+    TranscriptSegmentRow,
+)
 from agilina_api.identity.infrastructure.keycloak.access_token_verifier import (
     KeycloakAccessTokenVerifier,
 )
@@ -25,6 +32,7 @@ from agilina_api.identity.infrastructure.keycloak.authenticated_workers import (
 )
 from agilina_api.shared.presentation.http.access import get_authenticated_workers
 from agilina_api.shared.presentation.http.tenancy import TENANT_HEADER, get_tenant_directory
+from agilina_shared import CeremonyEventType
 from agilina_shared.enums import Language, OperationMode
 from tests.api.builders import (
     AUDIENCE,
@@ -38,6 +46,11 @@ from tests.api.builders import (
 )
 from tests.api.doubles import JWKS_URL, FakeClock, FakeRealmKeys, FakeTenantDirectory
 from tests.api.integration.support import stored_ceremony, stored_sprint, stored_team, stored_user
+from tests.shared.builders import (
+    CeremonyEventBuilder,
+    CeremonyResultBuilder,
+    TranscriptSegmentBuilder,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -179,3 +192,89 @@ async def test_a_person_of_the_tenant_cannot_ask_for_the_context(api, session_fa
 
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "not_a_worker"
+
+
+# ------------------------------------------------------- the result (AGI-126) --
+def _result_of(ceremony_id, *speakers) -> dict:
+    """What the worker posts: each speaker said one thing in their turn."""
+    return (
+        CeremonyResultBuilder()
+        .for_ceremony(ceremony_id)
+        .with_present(*(speaker.id for speaker in speakers))
+        .with_segments(*(TranscriptSegmentBuilder().said_by(s.id).build() for s in speakers))
+        .with_events(
+            *(
+                CeremonyEventBuilder().of_type(CeremonyEventType.TURN_STARTED).about(s.id).build()
+                for s in speakers
+            )
+        )
+        .build()
+        .model_dump(mode="json")
+    )
+
+
+async def _count(session_factory, row, ceremony_id) -> int:
+    async with session_factory() as session:
+        query = select(func.count()).select_from(row).where(row.ceremony_id == ceremony_id)
+        return (await session.execute(query)).scalar_one()
+
+
+async def test_the_worker_delivers_the_result_once_however_many_times_it_retries(
+    api, session_factory
+):
+    ceremony_id, _, _, ana, carla = await _scheduled_daily(session_factory)
+    url = f"/v1/ceremonies/{ceremony_id}/result"
+    headers = _headers(_worker_token("acme"), "acme")
+    body = _result_of(ceremony_id, carla, ana)
+
+    first = await api.post(url, json=body, headers=headers)
+    retry = await api.post(url, json=body, headers=headers)
+    another = await api.post(url, json=_result_of(ceremony_id, ana), headers=headers)
+
+    assert (first.status_code, retry.status_code) == (202, 202), first.text
+    assert first.json() == retry.json() == {"status": "received"}
+    assert another.status_code == 409
+    assert another.json()["error"]["code"] == "result_already_received"
+    assert await _count(session_factory, CeremonyResultRow, ceremony_id) == 1
+    assert await _count(session_factory, TranscriptSegmentRow, ceremony_id) == 2
+
+
+async def test_a_result_with_someone_outside_the_sprint_is_refused_and_not_stored(
+    api, session_factory
+):
+    ceremony_id, *_ = await _scheduled_daily(session_factory)
+    outsider = await stored_user(session_factory)
+
+    response = await api.post(
+        f"/v1/ceremonies/{ceremony_id}/result",
+        json=_result_of(ceremony_id, outsider),
+        headers=_headers(_worker_token("acme"), "acme"),
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["details"] == {
+        "fields": [
+            {"field": "body.segments.0.user_id", "reason": "not_a_participant"},
+            {"field": "body.events.0.user_id", "reason": "not_a_participant"},
+        ]
+    }
+    assert str(outsider.id) not in response.text
+    assert await _count(session_factory, CeremonyResultRow, ceremony_id) == 0
+
+
+async def test_a_result_reaches_only_the_database_of_its_tenant(api, session_factory):
+    """Ecomoda's worker cannot deliver to a ceremony of acme, and its token is no good in acme."""
+    ceremony_id, _, _, ana, _ = await _scheduled_daily(session_factory)
+    url = f"/v1/ceremonies/{ceremony_id}/result"
+    body = _result_of(ceremony_id, ana)
+
+    elsewhere = await api.post(
+        url, json=body, headers=_headers(_worker_token("ecomoda"), "ecomoda")
+    )
+    crossed = await api.post(url, json=body, headers=_headers(_worker_token("ecomoda"), "acme"))
+
+    assert elsewhere.status_code == 404
+    assert elsewhere.json()["error"]["code"] == "ceremony_not_found"
+    assert crossed.status_code == 401
+    assert crossed.json()["error"]["code"] == "not_authenticated"
+    assert await _count(session_factory, CeremonyResultRow, ceremony_id) == 0
