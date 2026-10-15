@@ -14,7 +14,6 @@ from tests.api.builders import next_id
 NO_TENANT = {
     ("get", "/health"): "liveness probe",
     ("get", "/health/ready"): "readiness probe",
-    ("get", "/v1/ceremonies/{ceremony_id}/context"): "worker contract, not implemented (HU-55)",
     ("post", "/v1/ceremonies/{ceremony_id}/result"): "worker contract, not implemented (HU-55)",
 }
 # A tenant's, but with no session: the person invited has no account yet.
@@ -32,7 +31,11 @@ def _operations() -> list[tuple[str, str]]:
 
 
 def _url(path: str) -> str:
-    return path.replace("{team_id}", str(next_id())).replace("{user_id}", str(next_id()))
+    return (
+        path.replace("{team_id}", str(next_id()))
+        .replace("{user_id}", str(next_id()))
+        .replace("{ceremony_id}", str(next_id()))
+    )
 
 
 def test_the_open_routes_are_routes_that_exist():

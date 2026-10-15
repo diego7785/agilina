@@ -26,7 +26,7 @@ el orden de turnos).
 | --- | --- | --- |
 | 200 | — | El contexto de la ceremonia |
 | 403 | `not_a_worker` | El token es válido pero es de una persona, no del worker |
-| 404 | `ceremony_not_found` | La ceremonia no existe en ese tenant |
+| 404 | `ceremony_not_found` | La ceremonia no existe en ese tenant, su sprint ya no es el activo del equipo o está agendada antes de que empiece |
 
 **Resultado.** Al cerrar, el worker entrega la transcripción atribuida
 (`segments`) y los eventos de la ceremonia (`events`, que puede venir vacía).

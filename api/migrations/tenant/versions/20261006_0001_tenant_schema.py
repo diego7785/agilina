@@ -1,8 +1,8 @@
-"""tenant schema: what a tenant's database holds (identity and teams)
+"""tenant schema: what a tenant's database holds (identity, teams and ceremonies)
 
 The whole schema of the database of one tenant, in one initial migration (AD-29): ``app_user``,
-``team``, ``team_member``, ``invitation``, ``sprint`` and ``sprint_participant``, as the
-reference schema (``agilina_schema.sql``) defines them, with the changes the stories made:
+``team``, ``team_member``, ``invitation``, ``sprint``, ``sprint_participant`` and ``ceremony``, as
+the reference schema (``agilina_schema.sql``) defines them, with the changes the stories made:
 ``team.created_by`` and ``invitation.created_by`` accept NULL, meaning "created by the platform
 operator" (AD-22), and a team's name has at most 80 characters, which backs the ``TeamName``
 rule of the domain (HU-05; ``char_length`` counts characters like Python's ``len`` does, so
@@ -19,6 +19,11 @@ from a removed one: the ``Sprint`` aggregate admits only active members, and rem
 takes them out of the active sprint's participants. The statuses are the glossary's (``planned``,
 ``active``, ``closed``), and the partial unique index makes the database keep a team to one
 active sprint at most.
+
+``ceremony`` is minimal (AGI-64): the team, the sprint and the scheduled instant, enough for the
+agent worker to ask for a ceremony's context. Its foreign key shares ``team_id`` with the sprint's,
+so a ceremony always belongs to a sprint of its own team. Nothing creates ceremonies yet but the
+tests (AGI-59 does).
 
 Development is local, so this migration is rewritten, not added to, while nobody else holds
 data that depends on it: ``make clean`` and ``make up`` build every database from it. From the
@@ -214,9 +219,28 @@ UPGRADE = [
     "which takes a removed member out of the active sprint.'",
     "COMMENT ON COLUMN sprint_participant.turn_order IS "
     "'Position in the daily''s round, from 1: the order of the list is the turn order.'",
+    # --------------------------------------------------------------- ceremony --
+    """
+    CREATE TABLE ceremony (
+        id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        team_id       UUID        NOT NULL,
+        sprint_id     UUID        NOT NULL,
+        scheduled_at  TIMESTAMPTZ NOT NULL,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+        CONSTRAINT ceremony_sprint_fk FOREIGN KEY (sprint_id, team_id)
+            REFERENCES sprint(id, team_id) ON DELETE CASCADE
+    )
+    """,
+    "COMMENT ON TABLE ceremony IS "
+    "'A ceremony the agent worker facilitates, minimal (AGI-64): its team, its sprint and when "
+    "it is scheduled. The foreign key keeps it in a sprint of its own team.'",
+    "COMMENT ON COLUMN ceremony.scheduled_at IS "
+    "'The instant the ceremony is scheduled, in UTC: it gives the sprint''s day N of M "
+    "(AD-31).'",
 ]
 
 DOWNGRADE = [
+    "DROP TABLE ceremony",
     "DROP TABLE sprint_participant",
     "DROP TABLE sprint",
     "DROP TABLE invitation",

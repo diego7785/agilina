@@ -33,6 +33,7 @@ def test_the_graph_is_built_without_postgres_keycloak_or_a_mail_server():
     assert container.start_sprint is not None
     assert container.reconfigure_sprint is not None
     assert container.get_active_sprint is not None
+    assert container.get_ceremony_context is not None
 
 
 def test_the_links_of_the_emails_open_the_web_of_the_tenant_from_its_public_url(monkeypatch):

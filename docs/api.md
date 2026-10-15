@@ -15,8 +15,8 @@ y ejecutable está en `/docs` (OpenAPI); este archivo es el resumen que se lee d
 
 | Cabecera | Sentido | Dónde |
 | --- | --- | --- |
-| `X-Agilina-Tenant` | La organización a la que se refiere la petición ([AD-29](adr/0029-un-tenant-es-una-organizacion-con-su-base-y-su-realm.md)) | Toda ruta salvo `/health*`, las de ceremonias y la documentación |
-| `Authorization: Bearer <token>` | Token de acceso del tenant (Keycloak) | Las rutas «con sesión» |
+| `X-Agilina-Tenant` | La organización a la que se refiere la petición ([AD-29](adr/0029-un-tenant-es-una-organizacion-con-su-base-y-su-realm.md)) | Toda ruta salvo `/health*`, `POST /v1/ceremonies/{ceremony_id}/result` (hasta AGI-126) y la documentación |
+| `Authorization: Bearer <token>` | Token de acceso del tenant (Keycloak): el de la persona, o el del worker del agente en las rutas de ceremonias | Las rutas «con sesión» |
 | `X-Request-ID` | Identificador de la petición. Se acepta el que envíe el cliente si tiene de 8 a 64 caracteres `A-Za-z0-9._-`; si no, la API genera uno. Siempre vuelve en la respuesta | Todas |
 
 ### El formato de un error
@@ -94,6 +94,7 @@ Toda respuesta de error lleva `Cache-Control: no-store`.
 | 409 | `already_a_team_member` | La persona ya es miembro activo del equipo | — |
 | 409 | `account_disabled` | La persona tiene cuenta, pero está desactivada | — |
 | 409 | `pending_invitation_exists` | Otra invitación a la misma persona se emitía en ese mismo instante | — |
+| 404 | `ceremony_not_found` | La ceremonia no existe, su sprint ya no es el activo del equipo o está agendada antes de que empiece (la misma respuesta) | — |
 | 501 | `not_implemented` | La operación está definida pero aún no se implementa | — |
 
 ## Salud
@@ -522,18 +523,30 @@ guarda y participantes con su orden. El sprint sigue activo. Solo para los admin
 
 ## Ceremonias (contrato del worker)
 
-Definidas en el Sprint 0; se implementan con HU-56. Mientras tanto responden `501`. Por ahora no
-exigen tenant ni sesión.
+Las dos operaciones del worker del agente ([contrato](contrato-worker-api.md)). Las usa solo él,
+con el token que el cliente `agilina-worker` del realm del tenant obtiene por *client credentials*:
+un token válido de una persona es `403 not_a_worker`, y uno del worker de otra organización no lo
+firma el realm del tenant, así que es `401 not_authenticated`. La entrega del resultado responde
+`501` hasta AGI-126 y, hasta entonces, no exige tenant ni sesión.
 
 ### `GET /v1/ceremonies/{ceremony_id}/context`
 
-El contexto que el worker necesita antes de entrar a la sala.
+Todo lo que el worker necesita antes de entrar a la sala, en una sola llamada: el tenant (el de
+`X-Agilina-Tenant`), el equipo y el sprint, el nombre de la sala (`room_name_for(tenant,
+ceremony_id)`), el idioma y el modo del equipo, el día N de M del sprint en el instante en que la
+ceremonia está programada (en el calendario del sprint, AD-31) y los participantes del sprint
+activo en orden de turno, desde 1, con su nombre, su rol guardado y su identidad en la sala
+(`str(user_id)`). Los umbrales de silencio y de turno estancado llevan los valores por defecto
+del contrato.
 
 | Estado | Cuerpo | Cuándo |
 | --- | --- | --- |
-| 200 | `CeremonyContext` (contrato en `shared/`) | Aún no ocurre |
+| 200 | `CeremonyContext` (contrato en `shared/`) | El worker pide una ceremonia del sprint activo de su equipo |
+| 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
+| 401 | error `not_authenticated` | Sin token, o no es válido para el realm del tenant (también el del worker de otra organización) |
+| 403 | error `not_a_worker` | Token válido, pero no es del worker del agente |
+| 404 | error `ceremony_not_found` | La ceremonia no existe, su sprint ya no es el activo del equipo o está agendada antes de que empiece |
 | 422 | error `validation_error` | `ceremony_id` no es un UUID |
-| 501 | error `not_implemented` | Siempre, hasta HU-56 |
 | 500 | error `internal_error` | Fallo inesperado |
 
 ### `POST /v1/ceremonies/{ceremony_id}/result`

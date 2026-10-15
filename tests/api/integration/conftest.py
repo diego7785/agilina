@@ -26,7 +26,7 @@ from agilina_api.shared.infrastructure.database.unit_of_work import SqlAlchemyUn
 from agilina_api.shared.infrastructure.migrations import drop_database, ensure_database, migrate
 from agilina_api.shared.infrastructure.settings import Settings, get_settings
 
-TABLES = "sprint_participant, sprint, invitation, team_member, team, app_user"
+TABLES = "ceremony, sprint_participant, sprint, invitation, team_member, team, app_user"
 
 TENANTS = (("acme", "ACME Corporation", "en"), ("ecomoda", "Ecomoda", "es"))
 

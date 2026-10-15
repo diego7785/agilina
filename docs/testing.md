@@ -66,6 +66,7 @@ await InvitationBuilder().for_team(team.id).saved_in(uow.invitations)
 | `SprintBuilder` | Un sprint activo del 2026-10-05 al 2026-10-16 con la daily a las 09:00 de America/Bogota (HU-07); `for_team(equipo)` llama a la daily a sus integrantes activos, `with_period`, `with_daily_time`, `with_participants` (en orden de turno) y `closed()` / `planned()` (se restauran tal como se guardan: cerrar un sprint llega con HU-10) |
 | `StartSprintBuilder`, `ReconfigureSprintBuilder` | Un admin configura el sprint o edita el activo (HU-07), con los mismos valores por defecto que `SprintBuilder` |
 | `ContactBuilder`, `TeamContactsBuilder`, `EmailMessageBuilder` | Datos de lectura y mensajes de correo |
+| `CeremonyBuilder`, `RosterBuilder` | Una ceremonia guardada, programada en la daily por defecto (AGI-64); `for_sprint(sprint)` la pone en ese sprint de su equipo y `scheduled_at_instant` cambia el instante. El *roster* es lo que ceremonies lee de teams: idioma, modo, calendario del sprint y `with_participant` en el siguiente turno. En integración, `stored_ceremony(session_factory, CeremonyBuilder().for_sprint(sprint))` escribe la fila, porque nada crea ceremonias todavía |
 
 Reglas:
 
@@ -111,6 +112,8 @@ En `tests/api/doubles/`, uno por puerto, en memoria. Los que más se usan:
 | `FakeActiveSprints` | `ActiveSprints` | Los equipos que tienen un sprint en curso |
 | `InMemorySprintRepository`, `FakeSprintQueries` | `SprintRepository`, `SprintQueries` | Los sprints guardados (copias, como la base) y su lectura: `FakeSprintQueries(repositorio)` lee lo que el repositorio guardó, así que una ruta que guarda y luego lee ve lo guardado |
 | `FakeMemberContacts` | `MemberContactsDirectory` | El nombre y el correo de cada integrante; los demás no tienen cuenta |
+| `FakeAuthenticatedWorkers` | `AuthenticatedWorkers` | El token del worker y el de una persona; cualquier otro no es válido (AGI-64) |
+| `FakeCeremonyQueries`, `FakeCeremonyRoster`, `FakeParticipantNames` | `CeremonyQueries`, `CeremonyRoster`, `ParticipantNames` | Las ceremonias, el *roster* del sprint activo de cada equipo y los nombres de los participantes (AGI-64) |
 
 ### Flujos de punta a punta
 

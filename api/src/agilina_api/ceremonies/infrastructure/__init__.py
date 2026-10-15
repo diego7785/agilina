@@ -1,0 +1,1 @@
+"""Ceremonies driven adapters: persistence."""

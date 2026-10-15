@@ -4,18 +4,22 @@ import pytest
 
 from agilina_api.bootstrap.context_adapters import (
     IdentityBackedMemberContacts,
+    IdentityBackedParticipantNames,
+    TeamsBackedCeremonyRoster,
     TeamsBackedContacts,
     TeamsBackedMembership,
 )
+from agilina_api.ceremonies.application.dtos import RosterParticipant, RosterRecord
 from agilina_api.identity.domain.errors import AlreadyTeamMemberError, UnknownTeamError
 from agilina_api.identity.infrastructure.persistence.user_contacts import SqlUserContacts
 from agilina_api.shared.infrastructure.database.unit_of_work import SqlAlchemyUnitOfWork
 from agilina_api.teams.application.dtos import MemberContact
+from agilina_api.teams.infrastructure.persistence.sql_sprint_queries import SqlSprintQueries
 from agilina_api.teams.infrastructure.persistence.team_queries import SqlTeamQueries
-from agilina_shared.enums import Language, TeamRole
-from tests.api.builders import AppUserBuilder, TeamBuilder, next_id
+from agilina_shared.enums import Language, OperationMode, TeamRole
+from tests.api.builders import AppUserBuilder, SprintBuilder, TeamBuilder, next_id
 from tests.api.doubles import FakeClock
-from tests.api.integration.support import stored_team, stored_user
+from tests.api.integration.support import stored_sprint, stored_team, stored_user
 
 pytestmark = pytest.mark.integration
 
@@ -98,3 +102,70 @@ async def test_asking_for_no_member_answers_without_a_query(session_factory):
     directory = IdentityBackedMemberContacts(SqlUserContacts(session_factory))
 
     assert await directory.contacts_of([]) == {}
+
+
+# --------------------------------------------- ceremony roster and names (AGI-64) --
+def _roster(session_factory) -> TeamsBackedCeremonyRoster:
+    return TeamsBackedCeremonyRoster(
+        SqlTeamQueries(session_factory), SqlSprintQueries(session_factory)
+    )
+
+
+async def test_the_roster_is_the_team_language_mode_and_the_active_sprint_in_turn_order(
+    session_factory,
+):
+    ana, carla = await stored_user(session_factory), await stored_user(session_factory)
+    team = await stored_team(
+        session_factory,
+        TeamBuilder()
+        .in_language(Language.ES)
+        .in_mode(OperationMode.AUTONOMOUS)
+        .with_admin(ana.id)
+        .with_member(carla.id),
+    )
+    sprint = await stored_sprint(
+        session_factory, SprintBuilder().for_team(team).with_participants(carla.id, ana.id)
+    )
+
+    roster = await _roster(session_factory).roster_of(team_id=team.id, sprint_id=sprint.id)
+
+    assert roster == RosterRecord(
+        language=Language.ES,
+        mode=OperationMode.AUTONOMOUS,
+        start_date=sprint.period.start,
+        end_date=sprint.period.end,
+        time_zone="America/Bogota",
+        participants=(
+            RosterParticipant(user_id=carla.id, role=TeamRole.MEMBER, turn_order=1),
+            RosterParticipant(user_id=ana.id, role=TeamRole.ADMIN, turn_order=2),
+        ),
+    )
+
+
+async def test_a_sprint_that_is_not_the_active_one_has_no_roster(session_factory):
+    ana = await stored_user(session_factory)
+    team = await stored_team(session_factory, TeamBuilder().with_admin(ana.id))
+    closed = await stored_sprint(session_factory, SprintBuilder().for_team(team).closed())
+    await stored_sprint(session_factory, SprintBuilder().for_team(team).numbered(2))
+
+    assert await _roster(session_factory).roster_of(team_id=team.id, sprint_id=closed.id) is None
+
+
+async def test_a_team_without_an_active_sprint_has_no_roster(session_factory):
+    ana = await stored_user(session_factory)
+    team = await stored_team(session_factory, TeamBuilder().with_admin(ana.id))
+
+    assert await _roster(session_factory).roster_of(team_id=team.id, sprint_id=next_id()) is None
+
+
+async def test_the_names_of_the_participants_are_their_full_names_active_or_not(session_factory):
+    ana = await stored_user(session_factory, AppUserBuilder().with_unique_email().named("Ana Gil"))
+    disabled = await stored_user(
+        session_factory, AppUserBuilder().with_unique_email().named("Bruno Díaz").disabled()
+    )
+    names = IdentityBackedParticipantNames(SqlUserContacts(session_factory))
+
+    assert await names.names_of([ana.id, disabled.id, next_id()]) == {
+        ana.id: "Ana Gil",
+        disabled.id: "Bruno Díaz",
+    }

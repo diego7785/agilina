@@ -6,12 +6,18 @@ from pathlib import Path
 import pytest
 
 from agilina_api.bootstrap.app import create_app
+from agilina_api.ceremonies.presentation.http.errors import CeremoniesErrors
 from agilina_api.identity.presentation.http.errors import IdentityErrors
 from agilina_api.shared.presentation.http.api_error import SharedErrors, catalog_of
 from agilina_api.teams.presentation.http.errors import TeamsErrors
 
 DOC = (Path(__file__).parents[4] / "docs" / "api.md").read_text(encoding="utf-8")
-CATALOG = (*catalog_of(SharedErrors), *catalog_of(IdentityErrors), *catalog_of(TeamsErrors))
+CATALOG = (
+    *catalog_of(SharedErrors),
+    *catalog_of(IdentityErrors),
+    *catalog_of(TeamsErrors),
+    *catalog_of(CeremoniesErrors),
+)
 # What every route may answer by the very nature of HTTP, so the doc says it once, in the
 # conventions. The 500 is not here: every endpoint declares it and lists it.
 EVERYWHERE = {"404", "405"}
