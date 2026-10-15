@@ -20,11 +20,25 @@ class TranscriptSegmentBuilder:
     def said_by(self, user_id: UUID) -> Self:
         return replace(self, user_id=user_id)
 
+    def saying(self, text: str) -> Self:
+        return replace(self, text=text)
+
+    def spanning(self, start_ms: int, end_ms: int) -> Self:
+        return replace(self, start_ms=start_ms, end_ms=end_ms)
+
     def build(self) -> TranscriptSegment:
-        return TranscriptSegment(
-            user_id=self.user_id,
-            room_identity=str(self.user_id),
-            text=self.text,
-            start_ms=self.start_ms,
-            end_ms=self.end_ms,
-        )
+        return TranscriptSegment(**self._fields())
+
+    def build_unchecked(self) -> TranscriptSegment:
+        """The segment as it is, without the contract's validation: what the database must
+        still refuse (an end before the start, for instance)."""
+        return TranscriptSegment.model_construct(**self._fields())
+
+    def _fields(self) -> dict[str, object]:
+        return {
+            "user_id": self.user_id,
+            "room_identity": str(self.user_id),
+            "text": self.text,
+            "start_ms": self.start_ms,
+            "end_ms": self.end_ms,
+        }

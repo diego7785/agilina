@@ -190,3 +190,15 @@ def test_enum_values_match_the_database_enum_types():
     """The values travel through the API and are stored as PostgreSQL enums."""
     assert {mode.value for mode in OperationMode} == {"support", "autonomous"}
     assert {role.value for role in TeamRole} == {"admin", "member"}
+
+
+def test_a_segment_that_ends_before_it_starts_is_rejected():
+    """The database refuses it as well: rejected here, it is a 422 and not a 500."""
+    with pytest.raises(ValidationError, match="end_ms must not be before start_ms"):
+        TranscriptSegmentBuilder().spanning(2400, 1000).build()
+
+
+def test_a_segment_of_no_duration_is_valid():
+    segment = TranscriptSegmentBuilder().spanning(1000, 1000).build()
+
+    assert segment.start_ms == segment.end_ms == 1000

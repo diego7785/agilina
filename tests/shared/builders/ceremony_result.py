@@ -20,12 +20,19 @@ class CeremonyResultBuilder:
     started_at: datetime = STARTED_AT
     closed_at: datetime = CLOSED_AT
     present_participants: tuple[UUID, ...] = ()
+    absent_participants: tuple[UUID, ...] = ()
     segments: tuple[TranscriptSegment, ...] = ()
     events: tuple[CeremonyEvent, ...] = ()
     degradation_detail: str | None = None
 
+    def for_ceremony(self, ceremony_id: UUID) -> Self:
+        return replace(self, ceremony_id=ceremony_id)
+
     def with_present(self, *user_ids: UUID) -> Self:
         return replace(self, present_participants=user_ids)
+
+    def with_absent(self, *user_ids: UUID) -> Self:
+        return replace(self, absent_participants=user_ids)
 
     def with_segments(self, *segments: TranscriptSegment) -> Self:
         return replace(self, segments=segments)
@@ -37,14 +44,23 @@ class CeremonyResultBuilder:
         return replace(self, status=CeremonyStatus.DEGRADED, degradation_detail=detail)
 
     def build(self) -> CeremonyResult:
-        return CeremonyResult(
-            ceremony_id=self.ceremony_id,
-            status=self.status,
-            started_at=self.started_at,
-            closed_at=self.closed_at,
-            present_participants=list(self.present_participants),
-            segments=list(self.segments),
-            events=list(self.events),
-            degraded=self.degradation_detail is not None,
-            degradation_detail=self.degradation_detail,
-        )
+        return CeremonyResult(**self._fields())
+
+    def build_unchecked(self) -> CeremonyResult:
+        """The result as it is, without the contract's validation: with a segment from
+        ``TranscriptSegmentBuilder.build_unchecked``, what the database must still refuse."""
+        return CeremonyResult.model_construct(**self._fields())
+
+    def _fields(self) -> dict[str, object]:
+        return {
+            "ceremony_id": self.ceremony_id,
+            "status": self.status,
+            "started_at": self.started_at,
+            "closed_at": self.closed_at,
+            "present_participants": list(self.present_participants),
+            "absent_participants": list(self.absent_participants),
+            "segments": list(self.segments),
+            "events": list(self.events),
+            "degraded": self.degradation_detail is not None,
+            "degradation_detail": self.degradation_detail,
+        }
