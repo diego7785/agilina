@@ -61,6 +61,37 @@ async def test_the_keys_are_read_once_and_kept(setup):
     assert setup.realm.reads == 1
 
 
+async def test_the_claims_of_a_valid_token_are_all_given(setup):
+    token = AccessTokenBuilder().as_worker().with_claim("custom", 7).build()
+
+    claims = await setup.verifier.verified_claims(token)
+
+    assert claims is not None
+    assert claims["sub"] == SUBJECT and claims["iss"] == ISSUER
+    assert claims["azp"] == "agilina-worker" and claims["custom"] == 7
+
+
+@pytest.mark.parametrize(
+    "token",
+    [
+        "not-a-token",
+        AccessTokenBuilder().build_unsigned(),
+        AccessTokenBuilder().issued_by("http://evil.test/realms/agilina").build(),
+        AccessTokenBuilder().for_audience("account").build(),
+        AccessTokenBuilder().of_type("Refresh").build(),
+        AccessTokenBuilder().for_subject("  ").build(),
+        AccessTokenBuilder().never_expiring().build(),
+        AccessTokenBuilder().signed_with(signing_key("key-1", "attacker")).build(),
+    ],
+    ids=["garbage", "unsigned", "issuer", "audience", "type", "subject", "expiry", "signature"],
+)
+async def test_a_refused_token_gives_no_claims_and_the_reason_is_logged(setup, caplog, token):
+    with caplog.at_level(logging.INFO):
+        assert await setup.verifier.verified_claims(token) is None
+
+    assert "Access token rejected" in caplog.text
+
+
 # ------------------------------------------------------------------------ the time --
 async def test_a_token_lives_until_its_expiry_plus_the_margin(setup):
     token = AccessTokenBuilder().build()  # expires 15 minutes after NOW

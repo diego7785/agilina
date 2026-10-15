@@ -29,6 +29,9 @@ from agilina_api.identity.infrastructure.keycloak.access_token_verifier import (
 from agilina_api.identity.infrastructure.keycloak.authenticated_users import (
     KeycloakAuthenticatedUsers,
 )
+from agilina_api.identity.infrastructure.keycloak.authenticated_workers import (
+    KeycloakAuthenticatedWorkers,
+)
 from agilina_api.identity.infrastructure.keycloak.identity_provider import KeycloakIdentityProvider
 from agilina_api.identity.infrastructure.persistence.invitation_queries import SqlInvitationQueries
 from agilina_api.identity.infrastructure.persistence.unit_of_work import (
@@ -36,7 +39,11 @@ from agilina_api.identity.infrastructure.persistence.unit_of_work import (
 )
 from agilina_api.identity.infrastructure.persistence.user_contacts import SqlUserContacts
 from agilina_api.identity.infrastructure.tokens import SecretsActivationTokenGenerator
-from agilina_api.shared.application.access import AuthenticatedUsers, TeamAccess
+from agilina_api.shared.application.access import (
+    AuthenticatedUsers,
+    AuthenticatedWorkers,
+    TeamAccess,
+)
 from agilina_api.shared.application.tenancy import Tenant
 from agilina_api.shared.infrastructure.clock import SystemClock
 from agilina_api.shared.infrastructure.database.session import (
@@ -87,6 +94,7 @@ class Container:
     get_team_dashboard: GetTeamDashboardHandler
     team_queries: TeamQueries
     authenticated_users: AuthenticatedUsers
+    authenticated_workers: AuthenticatedWorkers
     team_access: TeamAccess
     identity_provider: KeycloakIdentityProvider
     access_token_verifier: KeycloakAccessTokenVerifier
@@ -185,6 +193,10 @@ def build_container(settings: Settings, tenant: Tenant) -> Container:
         get_team_dashboard=GetTeamDashboardHandler(team_queries, get_active_sprint),
         team_queries=team_queries,
         authenticated_users=KeycloakAuthenticatedUsers(access_token_verifier, session_factory),
+        # The same verifier: the worker's token is one of this tenant's realm, for this API.
+        authenticated_workers=KeycloakAuthenticatedWorkers(
+            access_token_verifier, settings.keycloak_worker_client
+        ),
         # The teams query answers the shared port as it is: the membership is checked
         # against the stored role, never against a claim of the token.
         team_access=team_queries,

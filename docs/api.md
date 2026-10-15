@@ -64,6 +64,7 @@ Toda respuesta de error lleva `Cache-Control: no-store`.
 | 403 | `account_not_active` | El token es válido, pero su dueño no es usuario activo de la organización: no tiene cuenta en ella o está desactivada. La persona tiene sesión, así que la web no la manda a iniciar sesión otra vez | — |
 | 403 | `not_a_team_member` | El usuario no es miembro activo del equipo (ajeno, retirado o inexistente: la misma respuesta) | — |
 | 403 | `not_a_team_admin` | El usuario es miembro del equipo, pero no uno de sus admins (según el rol guardado) | — |
+| 403 | `not_a_worker` | El token es válido, pero no es del worker del agente: la ruta es solo suya (`azp` distinto de `agilina-worker`) | — |
 | 422 | `validation_error` | El cuerpo, un parámetro o una cabecera no es válido | `fields[]`: `{field, reason}` |
 | 404 | `invitation_not_found` | El enlace se alteró o nunca existió | — |
 | 410 | `invitation_used` | La invitación ya se usó | — |

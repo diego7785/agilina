@@ -20,6 +20,7 @@ from agilina_api.shared.application.access import (
     NotATeamAdminError,
     NotATeamMemberError,
     NotAuthenticatedError,
+    NotAWorkerError,
 )
 from agilina_api.shared.application.ports import MailDeliveryError
 from agilina_api.shared.application.tenancy import TenantNotFoundError, TenantRequiredError
@@ -49,6 +50,7 @@ SHARED_ERRORS: tuple[ErrorMapping, ...] = (
     ErrorMapping(AccountNotActiveError, SharedErrors.ACCOUNT_NOT_ACTIVE),
     ErrorMapping(NotATeamMemberError, SharedErrors.NOT_A_TEAM_MEMBER),
     ErrorMapping(NotATeamAdminError, SharedErrors.NOT_A_TEAM_ADMIN),
+    ErrorMapping(NotAWorkerError, SharedErrors.NOT_A_WORKER),
     ErrorMapping(MailDeliveryError, SharedErrors.MAIL_UNAVAILABLE),
 )
 

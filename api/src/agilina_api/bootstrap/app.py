@@ -27,7 +27,11 @@ from agilina_api.shared.infrastructure.scheduler import create_scheduler
 from agilina_api.shared.infrastructure.settings import get_settings
 from agilina_api.shared.infrastructure.tenancy.sql_tenant_directory import SqlTenantDirectory
 from agilina_api.shared.presentation.http import health_router, tenancy_router
-from agilina_api.shared.presentation.http.access import get_authenticated_users, get_team_access
+from agilina_api.shared.presentation.http.access import (
+    get_authenticated_users,
+    get_authenticated_workers,
+    get_team_access,
+)
 from agilina_api.shared.presentation.http.dependencies import (
     get_liveness_query,
     get_readiness_query,
@@ -174,6 +178,9 @@ def create_app() -> FastAPI:
             lambda container: container.get_team_dashboard
         ),
         get_authenticated_users: from_container(lambda container: container.authenticated_users),
+        get_authenticated_workers: from_container(
+            lambda container: container.authenticated_workers
+        ),
         get_team_access: from_container(lambda container: container.team_access),
     }
     app.dependency_overrides.update(overrides)

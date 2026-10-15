@@ -74,7 +74,6 @@ class Settings(BaseSettings):
     """Keycloak's own administrator: only the operator's tools use it, to create realms."""
     keycloak_web_client: str = "agilina-web"
     keycloak_worker_client: str = "agilina-worker"
-    keycloak_worker_secret: str = ""
     keycloak_api_client: str = "agilina-api"
 
     # ---------------------------------------------------------------- email --
@@ -129,6 +128,14 @@ class Settings(BaseSettings):
         """The secret of the ``agilina-api`` client of the tenant's realm: one per tenant,
         in ``AGILINA_TENANT_<SLUG>_KEYCLOAK_API_SECRET``. Never in the repository."""
         return SecretStr(os.environ.get(f"AGILINA_TENANT_{slug.upper()}_KEYCLOAK_API_SECRET", ""))
+
+    def tenant_worker_secret(self, slug: str) -> SecretStr:
+        """The secret of the ``agilina-worker`` client of the tenant's realm, in
+        ``AGILINA_TENANT_<SLUG>_KEYCLOAK_WORKER_SECRET``. The API only writes it into the realm
+        it creates; the worker uses it to sign in. Never in the repository."""
+        return SecretStr(
+            os.environ.get(f"AGILINA_TENANT_{slug.upper()}_KEYCLOAK_WORKER_SECRET", "")
+        )
 
     @property
     def origins(self) -> list[str]:

@@ -67,3 +67,14 @@ async def test_an_invalid_token_does_not_even_reach_the_database():
     users = KeycloakAuthenticatedUsers(verifier, session_factory=None)  # type: ignore[arg-type]
 
     assert await users.user_id_for("not a token") is None
+
+
+async def test_the_token_of_the_worker_on_a_person_route_is_an_account_not_active(
+    users, session_factory
+):
+    """The worker has no ``app_user``: its valid token is a ``403 account_not_active`` on a
+    person's route, never a person (docs/permisos.md, AGI-64)."""
+    await stored_user(session_factory, AppUserBuilder().with_unique_email().with_subject("sub-1"))
+
+    with pytest.raises(AccountNotActiveError):
+        await users.user_id_for(AccessTokenBuilder().as_worker().for_subject("svc").build())

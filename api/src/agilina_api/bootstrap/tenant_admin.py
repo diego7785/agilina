@@ -5,8 +5,9 @@
 
 Adding a tenant is four things, and this does all of them, in an order that can be repeated
 after a failure halfway: the tenant's database is created and migrated, its realm is created in
-Keycloak and its row is written in the catalog. Whoever runs it needs the tenant's secret in the
-environment (``AGILINA_TENANT_<SLUG>_KEYCLOAK_API_SECRET``; ``make tenant-add`` generates it).
+Keycloak and its row is written in the catalog. Whoever runs it needs the tenant's two client
+secrets in the environment (``AGILINA_TENANT_<SLUG>_KEYCLOAK_API_SECRET`` and
+``AGILINA_TENANT_<SLUG>_KEYCLOAK_WORKER_SECRET``; ``make tenant-add`` generates them).
 There is no panel for this: the administrators are the developers.
 """
 
@@ -36,12 +37,15 @@ def _provisioner(settings: Settings) -> KeycloakRealmProvisioner:
 def _ensure_realm(
     settings: Settings, provisioner: KeycloakRealmProvisioner, slug: str, name: str, language: str
 ) -> None:
-    secret = settings.tenant_api_secret(slug).get_secret_value()
-    if not secret:
-        raise SystemExit(
-            f"AGILINA_TENANT_{slug.upper()}_KEYCLOAK_API_SECRET is not set: use make tenant-add"
-        )
-    realm = render_realm(settings.tenant_realm(slug), name, language, secret)
+    api_secret = settings.tenant_api_secret(slug).get_secret_value()
+    worker_secret = settings.tenant_worker_secret(slug).get_secret_value()
+    for client, secret in (("API", api_secret), ("WORKER", worker_secret)):
+        if not secret:
+            raise SystemExit(
+                f"AGILINA_TENANT_{slug.upper()}_KEYCLOAK_{client}_SECRET is not set: "
+                "use make tenant-add"
+            )
+    realm = render_realm(settings.tenant_realm(slug), name, language, api_secret, worker_secret)
     created = provisioner.ensure_realm(realm)
     print(f"Realm {settings.tenant_realm(slug)}: {'created' if created else 'already there'}")
 

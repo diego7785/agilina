@@ -18,6 +18,7 @@ def _realm(**overrides) -> dict:
         "name": "ACME Corporation",
         "locale": "en",
         "api_secret": "the-secret",
+        "worker_secret": "the-worker-secret",
     }
     values.update(overrides)
     return render_realm(**values)
@@ -41,6 +42,32 @@ def test_the_api_client_of_the_realm_has_the_secret_of_its_tenant():
     clients = _clients(_realm(api_secret="acme-secret"))
 
     assert clients["agilina-api"]["secret"] == "acme-secret"
+
+
+def test_the_worker_client_signs_in_with_the_secret_of_its_tenant_for_the_api():
+    """Client credentials only, with the tenant's own secret, and its tokens carry the
+    audience ``agilina-api`` so the API's verifier accepts them (AGI-64)."""
+    worker = _clients(_realm(worker_secret="acme-worker-secret"))["agilina-worker"]
+
+    assert worker["secret"] == "acme-worker-secret"
+    assert worker["clientAuthenticatorType"] == "client-secret"
+    assert worker["publicClient"] is False and worker["serviceAccountsEnabled"] is True
+    assert worker["standardFlowEnabled"] is False
+    assert worker["directAccessGrantsEnabled"] is False
+    assert worker["implicitFlowEnabled"] is False
+    assert [
+        mapper["config"]["included.client.audience"]
+        for mapper in worker["protocolMappers"]
+        if mapper["protocolMapper"] == "oidc-audience-mapper"
+    ] == ["agilina-api"]
+
+
+def test_each_client_gets_its_own_secret():
+    clients = _clients(_realm(api_secret="api-secret", worker_secret="worker-secret"))
+
+    assert clients["agilina-api"]["secret"] == "api-secret"
+    assert clients["agilina-worker"]["secret"] == "worker-secret"
+    assert "secret" not in clients["agilina-web"]
 
 
 def test_no_placeholder_is_left_behind():

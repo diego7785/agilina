@@ -19,6 +19,7 @@ The token itself is never logged, only the reason it was refused.
 
 import asyncio
 import logging
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -64,14 +65,20 @@ class KeycloakAccessTokenVerifier:
 
     async def verified_subject(self, token: str) -> str | None:
         """The ``sub`` of a valid access token, or ``None`` if it is not one."""
-        reason, subject = await self._verify(token)
+        claims = await self.verified_claims(token)
+        return None if claims is None else str(claims["sub"])
+
+    async def verified_claims(self, token: str) -> Mapping[str, Any] | None:
+        """Every claim of a valid access token, or ``None`` if it is not one. Its ``sub`` is
+        a non-blank string."""
+        reason, claims = await self._verify(token)
         if reason is not None:
             logger.info("Access token rejected: %s", reason)
-        return subject
+        return claims
 
     # --------------------------------------------------------------- internals --
-    async def _verify(self, token: str) -> tuple[str | None, str | None]:
-        """``(reason, None)`` when refused and ``(None, subject)`` when valid."""
+    async def _verify(self, token: str) -> tuple[str | None, dict[str, Any] | None]:
+        """``(reason, None)`` when refused and ``(None, claims)`` when valid."""
         try:
             header = jwt.get_unverified_header(token)
         except jwt.PyJWTError:
@@ -104,7 +111,7 @@ class KeycloakAccessTokenVerifier:
         subject = claims["sub"]
         if not isinstance(subject, str) or not subject.strip():
             return "no_subject", None
-        return None, subject
+        return None, claims
 
     def _decode(self, token: str, key: jwt.PyJWK) -> dict[str, Any]:
         # The time claims are checked below with the Clock, not with the system clock.
