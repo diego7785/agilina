@@ -10,9 +10,15 @@ from agilina_shared.enums import Language, OperationMode
 class CeremonyContext(ContractModel):
     """What the worker needs to know before joining the room."""
 
+    tenant: str = Field(
+        description="Slug of the organization the ceremony belongs to (AD-29). The worker "
+        "names it in X-Agilina-Tenant and authenticates with the agilina-worker client of "
+        "its realm."
+    )
     ceremony_id: UUID
     team_id: UUID
-    room: str
+    sprint_id: UUID
+    room: str = Field(description="LiveKit room name, as room_name_for(tenant, ceremony_id).")
     language: Language
     mode: OperationMode
     sprint_day: int = Field(ge=1, description="Current day of the sprint, for the greeting.")

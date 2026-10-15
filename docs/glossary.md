@@ -59,17 +59,18 @@ Si aparece un concepto nuevo, se agrega aquí antes de usarlo.
 | Daily occurrence | Ocurrencia de la daily | El instante UTC de una daily concreta: la hora de la daily en la zona de captura en una fecha del periodo, convertida a UTC. Hay una por cada día del periodo (`daily_occurrences`) |
 | Daily participant (`sprint_participant`) | Participante de la daily | Integrante del equipo convocado a la daily del sprint, con su `turn_order` desde 1. El orden de la lista es el orden de turnos |
 | `CeremonyStatus` | Estado de la ceremonia | `scheduled`, `in_progress`, `completed`, `cancelled`. El contrato del worker agrega `degraded`, que el esquema aún modela como bandera `degraded` de la ceremonia (a resolver en HU-56) |
-| `CeremonyContext` | Contexto de la ceremonia | Lo que el worker necesita saber antes de entrar a la sala |
-| `CeremonyResult` | Resultado de la ceremonia | Lo que el worker entrega a la API al cerrar |
+| `CeremonyContext` | Contexto de la ceremonia | Lo que el worker necesita saber antes de entrar a la sala. Lleva el `tenant` de la ceremonia, con el que el worker elige el realm en el que se autentica |
+| `CeremonyResult` | Resultado de la ceremonia | Lo que el worker entrega a la API al cerrar: la transcripción atribuida y los eventos |
+| `CeremonyEvent` | Evento de la ceremonia | Algo que pasó en la ceremonia, con su instante UTC y, si es de un participante, su `user_id`. Su tipo (`CeremonyEventType`) es uno de `ceremony_started`, `turn_started`, `turn_ended`, `degraded` y `ceremony_closed` |
 | `Roster` | Roster | Lista ordenada de los participantes convocados y su rol |
 | Turn | Turno | El momento en que un participante habla; los turnos siguen un orden fijo |
-| `turn_order` | Orden de turno | Posición del participante en la ronda |
+| `turn_order` | Orden de turno | Posición del participante en la ronda, desde 1 |
 | Silence threshold | Umbral de silencio (X) | Segundos de silencio tras los que Agilina pregunta |
 | Stuck-turn threshold | Umbral de turno trabado (Y) | Segundos sin avance tras los que Agilina interviene |
 | Wake word | Palabra de activación | Palabra con la que se le habla a Agilina durante la ceremonia |
 | Degraded mode | Modo degradado | La transcripción no responde: Agilina lo anuncia y la ceremonia sigue sin facilitación automática |
-| Room | Sala | La sala de audio de LiveKit de una ceremonia |
-| `room_identity` | Identidad de sala | Identidad con la que alguien entra a LiveKit; con ella se atribuye lo que dice, sin diarización |
+| Room | Sala | La sala de audio de LiveKit de una ceremonia. Se llama `<tenant>-<ceremony_id>` (`room_name_for`) |
+| `room_identity` | Identidad de sala | Identidad con la que alguien entra a LiveKit, `str(user_id)`; con ella se atribuye lo que dice, sin diarización |
 | `TranscriptSegment` | Segmento de transcripción | Fragmento final de texto atribuido a quien lo dijo, con marcas de tiempo |
 
 ## Lo que sale de la ceremonia

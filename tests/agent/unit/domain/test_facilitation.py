@@ -20,8 +20,10 @@ MEMBER_B = "dev-2"
 
 def _context(language: Language = Language.ES) -> CeremonyContext:
     return CeremonyContext(
+        tenant="acme",
         ceremony_id=uuid4(),
         team_id=uuid4(),
+        sprint_id=uuid4(),
         room="ceremony-1",
         language=language,
         mode=OperationMode.SUPPORT,
@@ -33,21 +35,21 @@ def _context(language: Language = Language.ES) -> CeremonyContext:
                 name="Diego",
                 room_identity=ADMIN,
                 role=TeamRole.ADMIN,
-                turn_order=0,
+                turn_order=1,
             ),
             ParticipantContext(
                 user_id=uuid4(),
                 name="Angélica",
                 room_identity=MEMBER_A,
                 role=TeamRole.MEMBER,
-                turn_order=1,
+                turn_order=2,
             ),
             ParticipantContext(
                 user_id=uuid4(),
                 name="Oscar",
                 room_identity=MEMBER_B,
                 role=TeamRole.MEMBER,
-                turn_order=2,
+                turn_order=3,
             ),
         ],
     )

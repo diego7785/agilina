@@ -3,6 +3,7 @@ from uuid import UUID
 
 from pydantic import Field
 
+from agilina_shared.contract.ceremony_event import CeremonyEvent
 from agilina_shared.contract.contract_model import ContractModel
 from agilina_shared.contract.transcript_segment import TranscriptSegment
 from agilina_shared.enums import CeremonyStatus
@@ -23,6 +24,9 @@ class CeremonyResult(ContractModel):
     present_participants: list[UUID]
     absent_participants: list[UUID] = Field(default_factory=list)
     segments: list[TranscriptSegment]
+    events: list[CeremonyEvent] = Field(
+        description="What happened in the ceremony, in order; it may be empty."
+    )
     degraded: bool = Field(
         default=False,
         description="True when the transcription service did not respond and the "

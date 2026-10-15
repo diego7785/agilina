@@ -28,6 +28,7 @@ async def test_delivering_a_result_is_not_implemented_either(client: AsyncClient
         "closed_at": "2026-10-04T14:15:00Z",
         "present_participants": [],
         "segments": [],
+        "events": [],
     }
 
     response = await client.post(f"/v1/ceremonies/{ceremony_id}/result", json=result)
