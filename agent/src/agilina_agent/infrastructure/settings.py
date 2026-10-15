@@ -1,13 +1,19 @@
-"""Worker settings."""
+"""Worker settings.
 
+The worker has no database setting at all (AGI-64): the API is its only source of truth.
+"""
+
+import os
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from agilina_shared.enums import Language
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
+DEFAULT_PENDING_DIR = REPO_ROOT / "infra" / "datos" / "agent-pending"
 
 
 class Settings(BaseSettings):
@@ -30,11 +36,14 @@ class Settings(BaseSettings):
     # The API is the only source of context and the only destination of the result.
     api_public_url: str = "http://localhost:8000"
 
-    # Keycloak service account the worker authenticates with.
+    # Keycloak service account the worker authenticates with, in the realm of each tenant
+    # (AD-29): the realm is this prefix and the slug, the same key the API and the web read.
     keycloak_url: str = "http://localhost:8080"
-    keycloak_realm: str = "agilina"
+    tenant_realm_prefix: str = "agilina-"
     keycloak_worker_client: str = "agilina-worker"
-    keycloak_worker_secret: str = ""
+
+    # Results not yet accepted by the API, one file per ceremony (CA6).
+    agent_pending_dir: Path = DEFAULT_PENDING_DIR
 
     # Transcription service, never exposed to the internet.
     stt_url: str = "http://localhost:8001"
@@ -43,6 +52,19 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     elevenlabs_voice_es: str = ""
     elevenlabs_voice_en: str = ""
+
+    @field_validator("agent_pending_dir", mode="before")
+    @classmethod
+    def _default_pending_dir_when_empty(cls, value: object) -> object:
+        # .env.example leaves it empty, and an empty path would be the working directory.
+        return value or DEFAULT_PENDING_DIR
+
+    def worker_secret(self, slug: str) -> SecretStr:
+        """The secret of the ``agilina-worker`` client of the tenant's realm, in
+        ``AGILINA_TENANT_<SLUG>_KEYCLOAK_WORKER_SECRET``. Never in the repository."""
+        return SecretStr(
+            os.environ.get(f"AGILINA_TENANT_{slug.upper()}_KEYCLOAK_WORKER_SECRET", "")
+        )
 
 
 @lru_cache

@@ -623,6 +623,23 @@ make keycloak-reset    # recrea los realms desde la plantilla: borra los usuario
 make invite tenant=acme team="Atlas" email=julian@example.com name="Julián Torres"   # vuelve a invitar
 ```
 
+### Resultados pendientes del worker
+
+Si la API no acepta el resultado de una ceremonia, el worker lo conserva en
+`infra/datos/agent-pending/<tenant>/<ceremony_id>.json` (o en `AGILINA_AGENT_PENDING_DIR`) hasta
+recibir un `202`, y al arrancar reenvía una vez lo que encuentre ahí. Para ver qué quedó:
+
+```bash
+ls -R infra/datos/agent-pending
+```
+
+Un archivo que sigue ahí después de arrancar el worker es un resultado que la API rechazó
+(`409` o `422`) o que no pudo entregarse: el log del worker dice por qué.
+
+En desarrollo el contenedor `agent` hereda el `.env` completo como todos los servicios de Python,
+pero el worker no lee ninguna variable de base de datos ni tiene código que la use: lo comprueba
+el contrato de import-linter «Agent: never touches the database or the API code» (`make arch`).
+
 ## Trabajar sin GPU
 
 El servicio de transcripción arranca en modo simulado

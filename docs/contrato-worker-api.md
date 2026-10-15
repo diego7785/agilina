@@ -67,9 +67,21 @@ de cada ruta está en [api.md](api.md).
   facilita.
 - **Idempotencia y reintento.** Entregar el mismo resultado otra vez responde
   `202` sin duplicar nada; otro resultado para la misma ceremonia responde
-  `409`. «El mismo» es el mismo SHA-256 del JSON canónico del `CeremonyResult`. La entrega guarda el resultado en disco antes del primer intento y
-  reintenta con espera creciente hasta lograrlo: perder una ceremonia por un
-  reinicio de la API no es aceptable. El archivo se borra solo con el `202`.
+  `409`. «El mismo» es el mismo SHA-256 del JSON canónico del `CeremonyResult`. La entrega guarda el resultado en disco antes del primer intento
+  (`<AGILINA_AGENT_PENDING_DIR>/<tenant>/<ceremony_id>.json`, por defecto en
+  `infra/datos/agent-pending`, escrito en un temporal y movido con `os.replace`)
+  y reintenta ante un error de transporte o un `5xx` con espera creciente: 2 s,
+  duplicando hasta un tope de 60 s, mientras viva el job. Perder una ceremonia
+  por un reinicio de la API no es aceptable. El archivo se borra solo con el
+  `202`. Un `409` o un `422` no se reintentan: el archivo queda y el log lo
+  dice. Al arrancar, el worker reenvía una vez lo que haya quedado en disco; lo
+  que vuelva a fallar sigue ahí.
+- **Fallar cerrado.** Un tenant cuyo slug no cumple `^[a-z][a-z0-9]{1,30}$`, o
+  sin secreto del worker configurado, no pide token: el contexto se anuncia como
+  no disponible. Sin secreto, la entrega queda en disco con un log de error; con
+  un slug inválido no se arma ninguna ruta ni URL y la entrega falla (en la
+  práctica no ocurre: sin contexto no hay facilitación ni resultado). El token
+  nunca se registra en los logs.
 - **Campos desconocidos.** Los modelos los rechazan. Una incompatibilidad entre
   versiones falla de inmediato en vez de perder datos en silencio.
 - **Tiempos.** Todo en UTC.

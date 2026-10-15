@@ -7,6 +7,7 @@ facilitation machine.
 """
 
 from typing import Protocol, runtime_checkable
+from uuid import UUID
 
 from agilina_shared.contract import CeremonyContext, CeremonyResult
 from agilina_shared.enums import Language
@@ -33,8 +34,12 @@ class SpeechSynthesizer(Protocol):
 
 @runtime_checkable
 class AgilinaApi(Protocol):
-    """The only two operations of the worker against the API."""
+    """The only two operations of the worker against the API, always within a tenant."""
 
-    async def get_context(self, ceremony_id: str) -> CeremonyContext: ...
+    async def get_context(self, tenant: str, ceremony_id: UUID) -> CeremonyContext:
+        """One request, no retry: raises ``ContextUnavailableError`` on any failure."""
+        ...
 
-    async def deliver_result(self, result: CeremonyResult) -> None: ...
+    async def deliver_result(self, tenant: str, result: CeremonyResult) -> None:
+        """Keeps the result on disk and retries until the API accepts it."""
+        ...
