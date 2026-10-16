@@ -11,6 +11,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from agilina_api.ceremonies.infrastructure.persistence import orm_models as ceremonies_models
 from agilina_api.identity.infrastructure.persistence import orm_models as identity_models
 from agilina_api.shared.infrastructure.database.base import Base
 from agilina_api.shared.infrastructure.migrations import (
@@ -22,7 +23,11 @@ from agilina_api.teams.infrastructure.persistence import orm_models as teams_mod
 
 pytestmark = pytest.mark.integration
 
-_REGISTERED = (identity_models, teams_models)  # the models must be imported to be in the metadata
+_REGISTERED = (
+    ceremonies_models,
+    identity_models,
+    teams_models,
+)  # the models must be imported to be in the metadata
 
 
 async def _columns(engine: AsyncEngine, table: str) -> dict[str, bool]:
@@ -43,6 +48,10 @@ async def test_every_table_the_story_needs_exists(engine: AsyncEngine):
         "invitation",
         "sprint",
         "sprint_participant",
+        "ceremony",
+        "ceremony_result",
+        "transcript_segment",
+        "ceremony_event",
         "alembic_version",
     } <= tables
 
@@ -67,6 +76,8 @@ async def test_citext_and_the_enums_exist(engine: AsyncEngine):
         "membership_status",
         "invitation_status",
         "sprint_status",
+        "ceremony_status",
+        "ceremony_event_type",
     } <= enums
 
 
@@ -78,7 +89,19 @@ async def test_created_by_accepts_null_for_the_platform_operator_ad_22(
 
 
 @pytest.mark.parametrize(
-    "table", ["app_user", "team", "team_member", "invitation", "sprint", "sprint_participant"]
+    "table",
+    [
+        "app_user",
+        "team",
+        "team_member",
+        "invitation",
+        "sprint",
+        "sprint_participant",
+        "ceremony",
+        "ceremony_result",
+        "transcript_segment",
+        "ceremony_event",
+    ],
 )
 async def test_every_orm_column_exists_in_the_database_with_the_same_nullability(
     engine: AsyncEngine, table: str
@@ -437,10 +460,23 @@ def test_the_migrations_go_down_and_up_again_cleanly(admin_dsn: str):
                 "invitation",
                 "sprint",
                 "sprint_participant",
+                "ceremony",
+                "ceremony_result",
+                "transcript_segment",
+                "ceremony_event",
             }
             & tables
         )
-        assert not {"team_role", "invitation_status", "sprint_status"} & enums
+        assert (
+            not {
+                "team_role",
+                "invitation_status",
+                "sprint_status",
+                "ceremony_status",
+                "ceremony_event_type",
+            }
+            & enums
+        )
 
         command.upgrade(alembic_config("tenant", url), "head")
     finally:

@@ -52,7 +52,7 @@ def _delete_realm(settings, name: str) -> None:
 async def test_a_realm_made_from_the_template_works_and_is_made_only_once(settings, provisioner):
     name = f"agilina-it{uuid.uuid4().hex[:8]}"
     api_secret = secrets.token_hex(16)
-    realm = render_realm(name, "Throwaway", "es", api_secret)
+    realm = render_realm(name, "Throwaway", "es", api_secret, secrets.token_hex(16))
     try:
         assert provisioner.ensure_realm(realm) is True
         assert provisioner.ensure_realm(realm) is False

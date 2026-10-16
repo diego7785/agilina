@@ -58,6 +58,13 @@ respuesta si el equipo es ajeno, lo retiraron o no existe).
 Las rutas públicas (`/health*`, `GET /v1/tenant`, `/v1/invitations/*`) y las de ceremonias están
 fuera de esta matriz: no dependen de un rol (ver `test_authentication.py`).
 
+Las rutas de ceremonias (`/v1/ceremonies/*`) son **solo del worker del agente** (AGI-64): las protege
+`current_worker`. Sin un token válido del realm del tenant responden `401 not_authenticated`, y con el
+token de una persona, `403 not_a_worker`. El worker se reconoce por el cliente al que se emitió el
+token (`azp`, `agilina-worker`), que no es un rol de equipo. Al revés, el token del worker en una ruta
+de persona responde `403 account_not_active`: es válido, pero no es de ningún usuario de la
+organización.
+
 ## Acciones planeadas
 
 Cuando existan, se agregan aquí y al inventario de la prueba. Hoy se prevé que sean del administrador:

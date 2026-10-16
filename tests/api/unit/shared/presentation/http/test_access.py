@@ -1,6 +1,7 @@
 """Who is calling (``current_user_id``), whether they belong to the team of the route
-(``current_team_member``) and whether they are one of its admins (``current_team_admin``),
-on a minimal application mounted by the test."""
+(``current_team_member``), whether they are one of its admins (``current_team_admin``) and
+whether the agent worker sent the request (``current_worker``), on a minimal application
+mounted by the test."""
 
 from uuid import UUID
 
@@ -13,7 +14,9 @@ from agilina_api.shared.presentation.http.access import (
     current_team_admin,
     current_team_member,
     current_user_id,
+    current_worker,
     get_authenticated_users,
+    get_authenticated_workers,
     get_team_access,
 )
 from agilina_api.shared.presentation.http.error_handlers import (
@@ -22,11 +25,12 @@ from agilina_api.shared.presentation.http.error_handlers import (
 )
 from agilina_shared.enums import TeamRole
 from tests.api.builders import next_id
-from tests.api.doubles import FakeAuthenticatedUsers, FakeTeamAccess
+from tests.api.doubles import FakeAuthenticatedUsers, FakeAuthenticatedWorkers, FakeTeamAccess
 
 TOKEN_A = "token-of-ana"
 TOKEN_B = "token-of-bruno"
 TOKEN_INACTIVE = "token-of-someone-not-active"
+TOKEN_WORKER = "token-of-the-worker"
 
 
 class Scenario:
@@ -44,10 +48,14 @@ class Scenario:
                 (self.team_b, self.bruno): TeamRole.MEMBER,
             }
         )
+        self.workers = FakeAuthenticatedWorkers(
+            worker_tokens={TOKEN_WORKER}, person_tokens={TOKEN_A, TOKEN_B}
+        )
         app = FastAPI()
         register_error_handlers(app, SHARED_ERRORS)
         app.dependency_overrides[get_authenticated_users] = lambda: self.users
         app.dependency_overrides[get_team_access] = lambda: self.access
+        app.dependency_overrides[get_authenticated_workers] = lambda: self.workers
 
         @app.get("/me")
         async def me(user_id: UUID = Depends(current_user_id)) -> dict[str, str]:
@@ -60,6 +68,10 @@ class Scenario:
         @app.get("/teams/{team_id}/admin-thing")
         async def admin_thing(team: TeamContext = Depends(current_team_admin)) -> dict[str, str]:
             return {"membership_id": str(team.membership_id), "role": team.role}
+
+        @app.get("/worker-thing", dependencies=[Depends(current_worker)])
+        async def worker_thing() -> dict[str, str]:
+            return {"status": "ok"}
 
         self.app = app
 
@@ -195,3 +207,33 @@ async def test_a_valid_token_of_someone_who_is_not_active_is_a_403_not_a_401(sce
         assert response.json()["error"]["code"] == "account_not_active"
         assert response.headers["cache-control"] == "no-store"
         assert "www-authenticate" not in response.headers
+
+
+# -------------------------------------------------------------- current_worker --
+async def test_the_token_of_the_worker_gets_through_a_worker_route(scenario):
+    response = await scenario.get("/worker-thing", TOKEN_WORKER)
+
+    assert response.status_code == 200 and response.json() == {"status": "ok"}
+
+
+async def test_a_worker_route_without_a_token_answers_401(scenario):
+    _assert_not_authenticated(await scenario.get("/worker-thing"))
+
+
+async def test_a_worker_route_with_a_scheme_other_than_bearer_answers_401(scenario):
+    _assert_not_authenticated(await scenario.get("/worker-thing", TOKEN_WORKER, scheme="Basic"))
+
+
+async def test_a_token_that_is_not_valid_answers_401_before_asking_whose_it_is(scenario):
+    """A token of another tenant's realm, an expired one or a forged one: the adapter says
+    ``None`` and the answer is the ``401``, never the ``403`` of a valid token."""
+    _assert_not_authenticated(await scenario.get("/worker-thing", "forged-token"))
+
+
+async def test_the_token_of_a_person_on_a_worker_route_answers_403_not_a_worker(scenario):
+    response = await scenario.get("/worker-thing", TOKEN_A)
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "not_a_worker"
+    assert response.headers["cache-control"] == "no-store"
+    assert "www-authenticate" not in response.headers

@@ -17,6 +17,10 @@ they name the team in the query (``?team_id=``), because a user has a different 
 team. ``current_team_member_by_query`` and ``current_team_admin_by_query`` are the same two
 dependencies for them, with the same answers in the same order.
 
+The routes of the agent worker (``/v1/ceremonies``) are not a person's: they declare
+``Depends(current_worker)``, which answers ``401 not_authenticated`` without a valid token
+and ``403 not_a_worker`` with a person's.
+
 The adapters are declared here and provided by the composition root, so this layer never
 imports the infrastructure one.
 """
@@ -29,9 +33,11 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from agilina_api.shared.application.access import (
     AuthenticatedUsers,
+    AuthenticatedWorkers,
     NotATeamAdminError,
     NotATeamMemberError,
     NotAuthenticatedError,
+    NotAWorkerError,
     TeamAccess,
     TeamContext,
 )
@@ -54,6 +60,10 @@ def get_team_access() -> TeamAccess:
     raise NotImplementedError("Wired by the composition root")
 
 
+def get_authenticated_workers() -> AuthenticatedWorkers:
+    raise NotImplementedError("Wired by the composition root")
+
+
 async def current_user_id(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
     users: AuthenticatedUsers = Depends(get_authenticated_users),
@@ -65,6 +75,26 @@ async def current_user_id(
     if user_id is None:
         raise NotAuthenticatedError("The bearer token does not identify a user of Agilina")
     return user_id
+
+
+async def current_worker(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+    workers: AuthenticatedWorkers = Depends(get_authenticated_workers),
+) -> None:
+    """Lets the request through only when the agent worker sent it.
+
+    The token is validated before anything is read from it, so a request without a valid
+    one answers ``401`` before the ``403``. What tells the worker apart is ``azp``, the
+    client the token was issued to: it identifies a service, it is not a team role, so the
+    rule that roles come from the stored membership still holds.
+    """
+    if credentials is None:
+        raise NotAuthenticatedError("The request carries no bearer token")
+    is_worker = await workers.is_worker(credentials.credentials)
+    if is_worker is None:
+        raise NotAuthenticatedError("The bearer token is not valid")
+    if not is_worker:
+        raise NotAWorkerError("Only the agent worker may do this")
 
 
 async def _membership(team_id: UUID, user_id: UUID, access: TeamAccess) -> TeamContext:

@@ -4,6 +4,9 @@ from agilina_api.bootstrap.container import build_container
 from agilina_api.identity.infrastructure.keycloak.authenticated_users import (
     KeycloakAuthenticatedUsers,
 )
+from agilina_api.identity.infrastructure.keycloak.authenticated_workers import (
+    KeycloakAuthenticatedWorkers,
+)
 from agilina_api.shared.infrastructure.settings import get_settings
 from tests.api.builders import TenantBuilder
 
@@ -30,6 +33,8 @@ def test_the_graph_is_built_without_postgres_keycloak_or_a_mail_server():
     assert container.start_sprint is not None
     assert container.reconfigure_sprint is not None
     assert container.get_active_sprint is not None
+    assert container.get_ceremony_context is not None
+    assert container.deliver_ceremony_result is not None
 
 
 def test_the_links_of_the_emails_open_the_web_of_the_tenant_from_its_public_url(monkeypatch):
@@ -61,6 +66,16 @@ def test_the_tokens_are_validated_against_the_realm_of_the_tenant_by_its_public_
     assert verifier._jwks_url == (  # noqa: SLF001
         "http://keycloak:8080/realms/agilina-ecomoda/protocol/openid-connect/certs"
     )
+
+
+def test_the_worker_is_recognized_by_its_client_with_the_verifier_of_the_tenant():
+    """The same verifier as a person's, so a worker token of another realm is not valid."""
+    container = _container("ecomoda")
+
+    workers = container.authenticated_workers
+    assert isinstance(workers, KeycloakAuthenticatedWorkers)
+    assert workers._verifier is container.access_token_verifier  # noqa: SLF001
+    assert workers._worker_client == "agilina-worker"  # noqa: SLF001
 
 
 def test_the_api_client_uses_the_secret_of_its_tenant(monkeypatch):

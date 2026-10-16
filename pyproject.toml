@@ -163,6 +163,7 @@ name = "API: the domain does not know frameworks"
 type = "forbidden"
 source_modules = [
     "agilina_api.shared_kernel",
+    "agilina_api.ceremonies.domain",
     "agilina_api.identity.domain",
     "agilina_api.teams.domain",
 ]
@@ -182,6 +183,13 @@ type = "forbidden"
 source_modules = ["agilina_agent.domain"]
 forbidden_modules = ["livekit", "httpx", "fastapi", "sqlalchemy"]
 allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Agent: never touches the database or the API code"
+type = "forbidden"
+# The API is the worker's only source of truth (AGI-64, CA4): no driver, no ORM, no migration.
+source_modules = ["agilina_agent"]
+forbidden_modules = ["agilina_api", "sqlalchemy", "asyncpg", "psycopg", "alembic"]
 
 [[tool.importlinter.contracts]]
 name = "STT: layers"

@@ -1,4 +1,5 @@
-"""Doubles of the shared access ports: ``AuthenticatedUsers`` and ``TeamAccess``."""
+"""Doubles of the shared access ports: ``AuthenticatedUsers``, ``AuthenticatedWorkers`` and
+``TeamAccess``."""
 
 from uuid import UUID
 
@@ -24,6 +25,24 @@ class FakeAuthenticatedUsers:
         if bearer_token in self.inactive_tokens:
             raise AccountNotActiveError("The token's user is not active")
         return self.users_by_token.get(bearer_token)
+
+
+class FakeAuthenticatedWorkers:
+    """A token in ``worker_tokens`` is the worker's, one in ``person_tokens`` is valid but a
+    person's, and any other token is not valid."""
+
+    def __init__(
+        self, worker_tokens: set[str] | None = None, person_tokens: set[str] | None = None
+    ) -> None:
+        self.worker_tokens = worker_tokens or set()
+        self.person_tokens = person_tokens or set()
+
+    async def is_worker(self, bearer_token: str) -> bool | None:
+        if bearer_token in self.worker_tokens:
+            return True
+        if bearer_token in self.person_tokens:
+            return False
+        return None
 
 
 class FakeTeamAccess:

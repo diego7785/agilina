@@ -11,8 +11,20 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from agilina_api.bootstrap.context_adapters import (
     IdentityBackedMemberContacts,
+    IdentityBackedParticipantNames,
+    TeamsBackedCeremonyRoster,
     TeamsBackedContacts,
     team_membership_factory,
+)
+from agilina_api.ceremonies.application.commands.deliver_ceremony_result import (
+    DeliverCeremonyResultHandler,
+)
+from agilina_api.ceremonies.application.queries.get_ceremony_context import (
+    GetCeremonyContextHandler,
+)
+from agilina_api.ceremonies.infrastructure.persistence.ceremony_queries import SqlCeremonyQueries
+from agilina_api.ceremonies.infrastructure.persistence.unit_of_work import (
+    ceremonies_unit_of_work_factory,
 )
 from agilina_api.identity.application.commands.activate_account import ActivateAccountHandler
 from agilina_api.identity.application.commands.invite_to_team import InviteToTeamHandler
@@ -29,6 +41,9 @@ from agilina_api.identity.infrastructure.keycloak.access_token_verifier import (
 from agilina_api.identity.infrastructure.keycloak.authenticated_users import (
     KeycloakAuthenticatedUsers,
 )
+from agilina_api.identity.infrastructure.keycloak.authenticated_workers import (
+    KeycloakAuthenticatedWorkers,
+)
 from agilina_api.identity.infrastructure.keycloak.identity_provider import KeycloakIdentityProvider
 from agilina_api.identity.infrastructure.persistence.invitation_queries import SqlInvitationQueries
 from agilina_api.identity.infrastructure.persistence.unit_of_work import (
@@ -36,7 +51,11 @@ from agilina_api.identity.infrastructure.persistence.unit_of_work import (
 )
 from agilina_api.identity.infrastructure.persistence.user_contacts import SqlUserContacts
 from agilina_api.identity.infrastructure.tokens import SecretsActivationTokenGenerator
-from agilina_api.shared.application.access import AuthenticatedUsers, TeamAccess
+from agilina_api.shared.application.access import (
+    AuthenticatedUsers,
+    AuthenticatedWorkers,
+    TeamAccess,
+)
 from agilina_api.shared.application.tenancy import Tenant
 from agilina_api.shared.infrastructure.clock import SystemClock
 from agilina_api.shared.infrastructure.database.session import (
@@ -85,8 +104,11 @@ class Container:
     reconfigure_sprint: ReconfigureSprintHandler
     get_active_sprint: GetActiveSprintHandler
     get_team_dashboard: GetTeamDashboardHandler
+    get_ceremony_context: GetCeremonyContextHandler
+    deliver_ceremony_result: DeliverCeremonyResultHandler
     team_queries: TeamQueries
     authenticated_users: AuthenticatedUsers
+    authenticated_workers: AuthenticatedWorkers
     team_access: TeamAccess
     identity_provider: KeycloakIdentityProvider
     access_token_verifier: KeycloakAccessTokenVerifier
@@ -135,9 +157,11 @@ def build_container(settings: Settings, tenant: Tenant) -> Container:
     identity_uow = identity_unit_of_work_factory(session_factory, team_membership_factory(clock))
     teams_uow = teams_unit_of_work_factory(session_factory)
     team_queries = SqlTeamQueries(session_factory)
-    get_active_sprint = GetActiveSprintHandler(SqlSprintQueries(session_factory), clock)
+    sprint_queries = SqlSprintQueries(session_factory)
+    get_active_sprint = GetActiveSprintHandler(sprint_queries, clock)
     user_contacts = SqlUserContacts(session_factory)
     team_contacts = TeamsBackedContacts(team_queries, user_contacts)
+    ceremony_roster = TeamsBackedCeremonyRoster(team_queries, sprint_queries)
     # The web lives under the tenant's name (``/<tenant>/…``): its first segment decides
     # which realm signs the person in.
     tenant_web_url = f"{settings.web_public_url.rstrip('/')}/{tenant.slug}"
@@ -183,8 +207,20 @@ def build_container(settings: Settings, tenant: Tenant) -> Container:
         reconfigure_sprint=ReconfigureSprintHandler(teams_uow),
         get_active_sprint=get_active_sprint,
         get_team_dashboard=GetTeamDashboardHandler(team_queries, get_active_sprint),
+        get_ceremony_context=GetCeremonyContextHandler(
+            SqlCeremonyQueries(session_factory),
+            ceremony_roster,
+            IdentityBackedParticipantNames(user_contacts),
+        ),
+        deliver_ceremony_result=DeliverCeremonyResultHandler(
+            ceremonies_unit_of_work_factory(session_factory), ceremony_roster, clock
+        ),
         team_queries=team_queries,
         authenticated_users=KeycloakAuthenticatedUsers(access_token_verifier, session_factory),
+        # The same verifier: the worker's token is one of this tenant's realm, for this API.
+        authenticated_workers=KeycloakAuthenticatedWorkers(
+            access_token_verifier, settings.keycloak_worker_client
+        ),
         # The teams query answers the shared port as it is: the membership is checked
         # against the stored role, never against a claim of the token.
         team_access=team_queries,

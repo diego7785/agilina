@@ -15,7 +15,9 @@ import httpx
 TEMPLATE = Path(__file__).resolve().parents[6] / "infra" / "keycloak" / "realm-template.json"
 
 
-def render_realm(realm: str, name: str, locale: str, api_secret: str) -> dict[str, object]:
+def render_realm(
+    realm: str, name: str, locale: str, api_secret: str, worker_secret: str
+) -> dict[str, object]:
     """The realm of a tenant: the template with ``${TENANT_…}`` replaced by its values.
 
     ``substitute`` fails on a placeholder it was not given, so a template that grows a new
@@ -25,6 +27,7 @@ def render_realm(realm: str, name: str, locale: str, api_secret: str) -> dict[st
         "TENANT_NAME": name,
         "TENANT_LOCALE": locale,
         "TENANT_API_SECRET": api_secret,
+        "TENANT_WORKER_SECRET": worker_secret,
     }
     # JSON-escaped, so that a name with quotes cannot break out of its string.
     escaped = {key: json.dumps(value)[1:-1] for key, value in values.items()}

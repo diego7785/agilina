@@ -40,7 +40,8 @@ env: ## Create .env from .env.example, or complete it, with generated local pass
 	done
 	@# Local passwords that are still empty are generated.
 	@for key in POSTGRES_PASSWORD KEYCLOAK_ADMIN_PASSWORD PGADMIN_ADMIN_PASSWORD \
-			AGILINA_TENANT_ACME_KEYCLOAK_API_SECRET AGILINA_TENANT_ECOMODA_KEYCLOAK_API_SECRET; do \
+			AGILINA_TENANT_ACME_KEYCLOAK_API_SECRET AGILINA_TENANT_ECOMODA_KEYCLOAK_API_SECRET \
+			AGILINA_TENANT_ACME_KEYCLOAK_WORKER_SECRET AGILINA_TENANT_ECOMODA_KEYCLOAK_WORKER_SECRET; do \
 		grep -Eq "^$$key=.+" .env || { \
 			sed -i.bak -e "s|^$$key=.*|$$key=$$(openssl rand -hex 16)|" .env && rm -f .env.bak; \
 			echo "Generated $$key in .env"; }; \
@@ -127,6 +128,12 @@ tenant-add: env ## Add a tenant: make tenant-add slug=acme name="ACME Corporatio
 		echo "$$key=$$(openssl rand -hex 16)" >> .env; \
 		echo "Generated $$key in .env"; \
 		$(COMPOSE) up -d --no-deps api; }
+	@# The worker's secret: only the realm and the worker read it, so the API is not restarted.
+	@key=AGILINA_TENANT_$$(echo "$(slug)" | tr 'a-z' 'A-Z')_KEYCLOAK_WORKER_SECRET; \
+	grep -Eq "^$$key=.+" .env || { \
+		sed -i.bak "/^$$key=/d" .env && rm -f .env.bak; \
+		echo "$$key=$$(openssl rand -hex 16)" >> .env; \
+		echo "Generated $$key in .env"; }
 	$(COMPOSE) run --rm --build api python -m agilina_api.bootstrap.tenant_admin \
 		--slug "$(slug)" --name "$(name)" $(if $(lang),--lang "$(lang)",)
 

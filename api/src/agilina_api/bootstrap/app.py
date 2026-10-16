@@ -11,7 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agilina_api import __version__
 from agilina_api.bootstrap.tenants import TenantContainers, from_container
+from agilina_api.ceremonies.presentation.http import dependencies as ceremonies_dependencies
 from agilina_api.ceremonies.presentation.http import router as ceremonies_router
+from agilina_api.ceremonies.presentation.http.errors import CEREMONIES_ERRORS
 from agilina_api.identity.presentation.http import dependencies as identity_dependencies
 from agilina_api.identity.presentation.http import router as identity_router
 from agilina_api.identity.presentation.http.errors import IDENTITY_ERRORS
@@ -27,7 +29,11 @@ from agilina_api.shared.infrastructure.scheduler import create_scheduler
 from agilina_api.shared.infrastructure.settings import get_settings
 from agilina_api.shared.infrastructure.tenancy.sql_tenant_directory import SqlTenantDirectory
 from agilina_api.shared.presentation.http import health_router, tenancy_router
-from agilina_api.shared.presentation.http.access import get_authenticated_users, get_team_access
+from agilina_api.shared.presentation.http.access import (
+    get_authenticated_users,
+    get_authenticated_workers,
+    get_team_access,
+)
 from agilina_api.shared.presentation.http.dependencies import (
     get_liveness_query,
     get_readiness_query,
@@ -112,7 +118,9 @@ def create_app() -> FastAPI:
     app.include_router(teams_router.router)
     app.include_router(users_router.router)
     app.include_router(identity_router.team_invitations_router)
-    register_error_handlers(app, (*SHARED_ERRORS, *IDENTITY_ERRORS, *TEAMS_ERRORS))
+    register_error_handlers(
+        app, (*SHARED_ERRORS, *IDENTITY_ERRORS, *TEAMS_ERRORS, *CEREMONIES_ERRORS)
+    )
 
     # Wiring: presentation declares what it needs, this is where it is provided.
     # The platform's catalog: which tenants exist (and, further on, the scheduler's jobs).
@@ -173,7 +181,16 @@ def create_app() -> FastAPI:
         teams_dependencies.get_get_team_dashboard_handler: from_container(
             lambda container: container.get_team_dashboard
         ),
+        ceremonies_dependencies.get_get_ceremony_context_handler: from_container(
+            lambda container: container.get_ceremony_context
+        ),
+        ceremonies_dependencies.get_deliver_ceremony_result_handler: from_container(
+            lambda container: container.deliver_ceremony_result
+        ),
         get_authenticated_users: from_container(lambda container: container.authenticated_users),
+        get_authenticated_workers: from_container(
+            lambda container: container.authenticated_workers
+        ),
         get_team_access: from_container(lambda container: container.team_access),
     }
     app.dependency_overrides.update(overrides)

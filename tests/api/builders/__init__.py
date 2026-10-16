@@ -14,6 +14,7 @@ from tests.api.builders.access_token import (
     SigningKey,
     signing_key,
 )
+from tests.api.builders.ceremony import CeremonyBuilder, RosterBuilder
 from tests.api.builders.contacts import ContactBuilder, TeamContactsBuilder
 from tests.api.builders.defaults import DAILY_TIME, NOW, PASSWORD, TOKEN
 from tests.api.builders.email_message import EmailMessageBuilder
@@ -47,6 +48,7 @@ __all__ = [
     "AccessTokenBuilder",
     "ActivateAccountBuilder",
     "AppUserBuilder",
+    "CeremonyBuilder",
     "ChangeMemberRoleBuilder",
     "ContactBuilder",
     "EmailMessageBuilder",
@@ -57,6 +59,7 @@ __all__ = [
     "ReconfigureSprintBuilder",
     "RemoveMemberBuilder",
     "RequestNewInvitationBuilder",
+    "RosterBuilder",
     "SprintBuilder",
     "StartSprintBuilder",
     "TeamBuilder",

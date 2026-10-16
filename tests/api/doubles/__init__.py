@@ -1,6 +1,17 @@
 """Doubles of the ports: in-memory implementations the use case tests run against."""
 
-from tests.api.doubles.access import FakeAuthenticatedUsers, FakeTeamAccess
+from tests.api.doubles.access import (
+    FakeAuthenticatedUsers,
+    FakeAuthenticatedWorkers,
+    FakeTeamAccess,
+)
+from tests.api.doubles.ceremonies import (
+    FakeCeremoniesUnitOfWork,
+    FakeCeremonyQueries,
+    FakeCeremonyRoster,
+    FakeParticipantNames,
+    InMemoryCeremonyRepository,
+)
 from tests.api.doubles.clock import FakeClock
 from tests.api.doubles.identity import (
     FakeIdentityProvider,
@@ -28,13 +39,18 @@ from tests.api.doubles.tenancy import FakeTenantDirectory
 __all__ = [
     "FakeActiveSprints",
     "FakeAuthenticatedUsers",
+    "FakeAuthenticatedWorkers",
     "JWKS_URL",
+    "FakeCeremoniesUnitOfWork",
+    "FakeCeremonyQueries",
+    "FakeCeremonyRoster",
     "FakeClock",
     "FakeIdentityProvider",
     "FakeIdentityUnitOfWork",
     "FakeInvitationQueries",
     "FakeMailer",
     "FakeMemberContacts",
+    "FakeParticipantNames",
     "FakeRealmKeys",
     "FakeRenderer",
     "FakeSprintQueries",
@@ -45,6 +61,7 @@ __all__ = [
     "FakeTeamsUnitOfWork",
     "FakeTenantDirectory",
     "FakeTokenGenerator",
+    "InMemoryCeremonyRepository",
     "InMemoryInvitationRepository",
     "InMemorySprintRepository",
     "InMemoryTeamRepository",

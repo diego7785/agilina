@@ -37,6 +37,12 @@ TEMPLATES: dict[str, dict[Language, str]] = {
         Language.EN: "I can't listen right now: the transcription service isn't responding. "
         "Please carry on without me and I'll let you know when I'm back.",
     },
+    "context_unavailable": {
+        Language.ES: "No pude obtener los datos de esta reunión, así que no voy a facilitarla. "
+        "Pueden continuar sin mí.",
+        Language.EN: "I couldn't get the details of this meeting, so I won't be facilitating it. "
+        "Please carry on without me.",
+    },
 }
 
 

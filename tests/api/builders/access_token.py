@@ -102,6 +102,10 @@ class AccessTokenBuilder:
     def with_claim(self, name: str, value: Any) -> Self:
         return replace(self, extra_claims={**self.extra_claims, name: value})
 
+    def as_worker(self) -> Self:
+        """The token the agent worker gets with its client credentials."""
+        return self.with_claim("azp", "agilina-worker")
+
     def claims(self) -> dict[str, Any]:
         claims: dict[str, Any] = {
             "iss": self.issuer,

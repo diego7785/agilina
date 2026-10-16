@@ -109,8 +109,9 @@ curl -i -H 'X-Agilina-Tenant: nadie' localhost:8000/v1/tenant    # 404 tenant_no
 
 Dónde está cada cosa: el catálogo de tenants es la base `agilina_platform` (tabla `tenant`, y los
 trabajos programados); `pgAdmin` ve todas. Los nombres salen del *slug* (prefijos
-`AGILINA_TENANT_DB_PREFIX` y `AGILINA_TENANT_REALM_PREFIX`), y el secreto del cliente `agilina-api` de
-cada realm está en el `.env` como `AGILINA_TENANT_<SLUG>_KEYCLOAK_API_SECRET` (uno por tenant).
+`AGILINA_TENANT_DB_PREFIX` y `AGILINA_TENANT_REALM_PREFIX`), y los secretos de los clientes `agilina-api`
+y `agilina-worker` de cada realm están en el `.env` como `AGILINA_TENANT_<SLUG>_KEYCLOAK_API_SECRET` y
+`AGILINA_TENANT_<SLUG>_KEYCLOAK_WORKER_SECRET` (uno de cada por tenant).
 
 **Agregar un tenant** lo hace el administrador (hoy, quien desarrolla), con un comando; no hay panel:
 
@@ -118,8 +119,8 @@ cada realm está en el `.env` como `AGILINA_TENANT_<SLUG>_KEYCLOAK_API_SECRET` (
 make tenant-add slug=wonka name="Wonka Industries" lang=en
 ```
 
-Crea y migra su base, crea su realm desde `infra/keycloak/realm-template.json`, genera su secreto en el
-`.env` (y reinicia la API para que lo lea) y lo escribe en el catálogo. Se puede repetir sin problema.
+Crea y migra su base, crea su realm desde `infra/keycloak/realm-template.json`, genera sus dos secretos en
+el `.env` (y reinicia la API para que lea el suyo) y lo escribe en el catálogo. Se puede repetir sin problema.
 `slug`: letras minúsculas y dígitos, de 2 a 31 caracteres, empieza con letra (`platform`, `admin` y `api`
 están reservados). **Suspender, reactivar o renombrar** es un `UPDATE` directo en el catálogo:
 
@@ -502,7 +503,8 @@ Entras al realm `master`, que es el de administración; los de Agilina son uno p
 (`agilina-acme`, `agilina-ecomoda`…) y se eligen en el menú de arriba a la izquierda. Este usuario
 administra Keycloak, no es una persona de Agilina. Los realms de los tenants no tienen ninguna persona:
 solo los clientes `agilina-web`, `agilina-worker` y `agilina-api`, y las cuentas de servicio de los dos
-últimos (la del worker y la que usa la API para crear cuentas). Las personas llegan con las
+últimos (la del worker, que llama a la API con sus credenciales de cliente, y la que usa la API para crear
+cuentas). Las personas llegan con las
 invitaciones (HU-02; ver «El usuario de desarrollo»).
 
 La contraseña solo se aplica cuando Keycloak se crea por primera vez, con su
@@ -606,13 +608,37 @@ Para **volver a Mailpit**, restaura esas variables a los valores de `.env.exampl
 
 ## El secreto del worker
 
-Los realms de los tenants se crean desde `infra/keycloak/realm-template.json` y el
-secreto del cliente `agilina-worker` de cada uno lo genera Keycloak: no está en el
-repositorio. (Cómo el worker elige su tenant se define con HU-55.) Para obtenerlo:
+El worker del agente llama a la API como servicio: pide su token al cliente `agilina-worker` del
+realm del tenant con *client credentials* (AGI-64) y la API lo acepta solo en las rutas de
+ceremonias. Su secreto es uno por tenant, `AGILINA_TENANT_<SLUG>_KEYCLOAK_WORKER_SECRET`, y no hay
+que copiarlo de ningún lado: `make env` genera el de `acme` y `ecomoda`, y `make tenant-add` el de un
+tenant nuevo. La plantilla del realm lo escribe en el cliente al crear el realm.
 
-1. Entra a la consola de Keycloak (ver la sección anterior).
-2. Realm `agilina-acme` (o el del tenant) → Clients → `agilina-worker` → pestaña Credentials.
-3. Copia el secreto en `AGILINA_KEYCLOAK_WORKER_SECRET` de tu `.env` y ejecuta `make agent`.
+Un realm creado antes de este cambio no tiene ese secreto ni la audiencia `agilina-api` en el token
+del worker, y el worker recibe `401`. Para recrearlo:
+
+```bash
+make env               # agrega y genera los secretos del worker que falten en el .env
+make keycloak-reset    # recrea los realms desde la plantilla: borra los usuarios de Keycloak
+make invite tenant=acme team="Atlas" email=julian@example.com name="Julián Torres"   # vuelve a invitar
+```
+
+### Resultados pendientes del worker
+
+Si la API no acepta el resultado de una ceremonia, el worker lo conserva en
+`infra/datos/agent-pending/<tenant>/<ceremony_id>.json` (o en `AGILINA_AGENT_PENDING_DIR`) hasta
+recibir un `202`, y al arrancar reenvía una vez lo que encuentre ahí. Para ver qué quedó:
+
+```bash
+ls -R infra/datos/agent-pending
+```
+
+Un archivo que sigue ahí después de arrancar el worker es un resultado que la API rechazó
+(`409` o `422`) o que no pudo entregarse: el log del worker dice por qué.
+
+En desarrollo el contenedor `agent` hereda el `.env` completo como todos los servicios de Python,
+pero el worker no lee ninguna variable de base de datos ni tiene código que la use: lo comprueba
+el contrato de import-linter «Agent: never touches the database or the API code» (`make arch`).
 
 ## Trabajar sin GPU
 

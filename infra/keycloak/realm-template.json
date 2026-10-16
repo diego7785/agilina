@@ -74,7 +74,7 @@
     {
       "clientId": "agilina-worker",
       "name": "Worker del agente",
-      "description": "Service account the worker authenticates against the API with. Keycloak generates the secret when importing the realm and it is copied to .env: it does not live in the repository.",
+      "description": "Service account the agent worker calls the API with (client credentials). Its tokens are for agilina-api. Its secret is the tenant's, from the .env: not in the repository.",
       "enabled": true,
       "publicClient": false,
       "protocol": "openid-connect",
@@ -82,8 +82,24 @@
       "directAccessGrantsEnabled": false,
       "implicitFlowEnabled": false,
       "serviceAccountsEnabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${TENANT_WORKER_SECRET}",
       "redirectUris": [],
-      "webOrigins": []
+      "webOrigins": [],
+      "protocolMappers": [
+        {
+          "name": "audience-agilina-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "agilina-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "agilina-api",

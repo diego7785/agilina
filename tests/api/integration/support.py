@@ -1,7 +1,10 @@
 """Storing builder-made objects in the real PostgreSQL, committed, as a test's starting data."""
 
+from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from agilina_api.ceremonies.infrastructure.persistence.orm_models import CeremonyRow
 from agilina_api.identity.domain.invitation import Invitation
 from agilina_api.identity.domain.user import AppUser
 from agilina_api.identity.infrastructure.persistence.invitation_repository import (
@@ -15,7 +18,14 @@ from agilina_api.teams.infrastructure.persistence.sprint_repository import (
     SqlAlchemySprintRepository,
 )
 from agilina_api.teams.infrastructure.persistence.team_repository import SqlAlchemyTeamRepository
-from tests.api.builders import AppUserBuilder, InvitationBuilder, SprintBuilder, TeamBuilder
+from tests.api.builders import (
+    NOW,
+    AppUserBuilder,
+    CeremonyBuilder,
+    InvitationBuilder,
+    SprintBuilder,
+    TeamBuilder,
+)
 
 SessionFactory = async_sessionmaker[AsyncSession]
 
@@ -60,3 +70,22 @@ async def stored_sprint(session_factory: SessionFactory, builder: SprintBuilder)
         sprint = await builder.saved_in(SqlAlchemySprintRepository(uow.session))
         await uow.commit()
     return sprint
+
+
+async def stored_ceremony(session_factory: SessionFactory, builder: CeremonyBuilder) -> UUID:
+    """A committed ceremony, written as a row: nothing creates ceremonies yet (AGI-59). Its
+    sprint must already be stored, in the same team (``CeremonyBuilder.for_sprint``), because
+    the database requires it. Returns its id."""
+    record = builder.build()
+    async with SqlAlchemyUnitOfWork(session_factory) as uow:
+        uow.session.add(
+            CeremonyRow(
+                id=builder.ceremony_id,
+                team_id=record.team_id,
+                sprint_id=record.sprint_id,
+                scheduled_at=record.scheduled_at,
+                created_at=NOW,
+            )
+        )
+        await uow.commit()
+    return builder.ceremony_id

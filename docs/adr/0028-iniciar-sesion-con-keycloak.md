@@ -85,3 +85,12 @@ lo use. Los hechos que pesaron:
 pasa la validación; el de otro tipo, el de una cuenta de servicio o uno alterado no; el mensaje
 de un login fallido es el mismo exista o no el correo) y `make test-e2e` (el recorrido completo
 en un navegador).
+
+## Nota posterior (AGI-64, 2026-10-15)
+
+Se agrega sin cambiar la decisión. La consecuencia sobre los tokens del worker se cumplió de otra
+forma: en lugar de un validador con otra audiencia, el cliente `agilina-worker` de cada realm recibe
+el mismo *mapper* de audiencia que `agilina-web`, así que su token dice `aud: agilina-api` y lo valida
+el mismo `KeycloakAccessTokenVerifier` del tenant. Lo distingue de una persona el `azp`
+(`agilina-worker`), que lee `KeycloakAuthenticatedWorkers`; las rutas del worker responden
+`403 not_a_worker` a una persona, y las de persona, `403 account_not_active` al worker.

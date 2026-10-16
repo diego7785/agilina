@@ -37,6 +37,7 @@ def keycloak(monkeypatch) -> FakeProvisioner:
     provisioner = FakeProvisioner()
     monkeypatch.setattr(tenant_admin, "_provisioner", lambda settings: provisioner)
     monkeypatch.setenv("AGILINA_TENANT_WONKA_KEYCLOAK_API_SECRET", "wonka-secret")
+    monkeypatch.setenv("AGILINA_TENANT_WONKA_KEYCLOAK_WORKER_SECRET", "wonka-worker-secret")
     return provisioner
 
 
@@ -122,9 +123,30 @@ def test_a_tenant_without_its_secret_is_not_added(wonka, keycloak, monkeypatch):
     assert _row(wonka.settings) is None
 
 
+def test_a_tenant_without_the_secret_of_its_worker_is_not_added(wonka, keycloak, monkeypatch):
+    monkeypatch.delenv("AGILINA_TENANT_WONKA_KEYCLOAK_WORKER_SECRET")
+
+    with pytest.raises(SystemExit, match="AGILINA_TENANT_WONKA_KEYCLOAK_WORKER_SECRET"):
+        tenant_admin.add_tenant(wonka.settings, "wonka", "Wonka Industries", Language.EN)
+
+    assert keycloak.realms == []
+    assert _row(wonka.settings) is None
+
+
+def test_the_realm_of_a_tenant_gets_the_secrets_of_its_two_clients(wonka, keycloak):
+    tenant_admin.add_tenant(wonka.settings, "wonka", "Wonka Industries", Language.EN)
+
+    [realm] = keycloak.realms
+    secrets = {client["clientId"]: client.get("secret") for client in realm["clients"]}
+    assert secrets["agilina-api"] == "wonka-secret"
+    assert secrets["agilina-worker"] == "wonka-worker-secret"
+
+
 def test_every_tenant_of_the_catalog_gets_its_realm(platform_databases, keycloak, monkeypatch):
     monkeypatch.setenv("AGILINA_TENANT_ACME_KEYCLOAK_API_SECRET", "acme-secret")
     monkeypatch.setenv("AGILINA_TENANT_ECOMODA_KEYCLOAK_API_SECRET", "ecomoda-secret")
+    monkeypatch.setenv("AGILINA_TENANT_ACME_KEYCLOAK_WORKER_SECRET", "acme-worker-secret")
+    monkeypatch.setenv("AGILINA_TENANT_ECOMODA_KEYCLOAK_WORKER_SECRET", "ecomoda-worker-secret")
 
     tenant_admin.create_missing_realms(platform_databases.settings)
 
@@ -149,6 +171,8 @@ def test_the_command_line_adds_a_tenant(wonka, keycloak, monkeypatch):
 def test_the_command_line_can_only_create_the_realms(platform_databases, keycloak, monkeypatch):
     monkeypatch.setenv("AGILINA_TENANT_ACME_KEYCLOAK_API_SECRET", "acme-secret")
     monkeypatch.setenv("AGILINA_TENANT_ECOMODA_KEYCLOAK_API_SECRET", "ecomoda-secret")
+    monkeypatch.setenv("AGILINA_TENANT_ACME_KEYCLOAK_WORKER_SECRET", "acme-worker-secret")
+    monkeypatch.setenv("AGILINA_TENANT_ECOMODA_KEYCLOAK_WORKER_SECRET", "ecomoda-worker-secret")
     monkeypatch.setattr(sys, "argv", ["tenant-add", "--realms-only"])
 
     assert tenant_admin.main() == 0
