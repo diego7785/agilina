@@ -7,7 +7,6 @@ import {
   type OnInit,
   signal,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
@@ -15,7 +14,7 @@ import { Notifier } from '@core/notifications/notifier';
 import { TenantContext } from '@core/tenant/tenant-context';
 import { Button } from '@shared/ui/button';
 import { DatePicker } from '@shared/ui/date-picker';
-import { TextField } from '@shared/ui/text-field';
+import { TimePicker } from '@shared/ui/time-picker';
 import { localTimeOf } from '@shared/utils/local-date-time';
 
 import { problemMessageKey } from './problem-message';
@@ -40,19 +39,18 @@ interface Turn {
 /**
  * Settings → Sprint: the period of the active sprint, the daily's time and who takes part in it,
  * in turn order. The form starts from what the API has (or empty, when the team has no active
- * sprint) and saving creates or edits the sprint. The daily's time is typed and shown in the
+ * sprint) and saving creates or edits the sprint. The daily's time is typed or picked and shown in the
  * browser's time zone and saved with it (AD-31). The screen does not decide who may open it: it
  * shows "no access" when the API refuses the team, and translates the API's other refusals.
  */
 @Component({
   selector: 'agl-team-sprint-settings-page',
   imports: [
-    FormsModule,
     RouterLink,
     TranslocoDirective,
     Button,
     DatePicker,
-    TextField,
+    TimePicker,
     SettingsNoAccess,
     SettingsTabs,
   ],

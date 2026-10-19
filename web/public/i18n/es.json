@@ -298,6 +298,8 @@
       },
       "calendar": {
         "choose_date": "Elige una fecha",
+        "choose_time": "Elige una hora",
+        "times": "Horas",
         "previous_month": "Mes anterior",
         "next_month": "Mes siguiente"
       },

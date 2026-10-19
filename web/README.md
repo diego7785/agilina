@@ -521,7 +521,11 @@ estilos de una pantalla son **clases de utilidad en su plantilla**.
   `<agl-date-picker inputId="…" [(value)]="…">` y no con `<input type="date">`, cuyo calendario
   dibuja el navegador y no se puede agrandar ni darle estilo: abre un calendario propio con el
   teclado del patrón de WAI-ARIA (flechas, Re Pág/Av Pág, Inicio/Fin, Escape), los nombres de
-  `Intl` en el idioma activo y `min` para los días que no se pueden elegir. El espacio y el ancho
+  `Intl` en el idioma activo y `min` para los días que no se pueden elegir. Una hora se elige con
+  `<agl-time-picker inputId="…" [(value)]="…">` y no con `<input type="time">`, que en Safari no
+  tiene selector y, vacío, pinta la hora actual como si estuviera elegida: es un combobox donde la
+  hora se escribe (`9:30`, `09:30`, `0930`) o se elige de una lista cada 15 minutos, con el teclado
+  del patrón de WAI-ARIA (flechas, Enter, Escape), y empieza vacío. El espacio y el ancho
   los pone quien coloca la pieza (`class="mt-4 w-full"`).
 - Los diálogos usan `agl-dialog`, un componente sobre el `<dialog>` nativo (`showModal()`):
   el navegador atrapa el foco, deja inerte el resto de la página y lo cierra con Escape, sin

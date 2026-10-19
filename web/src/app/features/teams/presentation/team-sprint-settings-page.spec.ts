@@ -383,7 +383,7 @@ describe('TeamSprintSettingsPage', () => {
     expect(text(field('Inicio'))).toBe('5 de octubre de 2026');
     expect(dateIn('Fin')).toBe('2026-10-16');
     const time = field('Hora de la reunión diaria');
-    expect(time.type).toBe('time');
+    expect(time.getAttribute('role')).toBe('combobox');
     expect(time.value).toBe('09:00');
   });
 
@@ -468,7 +468,8 @@ describe('TeamSprintSettingsPage', () => {
       .querySelector('[role="dialog"]')!
       .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await harness.fixture.whenStable();
-    await type(field('Hora de la reunión diaria'), '');
+    field('Hora de la reunión diaria').dispatchEvent(new Event('blur'));
+    await harness.fixture.whenStable();
 
     expect(text(page)).toContain('Elige la fecha de inicio.');
     expect(text(page)).toContain('Elige la hora de la reunión diaria.');
@@ -590,6 +591,15 @@ describe('TeamSprintSettingsPage', () => {
   });
 
   // ------------------------------------------------------- saving (CA1–CA5) --
+  it('starts the time of the daily empty when the team has no sprint', async () => {
+    sprints.current = null;
+    await open();
+
+    const time = field('Hora de la reunión diaria');
+    expect(time.value).toBe('');
+    expect(time.placeholder).toBe('Elige una hora');
+  });
+
   it('creates the sprint when the team has none, with the daily in UTC and the browser zone', async () => {
     sprints.current = null;
     await open();
