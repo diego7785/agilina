@@ -138,21 +138,44 @@
               <p id="room-hint" class="mt-2 text-sm font-medium" data-testid="join-hint">
                 {{ t('room.opens_at', { time: formatTime(ceremony.joinOpensAt, language) }) }}
               </p>
+            } @else if (joinState() === 'started') {
+              <p id="room-hint" class="mt-2 text-sm font-medium" data-testid="join-hint">
+                {{ t('room.started') }}
+              </p>
             } @else if (nextCeremony() === null) {
               <p id="room-hint" class="mt-2 text-sm font-medium" data-testid="join-hint">
                 {{ t('room.no_ceremony') }}
               </p>
             }
           </div>
-          <!-- Joining the room arrives with its own story (AGI-60): until then it does nothing. -->
-          <button
-            aglButton
-            type="button"
-            class="w-full sm:w-auto"
-            data-testid="join-room"
-            [disabled]="joinState() !== 'open'"
-            [attr.aria-describedby]="joinState() === 'open' ? null : 'room-hint'"
-          >
+          <!-- Joining is navigating, so it is a link while the window is open (AGI-60). -->
+          @if (canJoin()) {
+            <a
+              aglButton
+              class="w-full sm:w-auto"
+              data-testid="join-room"
+              [routerLink]="roomPath()"
+              [attr.aria-describedby]="joinState() === 'started' ? 'room-hint' : null"
+            >
+              <ng-container [ngTemplateOutlet]="micIcon" />
+              {{ t('room.join') }}
+            </a>
+          } @else {
+            <button
+              aglButton
+              type="button"
+              class="w-full sm:w-auto"
+              data-testid="join-room"
+              disabled
+              [attr.aria-describedby]="
+                joinState() === 'not_yet' || nextCeremony() === null ? 'room-hint' : null
+              "
+            >
+              <ng-container [ngTemplateOutlet]="micIcon" />
+              {{ t('room.join') }}
+            </button>
+          }
+          <ng-template #micIcon>
             <!-- Lucide "mic" icon. -->
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -169,8 +192,7 @@
               <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
               <rect x="9" y="2" width="6" height="13" rx="3" />
             </svg>
-            {{ t('room.join') }}
-          </button>
+          </ng-template>
         </div>
       </section>
     }

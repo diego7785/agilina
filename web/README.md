@@ -128,8 +128,8 @@ concepto se llame igual en todo el sistema:
 | `status` | Estado del entorno: prueba que la web habla con la API | Existe |
 | `tenancy` | La página «no encontrada» de una dirección sin organización | Existe |
 | `identity` | Activación de la cuenta desde la invitación (`/activate`); inicio y cierre de sesión; la página de cuenta no activa (`/account-not-active`) | Activación existe (HU-02); la página de cuenta no activa con su botón de cerrar sesión, también (AGI-123); el resto llega con HU-03/04 |
-| `teams` | Equipo, integrantes, sprint, dashboard y pestaña de configuración (solo `admin`) | Existe: dashboard en `/:tenant/teams/:teamId` (HU-12), que lee `GET /v1/teams/{id}/dashboard` en una sola llamada y muestra el día N de M con su barra y el número del sprint («Sprint 12», que asigna la API), la próxima daily en la hora del navegador, el modo como etiqueta de solo lectura y la sala; «Unirse a la sala» se habilita desde diez minutos antes de la daily (`join-window.ts`, con un temporizador, sin recargar) y por ahora no hace nada: la conexión llega con AGI-60; Configuración → Sprint tiene el botón «Cerrar sprint activo» del mockup, sin función todavía (llega con AGI-81); el encabezado tiene las entradas Dashboard y Configuración y **Cambiar de equipo**, que lleva al selector aunque haya un solo equipo (`{ choose: true }`);  selector mínimo, creación y dashboard placeholder (HU-05); Configuración → Equipo en `/:tenant/teams/:teamId/settings` (HU-06): integrantes con su etiqueta de rol, invitar, cambiar el rol y eliminar; Configuración → Sprint en `/:tenant/teams/:teamId/settings/sprint` (HU-07): fechas, hora de la daily en la zona del navegador y participantes ordenados con subir y bajar, y la línea «Día N de M» del dashboard. El resto llega con sus historias |
-| `ceremonies` | La sala de la Daily: LiveKit, turnos y controles hacia el agente | Llega con las historias de la ceremonia |
+| `teams` | Equipo, integrantes, sprint, dashboard y pestaña de configuración (solo `admin`) | Existe: dashboard en `/:tenant/teams/:teamId` (HU-12), que lee `GET /v1/teams/{id}/dashboard` en una sola llamada y muestra el día N de M con su barra y el número del sprint («Sprint 12», que asigna la API), la próxima daily en la hora del navegador, el modo como etiqueta de solo lectura y la sala; «Unirse a la sala» es un enlace a la sala desde diez minutos antes de la daily hasta quince minutos después (`join-window.ts`, con un temporizador, sin recargar; en ese último tramo dice que la reunión diaria ya empezó) y fuera de la ventana un botón deshabilitado (AGI-60); Configuración → Sprint tiene el botón «Cerrar sprint activo» del mockup, sin función todavía (llega con AGI-81); el encabezado tiene las entradas Dashboard y Configuración y **Cambiar de equipo**, que lleva al selector aunque haya un solo equipo (`{ choose: true }`);  selector mínimo, creación y dashboard placeholder (HU-05); Configuración → Equipo en `/:tenant/teams/:teamId/settings` (HU-06): integrantes con su etiqueta de rol, invitar, cambiar el rol y eliminar; Configuración → Sprint en `/:tenant/teams/:teamId/settings/sprint` (HU-07): fechas, hora de la daily en la zona del navegador y participantes ordenados con subir y bajar, y la línea «Día N de M» del dashboard. El resto llega con sus historias |
+| `ceremonies` | La sala de la Daily: LiveKit, turnos y controles hacia el agente | Existe la sala en `/:tenant/teams/:teamId/room` (AGI-60): pide el token a la API, entra con `livekit-client`, activa el micrófono, escucha a todos y muestra el estado de la conexión y del micrófono (ver «Sala de LiveKit»). Los participantes, quién habla y los controles llegan con AGI-61 y las historias de la ceremonia |
 
 ### Capas dentro de una funcionalidad
 
@@ -279,6 +279,31 @@ Un solo estilo para todos los formularios (el de `/:tenant/activate`, el de `/:t
   documenta en [docs/contrato-worker-api.md](../docs/contrato-worker-api.md)
   cuando se defina.
 - La pantalla no muestra transcripción en vivo.
+- **Puertos** (AGI-60): `RoomAccessPort` (el token, `HttpRoomAccessApi` sobre
+  `POST /v1/teams/{team_id}/dailies/current/token` de AGI-59) y `RoomPort` (la sala,
+  `LiveKitRoomAdapter`). `RoomFacade`, provista en `RoomPage`, los orquesta; salir de la página
+  sale de la sala.
+- **Cada conexión pide un token nuevo** (la primera, **Reintentar** y la que sigue a un token
+  rechazado, una sola vez): el token vive en memoria para esa conexión y no se guarda ni se
+  registra. La URL del servidor (`livekit_url`) llega con él, así que la web no tiene ninguna
+  variable ni credencial de LiveKit.
+- **El micrófono se pide primero**, al abrir la sala y antes de conectar (`RoomPort.requestMicrophone`):
+  la persona responde la pregunta del navegador y entra con él listo, que se publica al conectar
+  (`enableMicrophone`). Pedirlo antes también hace que el navegador muestre a WebRTC sus direcciones
+  reales (sin permiso, Chromium las esconde tras nombres mDNS). Si se niega (`NotAllowedError`), no hay (`NotFoundError`),
+  está ocupado o la página no es segura (HTTPS o `localhost`, `SECURE_CONTEXT`), la persona entra
+  igual como **oyente**, con una alerta que explica qué hacer y **Reintentar micrófono**. Los
+  errores del dispositivo se leen con `MediaDeviceFailure` del SDK.
+- **Reconexión:** el SDK reintenta solo con las esperas de `reconnect-budget.ts`. Como un intento
+  que se cuelga alarga la espera, `RoomFacade` además lleva su propio reloj: si 30 s
+  (`RECONNECT_BUDGET_MS`) después de «Reconectando…» no volvió, sale de la sala y muestra
+  «Desconectado» con **Reintentar** y **Volver al dashboard**. LiveKit nota la caída por sus pings,
+  así que «Reconectando…» puede tardar unos segundos en aparecer.
+- **Audio de los demás:** cada pista de audio se reproduce con un `<audio>` en un contenedor oculto
+  que crea el adaptador. Si el navegador bloquea la reproducción automática, la pantalla ofrece
+  **Activar audio** (`room.startAudio()`, en un gesto de la persona).
+- La prueba del adaptador usa un `Room` falso que entrega `LIVEKIT_ROOM_FACTORY`: ninguna prueba
+  unitaria abre una conexión.
 
 ## Tenants: una organización por dirección ([AD-29](../docs/adr/0029-un-tenant-es-una-organizacion-con-su-base-y-su-realm.md))
 

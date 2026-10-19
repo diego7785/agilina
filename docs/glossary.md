@@ -54,7 +54,7 @@ Si aparece un concepto nuevo, se agrega aquí antes de usarlo.
 | --- | --- | --- |
 | `Ceremony` | Ceremonia | Una ocurrencia de la reunión. Hoy solo existe el tipo `daily` |
 | Daily | Reunión diaria | La reunión diaria de pie (*stand-up*). En la interfaz y en los correos en español se dice «reunión diaria», no «daily» ni «Daily Stand-up»; en inglés, «daily» o «daily stand-up» (ver «Textos e i18n» en la guía de la web) |
-| Join window (`join_opens_at`) | Ventana para unirse | El tiempo en que un participante puede entrar a la sala de la próxima ceremonia: desde diez minutos antes de su inicio (`JOIN_WINDOW_LEAD`) hasta su inicio. Antes, «Unirse a la sala» está deshabilitado. La daily «en curso» todavía no se modela: llega con la ceremonia como registro (AGI-62, HU-17) |
+| Join window (`join_opens_at`, `join_closes_at`) | Ventana para unirse | El tiempo en que un participante puede entrar a la sala de una ceremonia: desde diez minutos antes de su inicio (`JOIN_WINDOW_LEAD`) hasta quince minutos después (`JOIN_WINDOW_TAIL`, sin incluirlo), para que quien llega tarde todavía entre (AGI-60). Fuera de ella, «Unirse a la sala» está deshabilitado. La daily que se puede unir es `joinable_daily_at`: la que está en curso dentro de esos quince minutos o, si no, la siguiente. Cuando la ceremonia sea un registro (AGI-62, HU-17), la ventana terminará al cerrarse |
 | `Sprint.number` | Número del sprint | El número del sprint en su equipo («Sprint 12»): 1 para el primero y, desde ahí, el mayor que el equipo haya tenido más uno, cerrado o no. Lo asigna la API al guardar (`SprintRepository.next_number`, con el equipo bloqueado), no se envía ni se edita y nunca se reutiliza. No es el día del sprint (`day.number`, el «N» de «día N de M») |
 | Daily occurrence | Ocurrencia de la daily | El instante UTC de una daily concreta: la hora de la daily en la zona de captura en una fecha del periodo, convertida a UTC. Hay una por cada día del periodo (`daily_occurrences`) |
 | Daily participant (`sprint_participant`) | Participante de la daily | Integrante del equipo convocado a la daily del sprint, con su `turn_order` desde 1. El orden de la lista es el orden de turnos |
@@ -70,6 +70,8 @@ Si aparece un concepto nuevo, se agrega aquí antes de usarlo.
 | Wake word | Palabra de activación | Palabra con la que se le habla a Agilina durante la ceremonia |
 | Degraded mode | Modo degradado | La transcripción no responde: Agilina lo anuncia y la ceremonia sigue sin facilitación automática |
 | Room | Sala | La sala de audio de LiveKit de una ceremonia. Se llama `<tenant>-<ceremony_id>` (`room_name_for`) |
+| Connection status | Estado de la conexión | Cómo está el participante en la sala: `connecting` (Conectando…), `connected` (Conectado), `reconnecting` (Reconectando…: se cayó la red y LiveKit lo intenta solo, hasta 30 s) y `failed` (Desconectado, con el motivo y, si sirve, **Reintentar**) |
+| Listener | Oyente | Participante que está en la sala sin micrófono (lo negó, no tiene o requiere HTTPS): escucha al equipo, pero nadie lo escucha. Puede reintentar el micrófono sin salir |
 | `room_identity` | Identidad de sala | Identidad con la que alguien entra a LiveKit, `str(user_id)`; con ella se atribuye lo que dice, sin diarización |
 | `TranscriptSegment` | Segmento de transcripción | Fragmento final de texto atribuido a quien lo dijo, con marcas de tiempo |
 

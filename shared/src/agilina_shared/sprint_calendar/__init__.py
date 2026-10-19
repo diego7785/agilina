@@ -8,7 +8,9 @@ configurable working days are out of scope.
 """
 
 from agilina_shared.sprint_calendar.daily_occurrences import daily_occurrences
+from agilina_shared.sprint_calendar.join_closes_at import JOIN_WINDOW_TAIL, join_closes_at
 from agilina_shared.sprint_calendar.join_opens_at import JOIN_WINDOW_LEAD, join_opens_at
+from agilina_shared.sprint_calendar.joinable_daily_at import joinable_daily_at
 from agilina_shared.sprint_calendar.next_daily_at import next_daily_at
 from agilina_shared.sprint_calendar.sprint_day import SprintDay
 from agilina_shared.sprint_calendar.sprint_day_at import sprint_day_at
@@ -16,10 +18,13 @@ from agilina_shared.sprint_calendar.sprint_phase import SprintPhase
 
 __all__ = [
     "JOIN_WINDOW_LEAD",
+    "JOIN_WINDOW_TAIL",
     "SprintDay",
     "SprintPhase",
     "daily_occurrences",
+    "join_closes_at",
     "join_opens_at",
+    "joinable_daily_at",
     "next_daily_at",
     "sprint_day_at",
 ]

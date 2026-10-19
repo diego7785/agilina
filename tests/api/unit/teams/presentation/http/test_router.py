@@ -718,6 +718,7 @@ async def test_an_admin_reads_the_dashboard_of_a_team_whose_sprint_has_not_start
             "type": "daily",
             "starts_at": "2026-10-05T14:00:00Z",
             "join_opens_at": "2026-10-05T13:50:00Z",
+            "join_closes_at": "2026-10-05T14:15:00Z",
         },
         "can_configure": True,
     }
@@ -747,6 +748,7 @@ async def test_while_the_sprint_is_in_progress_it_shows_the_day_and_the_next_dai
         "type": "daily",
         "starts_at": "2026-10-08T14:00:00Z",
         "join_opens_at": "2026-10-08T13:50:00Z",
+        "join_closes_at": "2026-10-08T14:15:00Z",
     }
 
 
@@ -760,6 +762,29 @@ async def test_the_daily_that_starts_in_ten_minutes_has_its_room_open_right_now(
 
     assert ceremony["join_opens_at"] == "2026-10-07T13:50:00Z"
     assert ceremony["starts_at"] == "2026-10-07T14:00:00Z"
+
+
+async def test_a_daily_under_way_stays_joinable_for_whoever_arrives_late(api):
+    await SprintBuilder().for_team_id(api.atlas).saved_in(api.members_uow.sprints)
+    api.clock.current = _at(7, 14, 14)
+
+    ceremony = (await api.request("GET", f"/{api.atlas}/dashboard", TOKEN_CARLA)).json()[
+        "next_ceremony"
+    ]
+
+    assert ceremony["starts_at"] == "2026-10-07T14:00:00Z"
+    assert ceremony["join_closes_at"] == "2026-10-07T14:15:00Z"
+
+
+async def test_once_its_window_closed_the_dashboard_moves_on_to_the_next_daily(api):
+    await SprintBuilder().for_team_id(api.atlas).saved_in(api.members_uow.sprints)
+    api.clock.current = _at(7, 14, 15)
+
+    ceremony = (await api.request("GET", f"/{api.atlas}/dashboard", TOKEN_CARLA)).json()[
+        "next_ceremony"
+    ]
+
+    assert ceremony["starts_at"] == "2026-10-08T14:00:00Z"
 
 
 async def test_a_team_without_an_active_sprint_has_no_sprint_and_no_ceremony(api):

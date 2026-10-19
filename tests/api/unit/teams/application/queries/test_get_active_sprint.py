@@ -103,6 +103,28 @@ async def test_while_in_progress_the_day_and_the_next_daily_follow_the_calendar(
     assert view.next_daily_at == next_daily
 
 
+@pytest.mark.parametrize(
+    ("now", "next_daily", "joinable"),
+    [
+        (_at(10, 13), _at(10, 14), _at(10, 14)),  # before the daily, both are today's
+        (_at(10, 14, 14), _at(11, 14), _at(10, 14)),  # late: today's is still joinable
+        (_at(10, 14, 15), _at(11, 14), _at(11, 14)),  # its window closed: tomorrow's
+        (_at(16, 14, 10), None, _at(16, 14)),  # the last daily, under way
+        (_at(16, 14, 15), None, None),  # the window of the last daily closed
+    ],
+)
+async def test_the_joinable_daily_stays_the_one_under_way_until_its_window_closes(
+    scenario, now, next_daily, joinable
+):
+    await scenario.a_sprint()
+
+    view = await scenario.at(now)
+
+    assert view is not None
+    assert view.next_daily_at == next_daily
+    assert view.joinable_daily_at == joinable
+
+
 async def test_once_the_last_daily_started_there_is_no_next_one(scenario):
     await scenario.a_sprint()
 

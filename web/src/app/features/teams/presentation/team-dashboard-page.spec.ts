@@ -74,7 +74,10 @@ describe('TeamDashboardPage', () => {
         provideTestI18n(),
         provideTestTenant(),
         provideRouter(
-          [{ path: ':tenant/teams/:teamId', component: TeamDashboardPage }],
+          [
+            { path: ':tenant/teams/:teamId', component: TeamDashboardPage },
+            { path: ':tenant/teams/:teamId/room', children: [] },
+          ],
           withComponentInputBinding(),
         ),
         { provide: TeamsPort, useValue: port },
@@ -330,21 +333,39 @@ describe('TeamDashboardPage', () => {
 
       const page = await open('/acme/teams/atlas');
 
-      expect(joinButton(page)?.disabled).toBeFalse();
+      expect(joinButton(page)?.tagName).toBe('A');
       expect(joinButton(page)?.getAttribute('aria-describedby')).toBeNull();
       expect(page.querySelector('[data-testid="join-hint"]')).toBeNull();
     });
 
-    it('does nothing yet when the button is pressed: joining arrives with its own story', async () => {
+    it('links to the room of the team inside the window', async () => {
       clock.now = new Date('2026-10-08T13:55:00Z');
       const page = await open('/acme/teams/atlas');
-      const url = TestBed.inject(Router).url;
 
-      joinButton(page)!.click();
+      const link = page.querySelector<HTMLAnchorElement>('a[data-testid="join-room"]');
+      expect(link?.getAttribute('href')).toBe('/acme/teams/atlas/room');
+      expect(link?.textContent).toContain('Unirse a la sala');
+    });
+
+    it('takes to the room when it is pressed', async () => {
+      clock.now = new Date('2026-10-08T13:55:00Z');
+      const page = await open('/acme/teams/atlas');
+
+      page.querySelector<HTMLAnchorElement>('a[data-testid="join-room"]')!.click();
       await harness.fixture.whenStable();
 
-      expect(TestBed.inject(Router).url).toBe(url);
-      expect(joinButton(page)).not.toBeNull();
+      expect(TestBed.inject(Router).url).toBe('/acme/teams/atlas/room');
+    });
+
+    it('still lets in whoever arrives late, and says the daily already started', async () => {
+      clock.now = new Date('2026-10-08T14:10:00Z');
+
+      const page = await open('/acme/teams/atlas');
+
+      const link = page.querySelector<HTMLAnchorElement>('a[data-testid="join-room"]');
+      expect(link).not.toBeNull();
+      expect(text(page, 'join-hint')).toBe('La reunión diaria ya empezó: todavía puedes entrar.');
+      expect(link?.getAttribute('aria-describedby')).toBe('room-hint');
     });
 
     it('is disabled, with a hint, when the sprint has no ceremony left', async () => {

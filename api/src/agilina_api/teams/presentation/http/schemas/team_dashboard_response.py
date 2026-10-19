@@ -16,8 +16,9 @@ class TeamDashboardResponse(BaseModel):
     )
     next_ceremony: NextCeremonyResponse | None = Field(
         description=(
-            "The next daily, or `null` when the team has no active sprint or its last daily "
-            "has already started."
+            "The daily whose room one may join (the one under way during its first fifteen "
+            "minutes, or else the next), or `null` when the team has no active sprint or the "
+            "window to join its last daily has closed."
         )
     )
     can_configure: bool = Field(
