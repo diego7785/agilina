@@ -2,4 +2,5 @@ from agilina_api.shared_kernel import DomainError
 
 
 class DailyNotOpenError(DomainError):
-    """No occurrence of the daily has its window to join open now (``current_daily_at``)."""
+    """No daily of the sprint is open to join now: ``joinable_daily_at`` gives none, or the one it
+    gives has not reached ``join_opens_at`` yet."""

@@ -21,7 +21,7 @@ from agilina_api.ceremonies.application.ports.outbound import (
 from agilina_api.ceremonies.domain.ceremony import Ceremony
 from agilina_api.shared.application.ports import Clock
 from agilina_shared import room_name_for
-from agilina_shared.sprint_calendar import current_daily_at, daily_occurrences
+from agilina_shared.sprint_calendar import daily_occurrences, join_opens_at, joinable_daily_at
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +70,9 @@ class JoinCurrentDailyHandler:
             local_time=roster.daily_time,
             time_zone=ZoneInfo(roster.time_zone),
         )
-        scheduled_at = current_daily_at(occurrences, now)
-        if scheduled_at is None:
+        # The dashboard's rule (AGI-60), so the button and the token never disagree.
+        scheduled_at = joinable_daily_at(occurrences, now)
+        if scheduled_at is None or now < join_opens_at(scheduled_at):
             raise DailyNotOpenError("No daily of the sprint is open to join now")
         async with self._uow_factory() as uow:
             ceremony = await uow.ceremonies.add_or_get(

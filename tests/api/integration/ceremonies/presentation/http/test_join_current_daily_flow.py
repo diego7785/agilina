@@ -48,6 +48,7 @@ from agilina_api.shared.presentation.http.access import get_authenticated_users
 from agilina_api.shared.presentation.http.tenancy import TENANT_HEADER, get_tenant_directory
 from agilina_api.teams.infrastructure.persistence.sql_sprint_queries import SqlSprintQueries
 from agilina_api.teams.infrastructure.persistence.team_queries import SqlTeamQueries
+from agilina_shared.sprint_calendar import JOIN_WINDOW_TAIL
 from tests.api.builders import (
     AUDIENCE,
     AccessTokenBuilder,
@@ -270,9 +271,9 @@ async def test_a_member_who_was_not_summoned_is_403_not_a_daily_participant(
 
 
 async def test_outside_the_window_the_daily_is_409_not_open(api, session_factory, clock, livekit):
-    """One hour after the start is already out: the window excludes it."""
+    """Fifteen minutes after the start is already out: the window excludes it."""
     team, _ = await _daily_of_atlas(session_factory)
-    clock.current = datetime(2026, 10, 7, 15, 0, tzinfo=UTC)
+    clock.current = datetime(2026, 10, 7, 14, 0, tzinfo=UTC) + JOIN_WINDOW_TAIL
 
     response = await api.post(
         URL.format(team_id=team.id), headers=_headers(clock, "acme", "sub-ana")

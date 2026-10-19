@@ -18,6 +18,7 @@ from agilina_api.ceremonies.application.errors import (
     RoomServiceUnavailableError,
 )
 from agilina_shared.enums import TeamRole
+from agilina_shared.sprint_calendar import JOIN_WINDOW_TAIL
 from tests.api.builders import DAILY_TIME, RosterBuilder, next_id
 from tests.api.doubles import (
     FakeCeremoniesUnitOfWork,
@@ -130,10 +131,10 @@ async def test_a_team_without_an_active_sprint_has_no_daily_to_join():
     "offset",
     [
         pytest.param(timedelta(minutes=-10), id="when-the-window-opens"),
-        pytest.param(timedelta(minutes=59, seconds=59), id="just-before-the-grace-ends"),
+        pytest.param(JOIN_WINDOW_TAIL - timedelta(microseconds=1), id="just-before-it-closes"),
     ],
 )
-async def test_the_daily_can_be_joined_from_ten_minutes_before_to_one_hour_after(scenario, offset):
+async def test_the_daily_can_be_joined_from_ten_minutes_before_to_fifteen_after(scenario, offset):
     scenario.clock.current = DAILY_TIME + offset
 
     admission = await scenario.join(scenario.ana)
@@ -146,7 +147,7 @@ async def test_the_daily_can_be_joined_from_ten_minutes_before_to_one_hour_after
     "offset",
     [
         pytest.param(timedelta(minutes=-10, seconds=-1), id="before-the-window-opens"),
-        pytest.param(timedelta(hours=1), id="once-the-grace-is-over"),
+        pytest.param(JOIN_WINDOW_TAIL, id="once-it-closes"),
     ],
 )
 async def test_outside_the_window_the_daily_is_not_open(scenario, offset):

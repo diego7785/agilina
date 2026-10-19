@@ -41,7 +41,7 @@ their microphone and listening to the others, and lasts two hours.
 Only a participant of the active sprint's daily, as stored, gets it: any other member of the
 team, its admin included, is `403 not_a_daily_participant`, and someone outside the team is
 `403 not_a_team_member`. A team without an active sprint is `409 no_active_sprint`, and outside
-the daily's window to join (from ten minutes before it starts to one hour after) it is
+the daily's window to join (from ten minutes before it starts to fifteen minutes after) it is
 `409 daily_not_open`. When the room server does not answer, or it is not configured, it is
 `503 room_service_unavailable`; asking again joins the same room.
 """

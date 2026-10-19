@@ -97,7 +97,7 @@ Toda respuesta de error lleva `Cache-Control: no-store`.
 | 404 | `ceremony_not_found` | La ceremonia no existe, su sprint ya no es el activo del equipo o está agendada antes de que empiece (la misma respuesta) | — |
 | 409 | `result_already_received` | La ceremonia ya tiene otro resultado: se cierra una sola vez | — |
 | 403 | `not_a_daily_participant` | El usuario es miembro del equipo, pero no está entre los participantes de la daily del sprint activo (tampoco el admin) | — |
-| 409 | `daily_not_open` | La ventana para unirse a la daily no está abierta: va de diez minutos antes de su hora a una hora después | — |
+| 409 | `daily_not_open` | La ventana para unirse a la daily no está abierta: va de diez minutos antes de su hora a quince minutos después (`joinable_daily_at`) | — |
 | 503 | `room_service_unavailable` | El servidor de salas (LiveKit) no responde, falla o no está configurado | — |
 
 ## Salud
@@ -540,7 +540,7 @@ de la convocatoria, y la clave de API de LiveKit no sale de la API.
 El token de acceso a la sala de la daily de hoy del equipo. Sin cuerpo. La API verifica, en este
 orden, que el equipo tenga un sprint activo, que quien pide esté entre los participantes guardados
 de su daily (ser miembro no basta, tampoco para el admin) y que la ventana para unirse esté abierta
-(de diez minutos antes de la hora de la daily a una hora después). Solo entonces guarda la ceremonia
+(de diez minutos antes de la hora de la daily a quince minutos después, la misma regla que el dashboard: `joinable_daily_at`). Solo entonces guarda la ceremonia
 de esa daily, o encuentra la que ya existe, abre su sala en LiveKit y firma el token. Cada daily
 tiene su propia sala, `<tenant>-<ceremony_id>` (`room_name_for`): dos participantes de la misma
 daily entran a la misma sala, y la daily del día siguiente usa otra. El token lleva la identidad
