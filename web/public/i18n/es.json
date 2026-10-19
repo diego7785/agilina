@@ -298,8 +298,11 @@
       },
       "calendar": {
         "choose_date": "Elige una fecha",
-        "choose_time": "Elige una hora",
-        "times": "Horas",
+        "hour": "Hora",
+        "minutes": "Minutos",
+        "period": "a. m. o p. m.",
+        "am": "a. m.",
+        "pm": "p. m.",
         "previous_month": "Mes anterior",
         "next_month": "Mes siguiente"
       },

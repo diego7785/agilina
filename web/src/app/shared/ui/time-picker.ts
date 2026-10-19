@@ -1,229 +1,158 @@
 import {
-  afterNextRender,
   Component,
   computed,
   ElementRef,
   inject,
-  Injector,
   input,
   linkedSignal,
   model,
   output,
-  signal,
 } from '@angular/core';
 
-/** Minutes between two times of the list; any other time can still be typed. */
-const STEP_MINUTES = 15;
-const MINUTES_IN_A_DAY = 24 * 60;
+import { ComboBox, type ComboOption } from './combo-box';
 
-/** Every time of the list, `HH:MM`, from 00:00 every `STEP_MINUTES`. */
-const TIMES: readonly string[] = [...Array(MINUTES_IN_A_DAY / STEP_MINUTES).keys()].map((index) =>
-  clockTime(index * STEP_MINUTES),
-);
-const MIDNIGHT = '00:00';
+type Period = 'AM' | 'PM';
+
+/** The parts of a time as the person sees them; empty while not chosen. */
+interface TimeParts {
+  readonly hour: string;
+  readonly minute: string;
+  readonly period: string;
+}
+
+const HOURS: readonly ComboOption[] = [...Array(12).keys()].map((index) => twoDigits(index + 1));
+const MINUTES: readonly ComboOption[] = [...Array(60).keys()].map((index) => twoDigits(index));
+const EMPTY: TimeParts = { hour: '', minute: '', period: '' };
 
 /**
- * A time box (`HH:MM`, 24 hours) where the time can be typed or picked from a list of its own,
- * instead of the browser's, which Safari does not have. Its label is a `<label for="…">`
- * pointing at `inputId`, the box itself:
+ * A time of the day (`HH:MM`, 24 hours) chosen in three boxes, the hour (1 to 12), the minutes
+ * (00 to 59) and a. m. or p. m.: each one is typed or picked from its list (`agl-combo-box`).
+ * It holds a time only once the three are chosen, and all three start empty when `value` is, so
+ * nothing looks chosen before the person chooses it. It replaces `<input type="time">`, which in
+ * Safari has no picker and, empty, paints the current time as if it were chosen.
  *
  * ```html
  * <label for="daily-time">Hora</label>
- * <agl-time-picker inputId="daily-time" [(value)]="dailyTime"
- *   [placeholder]="t('choose_time')" [listLabel]="t('times')" />
+ * <agl-time-picker inputId="daily-time" [(value)]="dailyTime" [hourLabel]="t('hour')"
+ *   [minuteLabel]="t('minutes')" [periodLabel]="t('period')" [amLabel]="t('am')"
+ *   [pmLabel]="t('pm')" />
  * ```
  *
- * It follows the combobox pattern of the WAI-ARIA practices with a list that does not filter:
- * the box opens the list on click or with Alt+Down; Down and Up move through the times (and open
- * it), Enter picks the highlighted one and Escape closes it. What is typed counts as soon as it
- * is a time (`9:30`, `09:30` or `0930`); anything else leaves the box without a time, so the
- * form asks for one. Starts empty when `value` is: nothing is preselected.
+ * The `<label for>` names the hour box; `touched` tells that the focus left the three.
  */
 @Component({
   selector: 'agl-time-picker',
+  imports: [ComboBox],
   templateUrl: './time-picker.html',
   host: {
-    class: 'relative block',
-    '(document:pointerdown)': 'onDocumentPointerDown($event)',
+    class: 'block',
+    role: 'group',
+    '[attr.data-value]': 'value()',
     '(focusout)': 'onFocusOut($event)',
   },
 })
 export class TimePicker {
-  /** The id of the box, which its `<label for>` points at. */
+  /** The id of the hour box, which the `<label for>` points at; the others add a suffix. */
   readonly inputId = input.required<string>();
-  /** The chosen time, `HH:MM`, or empty when there is none. */
+  /** The chosen time, `HH:MM` in 24 hours, or empty until the three parts are chosen. */
   readonly value = model('');
-  /** What the box says while no time is written, already translated. */
-  readonly placeholder = input.required<string>();
-  /** The accessible name of the list of times, already translated. */
-  readonly listLabel = input.required<string>();
-  /** Whether the box shows as invalid (`aria-invalid`). */
+  readonly hourLabel = input.required<string>();
+  readonly minuteLabel = input.required<string>();
+  readonly periodLabel = input.required<string>();
+  readonly amLabel = input.required<string>();
+  readonly pmLabel = input.required<string>();
+  /** Whether the boxes show as invalid (`aria-invalid`). */
   readonly invalid = input(false);
-  /** The ids of the elements that describe the box, such as its error message. */
+  /** The ids of the elements that describe the boxes, such as their error message. */
   readonly describedBy = input<string>();
-  /** The `data-testid` of the box, for the end-to-end tests. */
+  /** The `data-testid` of the hour box; the others add `-minute` and `-period`. */
   readonly testId = input<string>();
-  /** The person left the box, after opening the list or not. */
+  /** The focus left the three boxes. */
   readonly touched = output();
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly injector = inject(Injector);
 
-  protected readonly times = TIMES;
-  protected readonly open = signal(false);
-  /** What the box shows: the chosen time, or what the person is typing. */
-  protected readonly text = linkedSignal(() => this.value());
-  /** The time of the list the keyboard is on while it is open. */
-  protected readonly activeTime = signal(MIDNIGHT);
+  protected readonly hours = HOURS;
+  protected readonly minutes = MINUTES;
+  protected readonly periods = computed<readonly ComboOption[]>(() => [
+    { value: 'AM', label: this.amLabel() },
+    { value: 'PM', label: this.pmLabel() },
+  ]);
+  protected readonly parseHour = (text: string): string | null => numberIn(text, 1, 12);
+  protected readonly parseMinute = (text: string): string | null => numberIn(text, 0, 59);
+  protected readonly parsePeriod = parsePeriod;
 
-  protected readonly listId = computed(() => `${this.inputId()}-times`);
+  /**
+   * What each box holds: what the person chose so far while it still makes `value` (so clearing
+   * the hour keeps the minutes), or the parts of a `value` that came from outside.
+   */
+  protected readonly parts = linkedSignal<string, TimeParts>({
+    source: this.value,
+    computation: (value, previous) =>
+      previous !== undefined && timeOf(previous.value) === value ? previous.value : partsOf(value),
+  });
 
-  protected optionId(time: string): string {
-    return `${this.inputId()}-time-${time.replace(':', '')}`;
+  protected suffixed(id: string | undefined, suffix: string): string | undefined {
+    return id === undefined ? undefined : `${id}-${suffix}`;
   }
 
-  protected onClick(): void {
-    if (!this.open()) {
-      this.show();
-    }
-  }
-
-  protected toggle(): void {
-    if (this.open()) {
-      this.close(true);
-    } else {
-      this.show();
-      this.box()?.focus();
-    }
-  }
-
-  protected onInput(text: string): void {
-    this.text.set(text);
-    this.value.set(parseTime(text) ?? '');
-    const typed = this.value();
-    if (this.open() && typed !== '') {
-      this.moveTo(nearestListedTime(typed));
-    }
-  }
-
-  protected onKeydown(event: KeyboardEvent): void {
-    switch (event.key) {
-      case 'ArrowDown':
-      case 'ArrowUp':
-        event.preventDefault();
-        if (!this.open()) {
-          this.show();
-        } else if (!event.altKey) {
-          this.moveBy(event.key === 'ArrowDown' ? 1 : -1);
-        }
-        return;
-      case 'Enter':
-        if (this.open()) {
-          event.preventDefault();
-          this.pick(this.activeTime());
-        }
-        return;
-      case 'Escape':
-        if (this.open()) {
-          event.preventDefault();
-          this.close(true);
-        }
-        return;
-    }
-  }
-
-  protected pick(time: string): void {
-    this.value.set(time);
-    this.text.set(time);
-    this.close(true);
-  }
-
-  /** Leaving the box with the list closed counts as having been there. */
-  protected onBoxBlur(): void {
-    if (!this.open()) {
-      this.text.set(this.value());
-      this.touched.emit();
-    }
-  }
-
-  protected onDocumentPointerDown(event: PointerEvent): void {
-    if (this.open() && !this.contains(event.target)) {
-      this.close(false);
-    }
+  protected choose(part: keyof TimeParts, chosen: string): void {
+    const parts = { ...this.parts(), [part]: chosen };
+    this.parts.set(parts);
+    this.value.set(timeOf(parts));
   }
 
   protected onFocusOut(event: FocusEvent): void {
-    if (this.open() && event.relatedTarget !== null && !this.contains(event.relatedTarget)) {
-      this.close(false);
+    const next = event.relatedTarget;
+    if (!(next instanceof Node && this.host.nativeElement.contains(next))) {
+      this.touched.emit();
     }
-  }
-
-  /** Opens the list on the chosen time or, with none, on the next one of the clock. */
-  private show(): void {
-    const from = this.value() !== '' ? this.value() : clockTime(minutesOfDay(new Date()));
-    this.open.set(true);
-    this.moveTo(nearestListedTime(from));
-  }
-
-  private moveBy(steps: number): void {
-    const index = TIMES.indexOf(this.activeTime());
-    this.moveTo(TIMES[(index + steps + TIMES.length) % TIMES.length] ?? MIDNIGHT);
-  }
-
-  private moveTo(time: string): void {
-    this.activeTime.set(time);
-    afterNextRender(
-      () => {
-        this.host.nativeElement
-          .querySelector(`#${this.optionId(time)}`)
-          ?.scrollIntoView({ block: 'nearest' });
-      },
-      { injector: this.injector },
-    );
-  }
-
-  /** Closes the list; the box keeps the chosen time and, unless it went elsewhere, the focus. */
-  private close(returnFocus: boolean): void {
-    this.open.set(false);
-    this.text.set(this.value());
-    this.touched.emit();
-    if (returnFocus) {
-      this.box()?.focus();
-    }
-  }
-
-  private box(): HTMLInputElement | null {
-    return this.host.nativeElement.querySelector<HTMLInputElement>(`#${this.inputId()}`);
-  }
-
-  private contains(target: EventTarget | null): boolean {
-    return target instanceof Node && this.host.nativeElement.contains(target);
   }
 }
 
-/** `HH:MM` for a time typed as `9:30`, `09:30` or `0930`, or `null` when it is not one. */
-export function parseTime(text: string): string | null {
-  const match = /^(\d{1,2}):?(\d{2})$/.exec(text.trim());
+/** `HH:MM` in 24 hours once the three parts are chosen, or empty. */
+function timeOf({ hour, minute, period }: TimeParts): string {
+  if (hour === '' || minute === '' || period === '') {
+    return '';
+  }
+  const hours = (Number(hour) % 12) + (period === 'PM' ? 12 : 0);
+  return `${String(hours).padStart(2, '0')}:${minute}`;
+}
+
+function partsOf(value: string): TimeParts {
+  const match = /^(\d{2}):(\d{2})$/.exec(value);
   if (match === null) {
-    return null;
+    return EMPTY;
   }
   const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  return hours < 24 && minutes < 60 ? clockTime(hours * 60 + minutes) : null;
+  const period: Period = hours < 12 ? 'AM' : 'PM';
+  return {
+    hour: twoDigits(hours % 12 === 0 ? 12 : hours % 12).value,
+    minute: match[2] ?? '',
+    period,
+  };
 }
 
-/** The first time of the list at or after `time`, wrapping to 00:00 at the end of the day. */
-function nearestListedTime(time: string): string {
-  const [hours, minutes] = time.split(':').map(Number) as [number, number];
-  const index = Math.ceil((hours * 60 + minutes) / STEP_MINUTES) % TIMES.length;
-  return TIMES[index] ?? MIDNIGHT;
+/** The two-digit value of a whole number between `min` and `max` typed in `text`, or `null`. */
+function numberIn(text: string, min: number, max: number): string | null {
+  const trimmed = text.trim();
+  if (!/^\d{1,2}$/.test(trimmed)) {
+    return null;
+  }
+  const number = Number(trimmed);
+  return number >= min && number <= max ? twoDigits(number).value : null;
 }
 
-function minutesOfDay(date: Date): number {
-  return date.getHours() * 60 + date.getMinutes();
+/** AM or PM for what starts with an a or a p (`a. m.`, `AM`, `p`), or `null`. */
+function parsePeriod(text: string): Period | null {
+  const letter = text.trim().toLowerCase().charAt(0);
+  if (letter === 'a') {
+    return 'AM';
+  }
+  return letter === 'p' ? 'PM' : null;
 }
 
-function clockTime(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  return `${String(hours).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+function twoDigits(number: number): ComboOption {
+  const text = String(number).padStart(2, '0');
+  return { value: text, label: text };
 }

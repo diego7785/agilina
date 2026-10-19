@@ -1,75 +1,44 @@
-<div class="relative">
-  <input
-    #box
-    type="text"
-    role="combobox"
-    inputmode="numeric"
-    autocomplete="off"
-    aria-autocomplete="none"
-    class="block min-h-11 w-full rounded-md border border-border bg-transparent py-2 pr-11 pl-3 text-foreground shadow-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent aria-invalid:border-danger"
-    [id]="inputId()"
-    [placeholder]="placeholder()"
-    [value]="text()"
-    [attr.aria-expanded]="open()"
-    [attr.aria-controls]="listId()"
-    [attr.aria-activedescendant]="open() ? optionId(activeTime()) : null"
-    [attr.aria-invalid]="invalid()"
-    [attr.aria-describedby]="describedBy()"
-    [attr.data-testid]="testId()"
-    [attr.data-value]="value()"
-    (click)="onClick()"
-    (input)="onInput(box.value)"
-    (keydown)="onKeydown($event)"
-    (blur)="onBoxBlur()"
+<div class="flex items-center gap-2">
+  <agl-combo-box
+    class="w-20"
+    inputMode="numeric"
+    placeholder="--"
+    [inputId]="inputId()"
+    [options]="hours"
+    [parse]="parseHour"
+    [ariaLabel]="hourLabel()"
+    [invalid]="invalid()"
+    [describedBy]="describedBy()"
+    [testId]="testId()"
+    [value]="parts().hour"
+    (valueChange)="choose('hour', $event)"
   />
-  <button
-    type="button"
-    tabindex="-1"
-    aria-hidden="true"
-    class="absolute inset-y-0 right-0 flex w-11 cursor-pointer items-center justify-center text-muted hover:text-foreground"
-    (click)="toggle()"
-  >
-    <!-- Lucide "clock" icon. -->
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      class="size-5"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 6v6l4 2" />
-    </svg>
-  </button>
+  <span class="font-semibold text-muted" aria-hidden="true">:</span>
+  <agl-combo-box
+    class="w-20"
+    inputMode="numeric"
+    placeholder="--"
+    [inputId]="inputId() + '-minute'"
+    [options]="minutes"
+    [parse]="parseMinute"
+    [ariaLabel]="minuteLabel()"
+    [invalid]="invalid()"
+    [describedBy]="describedBy()"
+    [testId]="suffixed(testId(), 'minute')"
+    [value]="parts().minute"
+    (valueChange)="choose('minute', $event)"
+  />
+  <agl-combo-box
+    class="w-24"
+    placeholder="--"
+    [inputId]="inputId() + '-period'"
+    [options]="periods()"
+    [parse]="parsePeriod"
+    [ariaLabel]="periodLabel()"
+    [invalid]="invalid()"
+    [describedBy]="describedBy()"
+    [testId]="suffixed(testId(), 'period')"
+    [value]="parts().period"
+    (valueChange)="choose('period', $event)"
+  />
 </div>
-
-<ul
-  role="listbox"
-  class="absolute top-full left-0 z-20 mt-2 max-h-60 w-full overflow-y-auto rounded-xl border border-border bg-surface p-1 text-foreground shadow-lg"
-  [id]="listId()"
-  [hidden]="!open()"
-  [attr.aria-label]="listLabel()"
->
-  @if (open()) {
-    @for (time of times; track time) {
-      <li
-        role="option"
-        class="cursor-pointer rounded-lg px-3 py-2 text-sm hover:bg-accent/10"
-        [class.bg-accent]="time === value()"
-        [class.font-semibold]="time === value()"
-        [class.text-accent-foreground]="time === value()"
-        [class.ring-1]="time === activeTime()"
-        [class.ring-accent]="time === activeTime()"
-        [id]="optionId(time)"
-        [attr.aria-selected]="time === value()"
-        (pointerdown)="$event.preventDefault()"
-        (pointerup)="pick(time)"
-      >
-        {{ time }}
-      </li>
-    }
-  }
-</ul>
