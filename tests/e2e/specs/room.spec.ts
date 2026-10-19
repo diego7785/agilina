@@ -11,7 +11,7 @@ import { WEB } from '../playwright.config';
  *
  * She is the person of the sign-in story, and the dashboard story left her team with a daily a
  * few minutes away, so the room is open (from ten minutes before the daily to fifteen after).
- * The real room needs AGI-59 (the API issues the token) and a LiveKit server: without them the
+ * The real room needs a LiveKit server whose keys the API has (it issues the token): without it the
  * room answers with a failure and these tests are skipped, saying why. The Firefox that
  * Playwright ships has not been able to set up the audio (WebRTC) with a local LiveKit server, so
  * there it ends the same way.
@@ -24,7 +24,7 @@ const TENANT = 'acme';
 const EMAIL = `e2e-${RUN}@example.test`;
 const PASSWORD = 'una-clave-bien-larga-1';
 const WITHOUT_ROOM =
-  'The room could not be reached: it needs AGI-59 and LiveKit, and a browser that sets up WebRTC';
+  'The room could not be reached: it needs LiveKit, and a browser that sets up WebRTC';
 
 test.describe.configure({ mode: 'serial' });
 

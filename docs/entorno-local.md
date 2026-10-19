@@ -314,7 +314,7 @@ make test-e2e     # invita a una persona nueva a un equipo nuevo de cada tenant 
   al invitarla de nuevo, entra de inmediato con el aviso sin enlace.
 - `tests/e2e/specs/room.spec.ts` (AGI-60), en **Chromium y en Firefox**: desde el dashboard entra a
   la sala con el micrófono activo, rechaza el micrófono y queda como oyente, y sale de la sala.
-  Necesita la emisión del token (AGI-59) y un servidor de LiveKit; sin ellos sus pruebas se
+  Necesita un servidor de LiveKit con sus claves en el `.env`; sin él sus pruebas se
   **saltan** con el motivo y `make test-e2e` sigue en verde. En Firefox hoy también se saltan: el
   Firefox de Playwright no establece el audio con un LiveKit local (ver
   [testing.md](testing.md)).
@@ -699,7 +699,7 @@ make clean          # borra contenedores, volúmenes, imágenes y cachés
 | `make up` dice que un puerto está ocupado | Otro servicio usa 5432, 8000, 8080, 4200, 8025 o 1025. Detenlo o cambia el puerto en el `.env` (`POSTGRES_PORT`, `AGILINA_API_PORT`, `MAILPIT_UI_PORT`…) |
 | `make migrate` falla con conexión rechazada | Postgres todavía arranca: `make logs s=postgres` y reintenta |
 | `make agent` pide completar el `.env` | Faltan `AGILINA_LIVEKIT_URL`, `AGILINA_LIVEKIT_API_KEY` y `AGILINA_LIVEKIT_API_SECRET`: el worker no arranca sin ellos |
-| Entrar a la sala responde `503 room_service_unavailable` | La API no tiene `AGILINA_LIVEKIT_URL`, `AGILINA_LIVEKIT_API_KEY` o `AGILINA_LIVEKIT_API_SECRET`, o LiveKit no responde. Complétalos en el `.env`, reinicia la API (`make up`) y revisa `make logs s=api`. Para probar la ruta: crea el equipo con `make invite`, configura un sprint cuya daily esté en su ventana (de diez minutos antes a una hora después) y pide el token desde `/docs` con el token de un participante |
+| Entrar a la sala responde `503 room_service_unavailable` | La API no tiene `AGILINA_LIVEKIT_URL`, `AGILINA_LIVEKIT_API_KEY` o `AGILINA_LIVEKIT_API_SECRET`, o LiveKit no responde. Complétalos en el `.env`, reinicia la API (`make up`) y revisa `make logs s=api`. Para probar la ruta: crea el equipo con `make invite`, configura un sprint cuya daily esté en su ventana (de diez minutos antes a quince minutos después) y pide el token desde `/docs` con el token de un participante |
 | La web muestra «No disponible» | La API no está corriendo: `make logs s=api` |
 | Un tenant no tiene realm en Keycloak | Keycloak perdió sus datos o el tenant se agregó sin él: `make tenant-realms` |
 | Cambié `package.json` o `pyproject.toml` y la imagen no se construye ("lockfile needs to be updated" o `npm ci` falla) | Ejecuta `make lock`, commitea los dos locks y repite `make up` |

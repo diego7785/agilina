@@ -172,7 +172,7 @@ sin preguntar (`--use-fake-device-for-media-stream` con el permiso `microphone` 
 - **Firefox:** el de Playwright no logró establecer el audio (ICE) con un LiveKit local; sus pruebas
   terminan saltadas con el motivo. Firefox de escritorio se verifica a mano (AGI-135).
 
-La sala real necesita la emisión del token (AGI-59) y un servidor de LiveKit: sin ellos, la sala
+La sala real necesita un servidor de LiveKit con sus claves en el `.env`: sin él, la sala
 responde con un fallo y sus pruebas se saltan con el motivo, en vez de fallar. Que dos personas se
 escuchen se verifica a mano (AGI-135).
 
