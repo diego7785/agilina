@@ -42,3 +42,23 @@ def test_an_unknown_security_mode_is_rejected(monkeypatch: pytest.MonkeyPatch):
 
     with pytest.raises(ValueError):  # noqa: PT011 - pydantic's ValidationError is a ValueError
         Settings(_env_file=None)  # type: ignore[call-arg]
+
+
+def test_the_livekit_secret_is_read_from_the_environment_and_never_shown(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("AGILINA_LIVEKIT_API_SECRET", "livekit-top-secret")
+
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
+
+    assert settings.livekit_api_secret.get_secret_value() == "livekit-top-secret"
+    assert "livekit-top-secret" not in repr(settings)
+    assert "livekit-top-secret" not in str(settings)
+
+
+def test_without_the_variable_the_livekit_secret_is_empty(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("AGILINA_LIVEKIT_API_SECRET", raising=False)
+
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
+
+    assert settings.livekit_api_secret.get_secret_value() == ""
