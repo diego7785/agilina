@@ -423,6 +423,7 @@
       "failure": {
         "no_access": "You don't have access to this room.",
         "no_active_sprint": "Your team has no active sprint, so there is no daily to join.",
+        "daily_not_open": "The daily isn't open right now: you can join from ten minutes before it starts until fifteen minutes after.",
         "service_unavailable": "The room isn't available right now.",
         "token_rejected": "We couldn't validate your access to the room.",
         "connection_lost": "We lost the connection to the room and couldn't get it back.",

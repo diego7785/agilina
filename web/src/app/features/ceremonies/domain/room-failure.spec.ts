@@ -10,9 +10,10 @@ describe('room failure', () => {
     expect(roomFailureKindOf('boom')).toBe('unexpected');
   });
 
-  it('is not worth retrying without access or without a sprint', () => {
+  it('is not worth retrying without access, without a sprint or with the daily not open', () => {
     expect(isRetriable('no_access')).toBeFalse();
     expect(isRetriable('no_active_sprint')).toBeFalse();
+    expect(isRetriable('daily_not_open')).toBeFalse();
   });
 
   it('is worth retrying when the service or the connection failed', () => {

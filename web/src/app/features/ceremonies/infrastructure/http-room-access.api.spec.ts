@@ -70,6 +70,7 @@ describe('HttpRoomAccessApi', () => {
     [403, 'not_a_team_member', 'no_access'],
     [403, 'not_a_daily_participant', 'no_access'],
     [409, 'no_active_sprint', 'no_active_sprint'],
+    [409, 'daily_not_open', 'daily_not_open'],
     [503, 'room_service_unavailable', 'service_unavailable'],
     [500, 'internal_error', 'unexpected'],
     [422, 'validation_error', 'unexpected'],
