@@ -9,6 +9,7 @@ from agilina_api.ceremonies.application.ports.outbound.ceremony_repository impor
 )
 from agilina_api.ceremonies.application.ports.outbound.ceremony_roster import CeremonyRoster
 from agilina_api.ceremonies.application.ports.outbound.participant_names import ParticipantNames
+from agilina_api.ceremonies.application.ports.outbound.rooms import Rooms
 
 __all__ = [
     "CeremoniesUnitOfWork",
@@ -16,4 +17,5 @@ __all__ = [
     "CeremonyRepository",
     "CeremonyRoster",
     "ParticipantNames",
+    "Rooms",
 ]

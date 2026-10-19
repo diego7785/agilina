@@ -1,1 +1,1 @@
-"""Ceremonies driven adapters: persistence."""
+"""Ceremonies driven adapters: persistence and the LiveKit room server."""
