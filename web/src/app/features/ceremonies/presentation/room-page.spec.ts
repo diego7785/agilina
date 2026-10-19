@@ -1,0 +1,279 @@
+import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router, withComponentInputBinding } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
+
+import { provideTestI18n } from '@testing/i18n';
+import { FakeRoomAccessPort, FakeRoomPort } from '@testing/room';
+import { provideTestTenant } from '@testing/tenant';
+
+import { RoomPage } from './room-page';
+import { RoomAccessPort } from '../application/room-access.port';
+import { RoomPort } from '../application/room.port';
+import { RoomFailure } from '../domain/room-failure';
+
+describe('RoomPage', () => {
+  let access: FakeRoomAccessPort;
+  let room: FakeRoomPort;
+  let harness: RouterTestingHarness;
+
+  beforeEach(async () => {
+    access = new FakeRoomAccessPort();
+    room = new FakeRoomPort();
+    TestBed.configureTestingModule({
+      providers: [
+        provideTestI18n(),
+        provideTestTenant(),
+        provideRouter(
+          [
+            { path: ':tenant/teams/:teamId/room', component: RoomPage },
+            { path: ':tenant/teams/:teamId', children: [] },
+          ],
+          withComponentInputBinding(),
+        ),
+        { provide: RoomAccessPort, useValue: access },
+        { provide: RoomPort, useValue: room },
+      ],
+    });
+    harness = await RouterTestingHarness.create();
+  });
+
+  async function settle(): Promise<void> {
+    for (let round = 0; round < 10; round++) {
+      await Promise.resolve();
+    }
+    await harness.fixture.whenStable();
+  }
+
+  async function open(): Promise<HTMLElement> {
+    await harness.navigateByUrl('/acme/teams/atlas/room');
+    await settle();
+    return harness.routeNativeElement!;
+  }
+
+  function text(page: HTMLElement, testId: string): string | undefined {
+    return page.querySelector(`[data-testid="${testId}"]`)?.textContent.replace(/\s+/g, ' ').trim();
+  }
+
+  function click(page: HTMLElement, testId: string): void {
+    page.querySelector<HTMLElement>(`[data-testid="${testId}"]`)!.click();
+  }
+
+  // -------------------------------------------- criteria 1 and 2: entering the room --
+  describe('entering', () => {
+    it('enters the room of the team of the address and says it is connected', async () => {
+      const page = await open();
+
+      expect(access.requested).toEqual(['atlas']);
+      expect(page.querySelector('h1')?.textContent.trim()).toBe('Sala de reunión');
+      expect(text(page, 'room-status')).toBe('Conectado');
+      expect(page.querySelector('[data-testid="room-status"]')?.getAttribute('role')).toBe(
+        'status',
+      );
+    });
+
+    it('turns the microphone on as it enters', async () => {
+      const page = await open();
+
+      expect(room.microphonePrompts).toBe(1);
+      expect(room.microphoneRequests).toBe(1);
+      expect(text(page, 'microphone-on')).toBe('Micrófono activo');
+      expect(page.querySelector('[data-testid="microphone-alert"]')).toBeNull();
+    });
+
+    it('says it is connecting while the room has not answered', async () => {
+      room.connect = () => new Promise<void>(() => undefined);
+
+      const page = await open();
+
+      expect(text(page, 'room-status')).toBe('Conectando…');
+      expect(page.querySelector('[data-testid="microphone-pending"]')).toBeNull();
+    });
+  });
+
+  // -------------------------------------------- criterion 4: the microphone denied --
+  describe('the microphone', () => {
+    it('explains how to allow it when it is denied, and keeps the person as a listener', async () => {
+      room.microphoneAnswer = 'denied';
+
+      const page = await open();
+
+      const alert = page.querySelector('[data-testid="microphone-alert"]');
+      expect(alert?.getAttribute('role')).toBe('alert');
+      expect(alert?.textContent).toContain('No tenemos permiso para usar tu micrófono');
+      expect(text(page, 'microphone-help')).toContain('permite el micrófono para este sitio');
+      expect(alert?.textContent).toContain('estás en la sala como oyente');
+      expect(text(page, 'room-status')).toBe('Conectado');
+    });
+
+    it('asks for it again from the alert', async () => {
+      room.microphoneAnswer = 'denied';
+      const page = await open();
+
+      room.microphoneAnswer = 'on';
+      click(page, 'microphone-retry');
+      await settle();
+
+      expect(room.microphoneRequests).toBe(1);
+      expect(text(page, 'microphone-on')).toBe('Micrófono activo');
+    });
+
+    it('says when there is no microphone', async () => {
+      room.microphoneAnswer = 'not_found';
+
+      const page = await open();
+
+      expect(text(page, 'microphone-alert')).toContain('No encontramos un micrófono');
+    });
+
+    it('says when the microphone is busy', async () => {
+      room.microphoneAnswer = 'unavailable';
+
+      const page = await open();
+
+      expect(text(page, 'microphone-alert')).toContain('Tu micrófono no está disponible');
+    });
+
+    it('says the microphone needs HTTPS, without a retry that cannot help', async () => {
+      room.microphoneAnswer = 'insecure_context';
+
+      const page = await open();
+
+      expect(text(page, 'microphone-alert')).toContain('necesita una conexión segura');
+      expect(text(page, 'microphone-help')).toContain('https://');
+      expect(page.querySelector('[data-testid="microphone-retry"]')).toBeNull();
+    });
+  });
+
+  // -------------------------------------------- criterion 5: the connection drops --
+  describe('the connection', () => {
+    it('says it is reconnecting while the network is down, and connected when it is back', async () => {
+      const page = await open();
+
+      room.emit({ kind: 'reconnecting' });
+      await settle();
+      expect(text(page, 'room-status')).toBe('Reconectando…');
+
+      room.emit({ kind: 'reconnected' });
+      await settle();
+      expect(text(page, 'room-status')).toBe('Conectado');
+    });
+
+    it('offers to try again or go back when it could not get back', async () => {
+      const page = await open();
+
+      room.emit({ kind: 'lost' });
+      await settle();
+
+      expect(text(page, 'room-status')).toBe('Desconectado');
+      expect(text(page, 'room-failure-message')).toBe(
+        'Perdimos la conexión con la sala y no pudimos recuperarla.',
+      );
+      expect(text(page, 'room-retry')).toBe('Reintentar');
+      expect(page.querySelector('[data-testid="room-back"]')?.getAttribute('href')).toBe(
+        '/acme/teams/atlas',
+      );
+      expect(page.querySelector('[data-testid="microphone-on"]')).toBeNull();
+    });
+
+    it('enters again when retried', async () => {
+      const page = await open();
+      room.emit({ kind: 'lost' });
+      await settle();
+
+      click(page, 'room-retry');
+      await settle();
+
+      expect(access.requested.length).toBe(2);
+      expect(text(page, 'room-status')).toBe('Conectado');
+      expect(page.querySelector('[data-testid="room-failure"]')).toBeNull();
+    });
+
+    it('goes back to the dashboard', async () => {
+      const page = await open();
+      room.emit({ kind: 'lost' });
+      await settle();
+
+      click(page, 'room-back');
+      await settle();
+
+      expect(TestBed.inject(Router).url).toBe('/acme/teams/atlas');
+    });
+
+    it('leaves the room when the page goes away', async () => {
+      await open();
+      const before = room.disconnects;
+
+      await harness.navigateByUrl('/acme/teams/atlas');
+
+      expect(room.disconnects).toBe(before + 1);
+    });
+  });
+
+  // ------------------------------------------------ the answers of the token (AGI-59) --
+  describe('when it cannot enter', () => {
+    it('says the person has no access, and only offers to go back', async () => {
+      access.failure = new RoomFailure('no_access');
+
+      const page = await open();
+
+      expect(text(page, 'room-failure-message')).toBe('No tienes acceso a esta sala.');
+      expect(page.querySelector('[data-testid="room-retry"]')).toBeNull();
+      expect(page.querySelector('[data-testid="room-back"]')).not.toBeNull();
+    });
+
+    it('says the team has no active sprint, and only offers to go back', async () => {
+      access.failure = new RoomFailure('no_active_sprint');
+
+      const page = await open();
+
+      expect(text(page, 'room-failure-message')).toContain('no tiene un sprint activo');
+      expect(page.querySelector('[data-testid="room-retry"]')).toBeNull();
+    });
+
+    it('says the room is not available, and offers to try again', async () => {
+      access.failure = new RoomFailure('service_unavailable');
+
+      const page = await open();
+
+      expect(text(page, 'room-failure-message')).toBe(
+        'La sala no está disponible en este momento.',
+      );
+      expect(page.querySelector('[data-testid="room-retry"]')).not.toBeNull();
+    });
+
+    it('says the access could not be validated when LiveKit refuses the token twice', async () => {
+      room.connectFailures.push(
+        new RoomFailure('token_rejected'),
+        new RoomFailure('token_rejected'),
+      );
+
+      const page = await open();
+
+      expect(text(page, 'room-failure-message')).toBe('No pudimos validar tu acceso a la sala.');
+    });
+
+    it('says something went wrong for anything else', async () => {
+      access.failure = new RoomFailure('unexpected');
+
+      const page = await open();
+
+      expect(text(page, 'room-failure-message')).toBe('Algo salió mal al entrar a la sala.');
+    });
+  });
+
+  describe('the audio of the others', () => {
+    it('offers to turn it on when the browser blocked it', async () => {
+      const page = await open();
+
+      room.emit({ kind: 'audio_blocked', blocked: true });
+      await settle();
+      expect(text(page, 'audio-blocked')).toContain('Tu navegador pausó el audio de la sala.');
+
+      click(page, 'audio-resume');
+      await settle();
+
+      expect(room.audioResumed).toBe(1);
+      expect(page.querySelector('[data-testid="audio-blocked"]')).toBeNull();
+    });
+  });
+});

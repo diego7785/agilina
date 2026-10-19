@@ -161,12 +161,12 @@ async def get_team(
     summary="What the team's dashboard shows",
     description=(
         "The team's name, mode and the label of the user's role, its active sprint with its day "
-        "N of M, the next daily with the instant from which the room opens, and whether the "
+        "N of M, the daily one may join with the window of its room, and whether the "
         "interface draws the Settings entry, all in one answer. `sprint` is `null` when the team "
-        "has no active sprint; `next_ceremony`, when it has none or its last daily has already "
-        "started. Instants are in UTC; the web shows them in the browser's time zone. Any member "
-        "of the team gets it: any other user receives `403 not_a_team_member`, whether the team "
-        "exists or not."
+        "has no active sprint; `next_ceremony`, when it has none or the window to join its last "
+        "daily has closed. Instants are in UTC; the web shows them in the browser's time zone. "
+        "Any member of the team gets it: any other user receives `403 not_a_team_member`, "
+        "whether the team exists or not."
     ),
     responses=errors_of(
         *SIGNED_IN,

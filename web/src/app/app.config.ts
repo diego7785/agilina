@@ -10,6 +10,10 @@ import { provideI18n } from '@core/i18n/provide-i18n';
 import { provideLogging } from '@core/logging/provide-logging';
 import { HttpTenantApi } from '@core/tenant/http-tenant.api';
 import { TenantPort } from '@core/tenant/tenant.port';
+import { RoomAccessPort } from '@features/ceremonies/application/room-access.port';
+import { RoomPort } from '@features/ceremonies/application/room.port';
+import { HttpRoomAccessApi } from '@features/ceremonies/infrastructure/http-room-access.api';
+import { LiveKitRoomAdapter } from '@features/ceremonies/infrastructure/livekit-room.adapter';
 import { InvitationPort } from '@features/identity/application/invitation.port';
 import { LoginRedirectPort } from '@features/identity/application/login-redirect.port';
 import { HttpInvitationApi } from '@features/identity/infrastructure/http-invitation.api';
@@ -48,6 +52,8 @@ export function createAppConfig(runtimeConfig: RuntimeConfig): ApplicationConfig
       { provide: TeamsPort, useClass: HttpTeamsApi },
       { provide: UsersPort, useClass: HttpUsersApi },
       { provide: SprintsPort, useClass: HttpSprintsApi },
+      { provide: RoomAccessPort, useClass: HttpRoomAccessApi },
+      { provide: RoomPort, useClass: LiveKitRoomAdapter },
     ],
   };
 }

@@ -1,6 +1,9 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, input, type OnInit } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
+import { TenantContext } from '@core/tenant/tenant-context';
 import { Button } from '@shared/ui/button';
 import {
   formatCalendarDate,
@@ -14,14 +17,16 @@ import { TeamShellFacade } from '../application/team-shell.facade';
 
 /**
  * Dashboard of a team: the day of its active sprint, its next ceremony, the mode Agilina works
- * in (read only) and the way into the room, which is open only in the window of the ceremony.
+ * in (read only) and the way into the room, which is open only in the window of the ceremony
+ * (from ten minutes before it to fifteen after, for whoever arrives late): then it links to the
+ * room's page (AGI-60).
  * It is the same for both roles; the settings entry lives in the top bar and is drawn only for
  * an admin. Without an active sprint it says so and offers no room. The API computes the day and
  * the schedule; this page only shows them in the browser's time zone.
  */
 @Component({
   selector: 'agl-team-dashboard-page',
-  imports: [TranslocoDirective, Button],
+  imports: [NgTemplateOutlet, RouterLink, TranslocoDirective, Button],
   providers: [TeamDashboardFacade, TeamShellFacade],
   templateUrl: './team-dashboard-page.html',
 })
@@ -31,11 +36,14 @@ export class TeamDashboardPage implements OnInit {
 
   private readonly facade = inject(TeamDashboardFacade);
   private readonly shell = inject(TeamShellFacade);
+  private readonly tenant = inject(TenantContext);
 
   protected readonly team = this.facade.team;
   protected readonly sprint = this.facade.sprint;
   protected readonly nextCeremony = this.facade.nextCeremony;
   protected readonly joinState = this.facade.joinState;
+  protected readonly canJoin = this.facade.canJoin;
+  protected readonly roomPath = computed(() => this.tenant.path('teams', this.teamId(), 'room'));
   protected readonly loading = this.facade.loading;
   protected readonly problemMessage = computed(() => problemMessageKey(this.facade.problem()));
 

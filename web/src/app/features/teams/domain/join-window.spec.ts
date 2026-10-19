@@ -1,11 +1,12 @@
-import { joinState, nextJoinChange } from './join-window';
+import { canJoin, joinState, nextJoinChange } from './join-window';
 import { type NextCeremony } from './team-dashboard';
 
-/** The daily at 14:00 UTC; the room opens ten minutes before. */
+/** The daily at 14:00 UTC; the room opens ten minutes before and closes fifteen after. */
 const DAILY: NextCeremony = {
   type: 'daily',
   startsAt: '2026-10-12T14:00:00Z',
   joinOpensAt: '2026-10-12T13:50:00Z',
+  joinClosesAt: '2026-10-12T14:15:00Z',
 };
 
 function at(time: string): Date {
@@ -30,9 +31,25 @@ describe('join window', () => {
       expect(joinState(DAILY, at('13:59:59'))).toBe('open');
     });
 
-    it('is none once the ceremony has started: the next one is for the API to say', () => {
-      expect(joinState(DAILY, at('14:00:00'))).toBe('none');
-      expect(joinState(DAILY, at('14:05:00'))).toBe('none');
+    it('is started, and still joinable, while whoever arrives late may join', () => {
+      expect(joinState(DAILY, at('14:00:00'))).toBe('started');
+      expect(joinState(DAILY, at('14:14:59'))).toBe('started');
+    });
+
+    it('is none once the window closes: the next one is for the API to say', () => {
+      expect(joinState(DAILY, at('14:15:00'))).toBe('none');
+    });
+  });
+
+  describe('canJoin', () => {
+    it('lets in while the room is open, before or after the start', () => {
+      expect(canJoin('open')).toBeTrue();
+      expect(canJoin('started')).toBeTrue();
+    });
+
+    it('keeps out before the window and without a ceremony', () => {
+      expect(canJoin('not_yet')).toBeFalse();
+      expect(canJoin('none')).toBeFalse();
     });
   });
 
@@ -45,8 +62,12 @@ describe('join window', () => {
       expect(nextJoinChange(DAILY, at('13:50:00'))).toEqual(at('14:00:00'));
     });
 
-    it('is nothing once the ceremony has started', () => {
-      expect(nextJoinChange(DAILY, at('14:00:00'))).toBeNull();
+    it('is the closing of the window once the ceremony has started', () => {
+      expect(nextJoinChange(DAILY, at('14:00:00'))).toEqual(at('14:15:00'));
+    });
+
+    it('is nothing once the window has closed', () => {
+      expect(nextJoinChange(DAILY, at('14:15:00'))).toBeNull();
     });
 
     it('is nothing when there is no ceremony', () => {

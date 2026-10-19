@@ -2,8 +2,8 @@ import { type TeamDashboard } from '@features/teams/domain/team-dashboard';
 
 /**
  * The dashboard of Atlas in the middle of its sprint (Sprint 12, day 3 of 10), with the next daily at
- * 14:00 UTC of Thursday 2026-10-08 and its room opening ten minutes before. A test changes
- * only what it is about.
+ * 14:00 UTC of Thursday 2026-10-08 and its room open from ten minutes before to fifteen after.
+ * A test changes only what it is about.
  */
 export function aDashboard(changes: Partial<TeamDashboard> = {}): TeamDashboard {
   return {
@@ -18,6 +18,7 @@ export function aDashboard(changes: Partial<TeamDashboard> = {}): TeamDashboard 
       type: 'daily',
       startsAt: '2026-10-08T14:00:00Z',
       joinOpensAt: '2026-10-08T13:50:00Z',
+      joinClosesAt: '2026-10-08T14:15:00Z',
     },
     canConfigure: true,
     ...changes,

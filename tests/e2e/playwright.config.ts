@@ -20,5 +20,37 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
+  projects: [
+    // The stories of the product, told once and in order: they share the accounts they create.
+    { name: 'chromium', use: { browserName: 'chromium' }, testIgnore: /room\.spec\.ts/ },
+    // The room of the daily (AGI-60) in the two desktop browsers of its Definition of Done, after
+    // the stories that activate the person and give her team a daily minutes away. The microphone
+    // is a fake device the browser grants without asking. Chromium is the full browser (`channel`):
+    // the headless shell that Playwright uses by default has no microphone at all.
+    {
+      name: 'room-chromium',
+      dependencies: ['chromium'],
+      testMatch: /room\.spec\.ts/,
+      use: {
+        browserName: 'chromium',
+        channel: 'chromium',
+        permissions: ['microphone'],
+        launchOptions: { args: ['--use-fake-device-for-media-stream'] },
+      },
+    },
+    {
+      name: 'room-firefox',
+      dependencies: ['chromium'],
+      testMatch: /room\.spec\.ts/,
+      use: {
+        browserName: 'firefox',
+        launchOptions: {
+          firefoxUserPrefs: {
+            'media.navigator.streams.fake': true,
+            'media.navigator.permission.disabled': true,
+          },
+        },
+      },
+    },
+  ],
 });

@@ -28,7 +28,7 @@ from agilina_api.teams.presentation.http.schemas import (
 )
 from agilina_shared import role_label
 from agilina_shared.enums import CeremonyType, TeamRole
-from agilina_shared.sprint_calendar import join_opens_at
+from agilina_shared.sprint_calendar import join_closes_at, join_opens_at
 
 
 def present_created(team_id: UUID) -> CreatedTeamResponse:
@@ -109,7 +109,7 @@ def present_active_sprint(view: ActiveSprintView) -> ActiveSprintResponse:
 
 def present_team_dashboard(view: TeamDashboardView, role: TeamRole) -> TeamDashboardResponse:
     sprint = view.sprint
-    next_daily_at = sprint.next_daily_at if sprint is not None else None
+    daily_at = sprint.joinable_daily_at if sprint is not None else None
     return TeamDashboardResponse(
         team=DashboardTeamResponse(
             id=view.team.team_id,
@@ -132,10 +132,11 @@ def present_team_dashboard(view: TeamDashboardView, role: TeamRole) -> TeamDashb
         next_ceremony=(
             NextCeremonyResponse(
                 type=CeremonyType.DAILY,
-                starts_at=next_daily_at,
-                join_opens_at=join_opens_at(next_daily_at),
+                starts_at=daily_at,
+                join_opens_at=join_opens_at(daily_at),
+                join_closes_at=join_closes_at(daily_at),
             )
-            if next_daily_at is not None
+            if daily_at is not None
             else None
         ),
         can_configure=role == TeamRole.ADMIN,

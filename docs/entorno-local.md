@@ -312,8 +312,15 @@ make test-e2e     # invita a una persona nueva a un equipo nuevo de cada tenant 
   invita a alguien (el enlace llega a Mailpit), esa persona lo activa y, como Miembro, ve
   «sin acceso» en la pantalla; luego se le cambia el rol, se la elimina con la confirmación y,
   al invitarla de nuevo, entra de inmediato con el aviso sin enlace.
+- `tests/e2e/specs/room.spec.ts` (AGI-60), en **Chromium y en Firefox**: desde el dashboard entra a
+  la sala con el micrófono activo, rechaza el micrófono y queda como oyente, y sale de la sala.
+  Necesita la emisión del token (AGI-59) y un servidor de LiveKit; sin ellos sus pruebas se
+  **saltan** con el motivo y `make test-e2e` sigue en verde. En Firefox hoy también se saltan: el
+  Firefox de Playwright no establece el audio con un LiveKit local (ver
+  [testing.md](testing.md)).
 
-Corren en un contenedor sobre la red del anfitrión (Linux), con el entorno de `make up`.
+Corren en un contenedor sobre la red del anfitrión (Linux), con el entorno de `make up`. La imagen
+trae Chromium y Firefox (Firefox solo para la sala).
 
 ### El usuario de desarrollo
 

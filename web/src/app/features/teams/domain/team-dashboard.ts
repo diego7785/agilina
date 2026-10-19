@@ -22,13 +22,15 @@ export interface DashboardSprint {
 }
 
 /**
- * The next ceremony and the instant from which the room opens to its participants, both in UTC
- * (ISO 8601). The window to join goes from `joinOpensAt` to `startsAt`.
+ * The ceremony one may join and the window of its room, all in UTC (ISO 8601). The window goes
+ * from `joinOpensAt` up to `joinClosesAt`, a while after `startsAt`, so that whoever arrives
+ * late can still join (AGI-60).
  */
 export interface NextCeremony {
   readonly type: 'daily';
   readonly startsAt: string;
   readonly joinOpensAt: string;
+  readonly joinClosesAt: string;
 }
 
 /**
@@ -39,7 +41,7 @@ export interface TeamDashboard {
   readonly team: DashboardTeam;
   /** Null when the team has no active sprint. */
   readonly sprint: DashboardSprint | null;
-  /** Null when there is no active sprint or its last daily has already started. */
+  /** Null when there is no active sprint or the window to join its last daily has closed. */
   readonly nextCeremony: NextCeremony | null;
   readonly canConfigure: boolean;
 }
