@@ -383,5 +383,52 @@
       "title": "We could not find this organization",
       "text": "Check the address or open the link your organization sent you. If the problem continues, ask your administrator for help."
     }
+  },
+  "ceremonies": {
+    "room": {
+      "title": "Meeting room",
+      "status": {
+        "connecting": "Connecting…",
+        "connected": "Connected",
+        "reconnecting": "Reconnecting…",
+        "failed": "Disconnected"
+      },
+      "microphone": {
+        "on": "Microphone on",
+        "pending": "Turning the microphone on…",
+        "listener": "Meanwhile you are in the room as a listener: you hear your team, but they don't hear you.",
+        "retry": "Retry microphone",
+        "denied": {
+          "title": "We can't use your microphone",
+          "help": "Click the icon to the left of the browser's address, allow the microphone for this site and press \"Retry microphone\"."
+        },
+        "not_found": {
+          "title": "We couldn't find a microphone",
+          "help": "Plug in a microphone and press \"Retry microphone\"."
+        },
+        "unavailable": {
+          "title": "Your microphone isn't available",
+          "help": "Another app may be using it. Close it and press \"Retry microphone\"."
+        },
+        "insecure_context": {
+          "title": "The microphone needs a secure connection",
+          "help": "The browser only allows the microphone on HTTPS pages. Open Agilina with an address that starts with https://."
+        }
+      },
+      "audio": {
+        "blocked": "Your browser paused the room's audio.",
+        "resume": "Turn on audio"
+      },
+      "failure": {
+        "no_access": "You don't have access to this room.",
+        "no_active_sprint": "Your team has no active sprint, so there is no daily to join.",
+        "service_unavailable": "The room isn't available right now.",
+        "token_rejected": "We couldn't validate your access to the room.",
+        "connection_lost": "We lost the connection to the room and couldn't get it back.",
+        "unexpected": "Something went wrong joining the room."
+      },
+      "retry": "Try again",
+      "back_to_dashboard": "Back to dashboard"
+    }
   }
 }

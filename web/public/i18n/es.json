@@ -383,5 +383,52 @@
       "title": "No encontramos esta organización",
       "text": "Revisa la dirección o abre el enlace que te envió tu organización. Si el problema sigue, pide ayuda a tu administrador."
     }
+  },
+  "ceremonies": {
+    "room": {
+      "title": "Sala de reunión",
+      "status": {
+        "connecting": "Conectando…",
+        "connected": "Conectado",
+        "reconnecting": "Reconectando…",
+        "failed": "Desconectado"
+      },
+      "microphone": {
+        "on": "Micrófono activo",
+        "pending": "Activando el micrófono…",
+        "listener": "Mientras tanto estás en la sala como oyente: escuchas a tu equipo, pero no te escuchan.",
+        "retry": "Reintentar micrófono",
+        "denied": {
+          "title": "No tenemos permiso para usar tu micrófono",
+          "help": "Haz clic en el ícono que está a la izquierda de la dirección del navegador, permite el micrófono para este sitio y pulsa «Reintentar micrófono»."
+        },
+        "not_found": {
+          "title": "No encontramos un micrófono",
+          "help": "Conecta un micrófono y pulsa «Reintentar micrófono»."
+        },
+        "unavailable": {
+          "title": "Tu micrófono no está disponible",
+          "help": "Puede que otra aplicación lo esté usando. Ciérrala y pulsa «Reintentar micrófono»."
+        },
+        "insecure_context": {
+          "title": "El micrófono necesita una conexión segura",
+          "help": "El navegador solo permite el micrófono en páginas con HTTPS. Abre Agilina con una dirección que empiece por https://."
+        }
+      },
+      "audio": {
+        "blocked": "Tu navegador pausó el audio de la sala.",
+        "resume": "Activar audio"
+      },
+      "failure": {
+        "no_access": "No tienes acceso a esta sala.",
+        "no_active_sprint": "Tu equipo no tiene un sprint activo, así que no hay reunión diaria a la que entrar.",
+        "service_unavailable": "La sala no está disponible en este momento.",
+        "token_rejected": "No pudimos validar tu acceso a la sala.",
+        "connection_lost": "Perdimos la conexión con la sala y no pudimos recuperarla.",
+        "unexpected": "Algo salió mal al entrar a la sala."
+      },
+      "retry": "Reintentar",
+      "back_to_dashboard": "Volver al dashboard"
+    }
   }
 }

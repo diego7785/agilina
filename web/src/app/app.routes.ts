@@ -36,7 +36,8 @@ const notFound: Routes = [
  * routes of the teams need a session: the guard takes the person to sign in and brings them
  * back to the page they asked for. It is comfort, not security: the API decides who sees a team.
  * That includes the team settings (Team and Sprint), which only an admin may open: no guard checks
- * the role, since it would hide the API's 403, and the screen shows "no access" with it.
+ * the role, since it would hide the API's 403, and the screen shows "no access" with it. The room
+ * of the daily follows the same idea: the API says who may enter it.
  */
 export const routes: Routes = [
   { path: 'not-found', children: notFound },
@@ -115,6 +116,15 @@ export const routes: Routes = [
               import('@features/teams/presentation/team-dashboard-page').then(
                 (m) => m.TeamDashboardPage,
               ),
+            title: 'Agilina',
+          },
+          {
+            // The room of the team's daily (AGI-60). No guard checks the window or the
+            // participants: the API decides whether it issues the token, and the room says why not.
+            path: 'teams/:teamId/room',
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('@features/ceremonies/presentation/room-page').then((m) => m.RoomPage),
             title: 'Agilina',
           },
           {
