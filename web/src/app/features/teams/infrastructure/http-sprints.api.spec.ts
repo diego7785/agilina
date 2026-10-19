@@ -146,7 +146,7 @@ describe('HttpSprintsApi', () => {
     ['not_authenticated', 401, 'not_authenticated'],
     ['not_a_team_member', 403, 'forbidden'],
     ['not_a_team_admin', 403, 'forbidden'],
-    ['no_active_sprint', 404, 'no_active_sprint'],
+    ['no_active_sprint', 409, 'no_active_sprint'],
     ['active_sprint_exists', 409, 'active_sprint_exists'],
     ['sprint_ends_before_start', 422, 'ends_before_start'],
     ['invalid_time_zone', 422, 'invalid_time_zone'],

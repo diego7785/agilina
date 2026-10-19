@@ -44,7 +44,10 @@ make up      # .env, imágenes, contenedores, espera y migraciones
 claves locales aleatorias para Postgres y para el administrador de Keycloak, de
 modo que el repositorio no necesita guardar ninguna. Las claves de LiveKit,
 ElevenLabs y Gemini las completas tú: sin ellas la API y la web funcionan, pero
-el worker no entra a ninguna sala. La primera ejecución descarga y construye las
+nadie entra a una sala. La API también usa las de LiveKit: abre la sala de cada
+daily y firma el token de cada participante; sin ellas,
+`POST /v1/teams/{team_id}/dailies/current/token` responde
+`503 room_service_unavailable`, y el worker no arranca. La primera ejecución descarga y construye las
 imágenes y tarda varios minutos; las siguientes son rápidas.
 
 Los ganchos de git (`make hooks`) son opcionales y necesitan
@@ -689,6 +692,7 @@ make clean          # borra contenedores, volúmenes, imágenes y cachés
 | `make up` dice que un puerto está ocupado | Otro servicio usa 5432, 8000, 8080, 4200, 8025 o 1025. Detenlo o cambia el puerto en el `.env` (`POSTGRES_PORT`, `AGILINA_API_PORT`, `MAILPIT_UI_PORT`…) |
 | `make migrate` falla con conexión rechazada | Postgres todavía arranca: `make logs s=postgres` y reintenta |
 | `make agent` pide completar el `.env` | Faltan `AGILINA_LIVEKIT_URL`, `AGILINA_LIVEKIT_API_KEY` y `AGILINA_LIVEKIT_API_SECRET`: el worker no arranca sin ellos |
+| Entrar a la sala responde `503 room_service_unavailable` | La API no tiene `AGILINA_LIVEKIT_URL`, `AGILINA_LIVEKIT_API_KEY` o `AGILINA_LIVEKIT_API_SECRET`, o LiveKit no responde. Complétalos en el `.env`, reinicia la API (`make up`) y revisa `make logs s=api`. Para probar la ruta: crea el equipo con `make invite`, configura un sprint cuya daily esté en su ventana (de diez minutos antes a una hora después) y pide el token desde `/docs` con el token de un participante |
 | La web muestra «No disponible» | La API no está corriendo: `make logs s=api` |
 | Un tenant no tiene realm en Keycloak | Keycloak perdió sus datos o el tenant se agregó sin él: `make tenant-realms` |
 | Cambié `package.json` o `pyproject.toml` y la imagen no se construye ("lockfile needs to be updated" o `npm ci` falla) | Ejecuta `make lock`, commitea los dos locks y repite `make up` |

@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 from fastapi.routing import APIRoute
 
+from agilina_api.ceremonies.presentation.http import dailies_router
 from agilina_api.identity.presentation.http import router as identity_router
 from agilina_api.shared.presentation.http.access import (
     current_team_admin,
@@ -34,6 +35,8 @@ NEEDED_ROLE = {
     ("post", "/v1/teams/{team_id}/sprints"): ADMIN,
     ("get", "/v1/teams/{team_id}/sprints/active"): MEMBER,
     ("put", "/v1/teams/{team_id}/sprints/active"): ADMIN,
+    # A member, and on top of it a participant of the daily: a rule of the use case (AGI-59).
+    ("post", "/v1/teams/{team_id}/dailies/current/token"): MEMBER,
     ("get", "/v1/users/me"): MEMBER,
     ("get", "/v1/users"): ADMIN,
     ("get", "/v1/users/{user_id}"): ADMIN,
@@ -62,6 +65,7 @@ def _routes() -> dict[tuple[str, str], APIRoute]:
         *teams_router.router.routes,
         *users_router.router.routes,
         *identity_router.team_invitations_router.routes,
+        *dailies_router.router.routes,
     ]
     return {
         (method.lower(), route.path): route

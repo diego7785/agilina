@@ -2,7 +2,8 @@
 
 ``TeamsErrors`` is the catalog; ``TEAMS_ERRORS`` pairs each domain exception with an entry, and
 the composition root registers it in ``shared.presentation.http.error_handlers``. A team that
-does not exist answers ``SharedErrors.TEAM_NOT_FOUND``: identity answers it too.
+does not exist answers ``SharedErrors.TEAM_NOT_FOUND``: identity answers it too; one without an
+active sprint, ``SharedErrors.NO_ACTIVE_SPRINT``: ceremonies answers it too.
 """
 
 from agilina_api.shared.presentation.http.api_error import ApiError, SharedErrors
@@ -34,7 +35,6 @@ class TeamsErrors:
     SPRINT_IN_PROGRESS = ApiError(
         409, "sprint_in_progress", "Roles do not change while a sprint is in progress."
     )
-    NO_ACTIVE_SPRINT = ApiError(404, "no_active_sprint", "The team has no active sprint.")
     SPRINT_ENDS_BEFORE_START = ApiError(
         422, "sprint_ends_before_start", "The sprint's end date is before its start date."
     )
@@ -63,7 +63,7 @@ TEAMS_ERRORS: tuple[ErrorMapping, ...] = (
     ErrorMapping(MemberNotFoundError, TeamsErrors.MEMBER_NOT_FOUND),
     ErrorMapping(LastAdminError, TeamsErrors.LAST_ADMIN),
     ErrorMapping(RoleChangeDuringActiveSprintError, TeamsErrors.SPRINT_IN_PROGRESS),
-    ErrorMapping(NoActiveSprintError, TeamsErrors.NO_ACTIVE_SPRINT),
+    ErrorMapping(NoActiveSprintError, SharedErrors.NO_ACTIVE_SPRINT),
     ErrorMapping(SprintEndsBeforeStartError, TeamsErrors.SPRINT_ENDS_BEFORE_START),
     ErrorMapping(InvalidTimeZoneError, TeamsErrors.INVALID_TIME_ZONE),
     ErrorMapping(NoDailyParticipantsError, TeamsErrors.NO_DAILY_PARTICIPANTS),

@@ -46,6 +46,12 @@ token que falta o no vale recibe `401 not_authenticated`.
 | Configurar el sprint del equipo | `POST /v1/teams/{team_id}/sprints` | admin | ❌ | ✅ |
 | Ver el sprint activo | `GET /v1/teams/{team_id}/sprints/active` | miembro | ✅ | ✅ |
 | Editar el sprint activo | `PUT /v1/teams/{team_id}/sprints/active` | admin | ❌ | ✅ |
+| Entrar a la sala de la daily de hoy (token de LiveKit) ¹ | `POST /v1/teams/{team_id}/dailies/current/token` | miembro | ✅ | ✅ |
+
+¹ Ser miembro no basta: además hay que estar entre los participantes de la daily del sprint activo,
+también siendo admin. Un miembro que no fue convocado recibe `403 not_a_daily_participant`; la regla
+la evalúa el caso de uso contra los participantes guardados del sprint, nunca contra el token ni la
+web (AGI-59).
 
 Las rutas de `/v1/users` nombran el equipo en la query (`?team_id=`): un usuario tiene un rol distinto
 en cada equipo. `GET /v1/users/me` solo devuelve a quien llama; las demás rutas de usuarios son del
@@ -55,15 +61,16 @@ La columna del administrador es la misma en los dos modos. Un miembro que pide u
 recibe `403 not_a_team_admin`; quien no es miembro activo recibe `403 not_a_team_member` (la misma
 respuesta si el equipo es ajeno, lo retiraron o no existe).
 
-Las rutas públicas (`/health*`, `GET /v1/tenant`, `/v1/invitations/*`) y las de ceremonias están
-fuera de esta matriz: no dependen de un rol (ver `test_authentication.py`).
+Las rutas públicas (`/health*`, `GET /v1/tenant`, `/v1/invitations/*`) y las del worker
+(`/v1/ceremonies/*`) están fuera de esta matriz: no dependen de un rol (ver `test_authentication.py`).
 
 Las rutas de ceremonias (`/v1/ceremonies/*`) son **solo del worker del agente** (AGI-64): las protege
 `current_worker`. Sin un token válido del realm del tenant responden `401 not_authenticated`, y con el
 token de una persona, `403 not_a_worker`. El worker se reconoce por el cliente al que se emitió el
 token (`azp`, `agilina-worker`), que no es un rol de equipo. Al revés, el token del worker en una ruta
 de persona responde `403 account_not_active`: es válido, pero no es de ningún usuario de la
-organización.
+organización. La ruta para entrar a la sala de la daily (`/v1/teams/{team_id}/dailies/…`) sí es de
+personas y está en la matriz.
 
 ## Acciones planeadas
 

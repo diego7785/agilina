@@ -232,7 +232,7 @@ async def _active_sprint(handler: GetActiveSprintHandler, team_id: UUID) -> Acti
             SharedErrors.VALIDATION,
             *ADMINS_ONLY,
             SharedErrors.TEAM_NOT_FOUND,
-            TeamsErrors.NO_ACTIVE_SPRINT,
+            SharedErrors.NO_ACTIVE_SPRINT,
             TeamsErrors.ACTIVE_SPRINT_EXISTS,
             *SPRINT_RULE_ERRORS,
         ),
@@ -295,7 +295,7 @@ async def get_active_sprint(
         SharedErrors.VALIDATION,
         *ADMINS_ONLY,
         SharedErrors.TEAM_NOT_FOUND,
-        TeamsErrors.NO_ACTIVE_SPRINT,
+        SharedErrors.NO_ACTIVE_SPRINT,
         *SPRINT_RULE_ERRORS,
     ),
 )

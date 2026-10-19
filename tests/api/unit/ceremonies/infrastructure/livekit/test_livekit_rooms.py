@@ -120,7 +120,7 @@ async def test_a_failing_room_server_is_unavailable(livekit):
 
 
 @pytest.mark.parametrize("missing", ["url", "api_key", "api_secret"])
-async def test_missing_credentials_fail_closed_without_calling_the_server(missing):
+async def test_missing_credentials_fail_closed_without_calling_the_server(missing, caplog):
     livekit = FakeLiveKit()
     rooms = livekit.rooms(**{missing: ""})
 
@@ -129,6 +129,7 @@ async def test_missing_credentials_fail_closed_without_calling_the_server(missin
     with pytest.raises(RoomServiceUnavailableError):
         rooms.admission_for(room_name=ROOM, identity=IDENTITY, expires_at=EXPIRES_AT)
     assert livekit.requests == []
+    assert "LiveKit is not configured" in caplog.text
 
 
 def _assert_logs_are_clean(caplog, livekit: FakeLiveKit, admission: str) -> None:

@@ -19,9 +19,13 @@ from agilina_api.bootstrap.context_adapters import (
 from agilina_api.ceremonies.application.commands.deliver_ceremony_result import (
     DeliverCeremonyResultHandler,
 )
+from agilina_api.ceremonies.application.commands.join_current_daily import (
+    JoinCurrentDailyHandler,
+)
 from agilina_api.ceremonies.application.queries.get_ceremony_context import (
     GetCeremonyContextHandler,
 )
+from agilina_api.ceremonies.infrastructure.livekit.livekit_rooms import LiveKitRooms
 from agilina_api.ceremonies.infrastructure.persistence.ceremony_queries import SqlCeremonyQueries
 from agilina_api.ceremonies.infrastructure.persistence.unit_of_work import (
     ceremonies_unit_of_work_factory,
@@ -106,22 +110,25 @@ class Container:
     get_team_dashboard: GetTeamDashboardHandler
     get_ceremony_context: GetCeremonyContextHandler
     deliver_ceremony_result: DeliverCeremonyResultHandler
+    join_current_daily: JoinCurrentDailyHandler
     team_queries: TeamQueries
     authenticated_users: AuthenticatedUsers
     authenticated_workers: AuthenticatedWorkers
     team_access: TeamAccess
     identity_provider: KeycloakIdentityProvider
     access_token_verifier: KeycloakAccessTokenVerifier
+    rooms: LiveKitRooms
 
     async def aclose(self) -> None:
         await self.identity_provider.aclose()
         await self.access_token_verifier.aclose()
+        await self.rooms.aclose()
         await self.engine.dispose()
 
 
 def build_container(settings: Settings, tenant: Tenant) -> Container:
     """Nothing here connects to anything: sessions, HTTP clients and SMTP are used lazily,
-    so building it needs neither PostgreSQL nor Keycloak."""
+    so building it needs neither PostgreSQL, Keycloak nor LiveKit."""
     clock = SystemClock()
     engine = create_engine_for(
         settings.tenant_dsn(tenant.slug), echo=settings.log_level.upper() == "DEBUG"
@@ -162,6 +169,12 @@ def build_container(settings: Settings, tenant: Tenant) -> Container:
     user_contacts = SqlUserContacts(session_factory)
     team_contacts = TeamsBackedContacts(team_queries, user_contacts)
     ceremony_roster = TeamsBackedCeremonyRoster(team_queries, sprint_queries)
+    ceremonies_uow = ceremonies_unit_of_work_factory(session_factory)
+    rooms = LiveKitRooms(
+        url=settings.livekit_url,
+        api_key=settings.livekit_api_key,
+        api_secret=settings.livekit_api_secret.get_secret_value(),
+    )
     # The web lives under the tenant's name (``/<tenant>/…``): its first segment decides
     # which realm signs the person in.
     tenant_web_url = f"{settings.web_public_url.rstrip('/')}/{tenant.slug}"
@@ -213,7 +226,11 @@ def build_container(settings: Settings, tenant: Tenant) -> Container:
             IdentityBackedParticipantNames(user_contacts),
         ),
         deliver_ceremony_result=DeliverCeremonyResultHandler(
-            ceremonies_unit_of_work_factory(session_factory), ceremony_roster, clock
+            ceremonies_uow, ceremony_roster, clock
+        ),
+        # The web connects to the same LiveKit project whose keys sign the token.
+        join_current_daily=JoinCurrentDailyHandler(
+            ceremonies_uow, ceremony_roster, rooms, clock, settings.livekit_url
         ),
         team_queries=team_queries,
         authenticated_users=KeycloakAuthenticatedUsers(access_token_verifier, session_factory),
@@ -226,4 +243,5 @@ def build_container(settings: Settings, tenant: Tenant) -> Container:
         team_access=team_queries,
         identity_provider=identity_provider,
         access_token_verifier=access_token_verifier,
+        rooms=rooms,
     )

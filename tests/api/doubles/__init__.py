@@ -10,6 +10,7 @@ from tests.api.doubles.ceremonies import (
     FakeCeremonyQueries,
     FakeCeremonyRoster,
     FakeParticipantNames,
+    FakeRooms,
     InMemoryCeremonyRepository,
 )
 from tests.api.doubles.clock import FakeClock
@@ -51,6 +52,7 @@ __all__ = [
     "FakeMailer",
     "FakeMemberContacts",
     "FakeParticipantNames",
+    "FakeRooms",
     "FakeRealmKeys",
     "FakeRenderer",
     "FakeSprintQueries",

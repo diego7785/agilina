@@ -87,6 +87,7 @@ class LiveKitRooms(Rooms):
     def _sign(self, claims: dict[str, object]) -> str:
         """Fails closed: a token is never signed with missing credentials."""
         if not (self._url and self._api_key and self._api_secret):
+            logger.warning("LiveKit is not configured: set the AGILINA_LIVEKIT_* variables")
             raise RoomServiceUnavailableError("LiveKit is not configured")
         return jwt.encode({"iss": self._api_key, **claims}, self._api_secret, algorithm="HS256")
 

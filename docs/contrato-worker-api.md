@@ -57,7 +57,9 @@ de cada ruta está en [api.md](api.md).
 - **Nombre de la sala.** La sala de LiveKit se llama
   `room_name_for(tenant, ceremony_id)`, es decir `<tenant>-<ceremony_id>`. El
   worker obtiene el tenant y la ceremonia con `parse_room_name` antes de tener
-  el contexto; la API usa la misma función al crear la sala. Las dos viven en
+  el contexto; la API usa la misma función al crear la sala, que abre en
+  LiveKit cuando emite el primer token de esa daily
+  (`POST /v1/teams/{team_id}/dailies/current/token`, AGI-59). Las dos viven en
   `agilina_shared.room_name`.
 - **Identidad de sala.** El `room_identity` de cada participante es
   `str(user_id)`: el token de LiveKit se firma con esa identidad y con ella se
