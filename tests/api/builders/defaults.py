@@ -1,6 +1,6 @@
 """The values every builder starts from."""
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
 
 NOW = datetime(2026, 10, 4, 12, 0, tzinfo=UTC)
 """The instant the fake clock starts at and the default moment things are created."""
@@ -21,3 +21,5 @@ SPRINT_END = date(2026, 10, 16)
 DAILY_TIME_ZONE = "America/Bogota"
 DAILY_TIME = datetime(2026, 10, 5, 14, 0, tzinfo=UTC)
 """The daily's anchor: 09:00 in ``DAILY_TIME_ZONE`` (UTC-5, no daylight saving)."""
+DAILY_LOCAL_TIME = time(9, 0)
+"""``DAILY_TIME`` as the wall-clock time it repeats every day in ``DAILY_TIME_ZONE``."""

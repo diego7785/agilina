@@ -16,7 +16,7 @@ from tests.api.builders.access_token import (
 )
 from tests.api.builders.ceremony import CeremonyBuilder, RosterBuilder
 from tests.api.builders.contacts import ContactBuilder, TeamContactsBuilder
-from tests.api.builders.defaults import DAILY_TIME, NOW, PASSWORD, TOKEN
+from tests.api.builders.defaults import DAILY_LOCAL_TIME, DAILY_TIME, NOW, PASSWORD, TOKEN
 from tests.api.builders.email_message import EmailMessageBuilder
 from tests.api.builders.identifiers import next_id, reset_ids
 from tests.api.builders.identity_commands import (
@@ -39,6 +39,7 @@ from tests.api.builders.user import AppUserBuilder
 
 __all__ = [
     "AUDIENCE",
+    "DAILY_LOCAL_TIME",
     "DAILY_TIME",
     "ISSUER",
     "NOW",

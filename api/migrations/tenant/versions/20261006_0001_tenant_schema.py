@@ -23,10 +23,12 @@ active sprint at most.
 
 ``ceremony`` is minimal (AGI-64): the team, the sprint and the scheduled instant, enough for the
 agent worker to ask for a ceremony's context. Its foreign key shares ``team_id`` with the sprint's,
-so a ceremony always belongs to a sprint of its own team. Nothing creates ceremonies yet but the
-tests (AGI-59 does). What the worker delivers when the ceremony closes (AGI-126) is
-``ceremony_result``, one per ceremony (its primary key) with the SHA-256 of the delivery, which
-tells a retry of the same delivery from another one, and its ``transcript_segment`` and
+so a ceremony always belongs to a sprint of its own team. The API creates one per occurrence of
+the daily when a participant asks to join it (AGI-59), and ``ceremony_occurrence_unique`` keeps it
+to one, so two participants who join at the same time share its room. What the worker delivers
+when the ceremony closes (AGI-126) is ``ceremony_result``, one per ceremony (its primary key)
+with the SHA-256 of the delivery, which tells a retry of the same delivery from another one, and
+its ``transcript_segment`` and
 ``ceremony_event`` rows in the order they came (``position``, from 0). They all share the
 ceremony's ``team_id`` through their foreign keys. ``ceremony_status`` and
 ``ceremony_event_type`` hold the values of the shared contract's enums.
@@ -239,7 +241,8 @@ UPGRADE = [
         created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
         CONSTRAINT ceremony_sprint_fk FOREIGN KEY (sprint_id, team_id)
             REFERENCES sprint(id, team_id) ON DELETE CASCADE,
-        CONSTRAINT ceremony_id_team_unique UNIQUE (id, team_id)
+        CONSTRAINT ceremony_id_team_unique UNIQUE (id, team_id),
+        CONSTRAINT ceremony_occurrence_unique UNIQUE (team_id, sprint_id, scheduled_at)
     )
     """,
     "COMMENT ON TABLE ceremony IS "
@@ -248,6 +251,9 @@ UPGRADE = [
     "COMMENT ON COLUMN ceremony.scheduled_at IS "
     "'The instant the ceremony is scheduled, in UTC: it gives the sprint''s day N of M "
     "(AD-31).'",
+    "COMMENT ON CONSTRAINT ceremony_occurrence_unique ON ceremony IS "
+    "'One ceremony per occurrence of the daily (AGI-59): two participants who join at the "
+    "same time get the same ceremony and so the same room.'",
     # -------------------------------------------------------- ceremony_result --
     """
     CREATE TABLE ceremony_result (

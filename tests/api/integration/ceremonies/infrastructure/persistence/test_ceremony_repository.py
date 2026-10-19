@@ -1,10 +1,12 @@
 """The ceremony repository against a real PostgreSQL: the result, its segments and its events
 stored in one transaction, and the lock that keeps two deliveries of the same ceremony from
-interleaving (AGI-64, AGI-126)."""
+interleaving (AGI-64, AGI-126); one ceremony per occurrence of the daily, even when its
+participants join at the same time (AGI-59)."""
 
 import asyncio
 import contextlib
 import hashlib
+from datetime import timedelta
 from typing import Self
 from uuid import UUID
 
@@ -25,6 +27,7 @@ from agilina_api.ceremonies.infrastructure.persistence.ceremony_repository impor
 from agilina_api.ceremonies.infrastructure.persistence.orm_models import (
     CeremonyEventRow,
     CeremonyResultRow,
+    CeremonyRow,
     TranscriptSegmentRow,
 )
 from agilina_api.ceremonies.infrastructure.persistence.unit_of_work import (
@@ -34,7 +37,7 @@ from agilina_api.shared.infrastructure.database.unit_of_work import SqlAlchemyUn
 from agilina_api.teams.infrastructure.persistence.sql_sprint_queries import SqlSprintQueries
 from agilina_api.teams.infrastructure.persistence.team_queries import SqlTeamQueries
 from agilina_shared import CeremonyEventType, CeremonyResult, CeremonyStatus
-from tests.api.builders import NOW, CeremonyBuilder, SprintBuilder, TeamBuilder, next_id
+from tests.api.builders import DAILY_TIME, NOW, CeremonyBuilder, SprintBuilder, TeamBuilder, next_id
 from tests.api.doubles import FakeClock
 from tests.api.integration.support import stored_ceremony, stored_sprint, stored_team, stored_user
 from tests.shared.builders import (
@@ -347,3 +350,115 @@ async def test_two_different_deliveries_at_once_store_one_and_refuse_the_other(s
         "ResultAlreadyReceivedError",
     ]
     assert await _count(session_factory, CeremonyResultRow, daily.ceremony.ceremony_id) == 1
+
+
+# ------------------------------------------------------- one per occurrence --
+async def _a_sprint(session_factory):
+    ana = await stored_user(session_factory)
+    team = await stored_team(session_factory, TeamBuilder().with_admin(ana.id))
+    return await stored_sprint(session_factory, SprintBuilder().for_team(team))
+
+
+def _scheduled(sprint, scheduled_at=DAILY_TIME) -> Ceremony:
+    return Ceremony.schedule(
+        ceremony_id=next_id(),
+        team_id=sprint.team_id,
+        sprint_id=sprint.id,
+        scheduled_at=scheduled_at,
+    )
+
+
+async def _add_or_get(session_factory, ceremony: Ceremony, before=None) -> Ceremony:
+    async with SqlAlchemyCeremoniesUnitOfWork(session_factory) as uow:
+        if before is not None:
+            await before()
+        stored = await uow.ceremonies.add_or_get(ceremony)
+        await uow.commit()
+    return stored
+
+
+async def _ceremonies_of(session_factory, sprint) -> list[UUID]:
+    async with session_factory() as session:
+        return list(
+            await session.scalars(select(CeremonyRow.id).where(CeremonyRow.sprint_id == sprint.id))
+        )
+
+
+async def test_a_new_occurrence_stores_its_ceremony_as_it_came(session_factory):
+    sprint = await _a_sprint(session_factory)
+    ceremony = _scheduled(sprint)
+
+    stored = await _add_or_get(session_factory, ceremony)
+
+    assert stored.id == ceremony.id and stored.result_digest is None
+    assert await _ceremonies_of(session_factory, sprint) == [ceremony.id]
+
+
+async def test_the_same_occurrence_twice_is_the_same_ceremony_and_one_row(session_factory):
+    sprint = await _a_sprint(session_factory)
+    first = await _add_or_get(session_factory, _scheduled(sprint))
+
+    again = await _add_or_get(session_factory, _scheduled(sprint))
+
+    assert again.id == first.id
+    assert (again.team_id, again.sprint_id) == (sprint.team_id, sprint.id)
+    assert again.scheduled_at == DAILY_TIME and again.result_digest is None
+    assert await _ceremonies_of(session_factory, sprint) == [first.id]
+
+
+async def test_the_same_occurrence_comes_back_with_the_digest_of_its_result(session_factory):
+    daily = await Daily.stored(session_factory)
+    result = daily.result().build()
+    await _deliver(_handler(session_factory), result)
+    occurrence = Ceremony.schedule(
+        ceremony_id=next_id(),
+        team_id=daily.ceremony.team_id,
+        sprint_id=daily.ceremony.sprint_id,
+        scheduled_at=daily.ceremony.scheduled_at,
+    )
+
+    stored = await _add_or_get(session_factory, occurrence)
+
+    assert stored.id == daily.ceremony.ceremony_id
+    assert stored.result_digest == _digest(result)
+
+
+async def test_participants_who_join_at_the_same_time_get_the_same_ceremony(session_factory):
+    """The three reach the insert together, none committed: the unique constraint on the
+    occurrence makes the later ones wait for the first and then read its ceremony."""
+    sprint = await _a_sprint(session_factory)
+    rendezvous = _Rendezvous(parties=3)
+
+    stored = await asyncio.gather(
+        *(
+            _add_or_get(session_factory, _scheduled(sprint), before=rendezvous.meet)
+            for _ in range(3)
+        )
+    )
+
+    assert len({ceremony.id for ceremony in stored}) == 1
+    assert await _ceremonies_of(session_factory, sprint) == [stored[0].id]
+
+
+async def test_another_occurrence_of_the_same_sprint_is_another_ceremony(session_factory):
+    sprint = await _a_sprint(session_factory)
+    today = await _add_or_get(session_factory, _scheduled(sprint))
+
+    tomorrow = await _add_or_get(
+        session_factory, _scheduled(sprint, DAILY_TIME + timedelta(days=1))
+    )
+
+    assert tomorrow.id != today.id
+    assert sorted(await _ceremonies_of(session_factory, sprint)) == sorted([today.id, tomorrow.id])
+
+
+async def test_the_daily_of_another_team_at_the_same_instant_is_its_own_ceremony(session_factory):
+    atlas, orion = await _a_sprint(session_factory), await _a_sprint(session_factory)
+    atlas_daily = await _add_or_get(session_factory, _scheduled(atlas))
+
+    orion_daily = await _add_or_get(session_factory, _scheduled(orion))
+
+    assert orion_daily.id != atlas_daily.id
+    assert (orion_daily.team_id, orion_daily.sprint_id) == (orion.team_id, orion.id)
+    assert await _ceremonies_of(session_factory, atlas) == [atlas_daily.id]
+    assert await _ceremonies_of(session_factory, orion) == [orion_daily.id]

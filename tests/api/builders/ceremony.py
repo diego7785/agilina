@@ -1,7 +1,7 @@
 """Builders of what the ceremonies read: ``CeremonyRecord`` and ``RosterRecord`` (AGI-64)."""
 
 from dataclasses import dataclass, field, replace
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Self
 from uuid import UUID
 
@@ -13,7 +13,13 @@ from agilina_api.ceremonies.application.dtos import (
 from agilina_api.ceremonies.domain.ceremony import Ceremony
 from agilina_api.teams.domain.sprint import Sprint
 from agilina_shared.enums import Language, OperationMode, TeamRole
-from tests.api.builders.defaults import DAILY_TIME, DAILY_TIME_ZONE, SPRINT_END, SPRINT_START
+from tests.api.builders.defaults import (
+    DAILY_LOCAL_TIME,
+    DAILY_TIME,
+    DAILY_TIME_ZONE,
+    SPRINT_END,
+    SPRINT_START,
+)
 from tests.api.builders.identifiers import next_id
 
 
@@ -22,9 +28,9 @@ class CeremonyBuilder:
     """A ceremony scheduled at the default daily (2026-10-05T14:00Z, day 1 of the default
     sprint). ``for_sprint(sprint)`` puts it in that sprint of that sprint's team.
 
-    No behavior creates ceremonies yet (AGI-59): ``build()`` is the record as stored, and
-    ``tests/api/integration/support.py::stored_ceremony`` writes its row. ``aggregate()`` is
-    the ``Ceremony`` the commands work on, with the result ``with_result_received`` gave it."""
+    ``build()`` is the record as stored, and ``tests/api/integration/support.py::stored_ceremony``
+    writes its row. ``aggregate()`` is the ``Ceremony`` the commands work on, with the result
+    ``with_result_received`` gave it."""
 
     ceremony_id: UUID = field(default_factory=next_id)
     team_id: UUID = field(default_factory=next_id)
@@ -70,13 +76,15 @@ class CeremonyBuilder:
 @dataclass(frozen=True)
 class RosterBuilder:
     """A team in English and support mode, with the default sprint's calendar (2026-10-05 to
-    2026-10-16 in America/Bogota) and no participant. ``with_participant`` adds one at the
-    next turn."""
+    2026-10-16 in America/Bogota, daily at 09:00) and no participant. ``with_participant`` adds
+    one at the next turn."""
 
+    sprint_id: UUID = field(default_factory=next_id)
     language: Language = Language.EN
     mode: OperationMode = OperationMode.SUPPORT
     start: date = SPRINT_START
     end: date = SPRINT_END
+    daily_time: time = DAILY_LOCAL_TIME
     time_zone: str = DAILY_TIME_ZONE
     participants: tuple[RosterParticipant, ...] = ()
 
@@ -85,6 +93,12 @@ class RosterBuilder:
 
     def in_mode(self, mode: OperationMode) -> Self:
         return replace(self, mode=mode)
+
+    def for_sprint_id(self, sprint_id: UUID) -> Self:
+        return replace(self, sprint_id=sprint_id)
+
+    def with_daily_time(self, daily_time: time) -> Self:
+        return replace(self, daily_time=daily_time)
 
     def with_time_zone(self, time_zone: str) -> Self:
         return replace(self, time_zone=time_zone)
@@ -96,10 +110,12 @@ class RosterBuilder:
 
     def build(self) -> RosterRecord:
         return RosterRecord(
+            sprint_id=self.sprint_id,
             language=self.language,
             mode=self.mode,
             start_date=self.start,
             end_date=self.end,
+            daily_time=self.daily_time,
             time_zone=self.time_zone,
             participants=self.participants,
         )

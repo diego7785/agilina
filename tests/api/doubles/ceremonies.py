@@ -31,6 +31,9 @@ class FakeCeremonyRoster:
         self.rosters = rosters or {}
         self.asked: list[tuple[UUID, UUID]] = []
 
+    async def active_roster_of(self, *, team_id: UUID) -> RosterRecord | None:
+        return next((roster for (team, _), roster in self.rosters.items() if team == team_id), None)
+
     async def roster_of(self, *, team_id: UUID, sprint_id: UUID) -> RosterRecord | None:
         self.asked.append((team_id, sprint_id))
         return self.rosters.get((team_id, sprint_id))
@@ -62,6 +65,20 @@ class InMemoryCeremonyRepository:
     def __init__(self, *ceremonies: Ceremony) -> None:
         self.ceremonies = {ceremony.id: copy.deepcopy(ceremony) for ceremony in ceremonies}
         self.results: dict[UUID, StoredResult] = {}
+
+    async def add_or_get(self, ceremony: Ceremony) -> Ceremony:
+        occurrence = (ceremony.team_id, ceremony.sprint_id, ceremony.scheduled_at)
+        stored = next(
+            (
+                found
+                for found in self.ceremonies.values()
+                if (found.team_id, found.sprint_id, found.scheduled_at) == occurrence
+            ),
+            None,
+        )
+        if stored is None:
+            stored = self.ceremonies[ceremony.id] = copy.deepcopy(ceremony)
+        return copy.deepcopy(stored)
 
     async def lock(self, ceremony_id: UUID) -> Ceremony | None:
         found = self.ceremonies.get(ceremony_id)
