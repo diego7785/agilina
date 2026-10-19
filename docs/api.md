@@ -245,11 +245,15 @@ la entrada a Configuración. Cualquier miembro activo del equipo.
 - `sprint`: `{number, start_date, end_date, day: {number, total, phase}}` (`number` es el del sprint en
   su equipo, como en [Sprint](#sprint); fechas de calendario
   `AAAA-MM-DD`; `day` como en [Sprint](#sprint)), o `null` si el equipo no tiene sprint activo.
-- `next_ceremony`: `{type: "daily", starts_at, join_opens_at}` en UTC, o `null` si no hay sprint
-  activo o la última daily ya empezó. `starts_at` es el mismo instante que `next_daily_at` de
-  `GET …/sprints/active`; `join_opens_at` es diez minutos antes: desde ahí hasta `starts_at` se
-  puede entrar a la sala. La daily «en curso» todavía no se modela (llega con la ceremonia como
-  registro).
+- `next_ceremony`: `{type: "daily", starts_at, join_opens_at, join_closes_at}` en UTC: la daily a la
+  que se puede entrar, o `null` si no hay sprint activo o ya se cerró la ventana de su última daily.
+  `join_opens_at` es diez minutos antes de `starts_at` y `join_closes_at`, quince minutos después
+  (sin incluirlo): en ese tramo se puede entrar a la sala, también si se llega tarde (AGI-60). Hasta
+  `join_closes_at`, `next_ceremony` sigue siendo la daily en curso; después pasa a la siguiente. Por
+  eso, entre `starts_at` y `join_closes_at` no coincide con `next_daily_at` de `GET …/sprints/active`,
+  que ya es la del día siguiente. La regla es `joinable_daily_at` de `agilina_shared.sprint_calendar`,
+  la misma que debe usar la emisión del token de la sala (AGI-59). Cuando la ceremonia sea un
+  registro (AGI-62, HU-17), la ventana terminará al cerrarse la ceremonia.
 - `can_configure`: `true` para un admin. Solo decide si se dibuja Configuración; la API sigue
   validando el permiso en cada ruta de configuración.
 
@@ -270,7 +274,8 @@ la entrada a Configuración. Cualquier miembro activo del equipo.
   "sprint": {"number": 12, "start_date": "2026-10-08", "end_date": "2026-10-21",
              "day": {"number": 4, "total": 14, "phase": "in_progress"}},
   "next_ceremony": {"type": "daily", "starts_at": "2026-10-12T14:15:00Z",
-                    "join_opens_at": "2026-10-12T14:05:00Z"},
+                    "join_opens_at": "2026-10-12T14:05:00Z",
+                    "join_closes_at": "2026-10-12T14:30:00Z"},
   "can_configure": true
 }
 ```
