@@ -152,7 +152,7 @@ test('with a sprint whose daily is hours away, the dashboard shows day 1 and the
   await expect(page.getByTestId('join-hint')).toContainText('Se habilita a las');
 });
 
-test('when the daily is minutes away the room is open, and pressing it does nothing yet', async ({}, testInfo) => {
+test('when the daily is minutes away the room is open, and pressing it takes to the room', async () => {
   // Five minutes ahead that cross midnight would put today's daily in the past.
   test.skip(
     bogotaDateIn(0) !== new Intl.DateTimeFormat('en-CA', { timeZone: ZONE }).format(new Date(Date.now() + 5 * 60_000)),
@@ -171,8 +171,10 @@ test('when the daily is minutes away the room is open, and pressing it does noth
   await expect(page.getByTestId('join-room')).toBeEnabled();
   await expect(page.getByTestId('join-hint')).toHaveCount(0);
   await page.getByTestId('join-room').click();
-  await expect(page).toHaveURL(teamUrl);
-  testInfo.annotations.push({ type: 'note', description: 'Joining arrives with AGI-60' });
+  // What happens inside the room is told by room.spec.ts (AGI-60).
+  await expect(page).toHaveURL(`${teamUrl}/room`);
+  await page.goto(teamUrl);
+  await expect(page.getByTestId('join-room')).toBeVisible();
 });
 
 test('a success toast goes away by itself, a few seconds after it appeared', async () => {

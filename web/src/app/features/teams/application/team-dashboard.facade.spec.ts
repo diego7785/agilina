@@ -44,7 +44,7 @@ describe('TeamDashboardFacade', () => {
   let clock: TestClock;
   let facade: TeamDashboardFacade;
 
-  /** The daily of `aDashboard()` starts at 14:00 UTC and its room opens at 13:50. */
+  /** The daily of `aDashboard()` starts at 14:00 UTC; its room opens at 13:50 and closes at 14:15. */
   function start(now: string): void {
     port = new FakeTeamsPort();
     clock = new TestClock(now);
@@ -166,11 +166,26 @@ describe('TeamDashboardFacade', () => {
       expect(facade.joinState()).toBe('open');
     });
 
-    it('asks for the next ceremony by itself when the current one starts', async () => {
+    it('keeps the room joinable for whoever arrives late once the ceremony starts', async () => {
       start('2026-10-08T13:59:00Z');
       facade.follow(signal('atlas'));
       await settle();
       expect(facade.joinState()).toBe('open');
+
+      clock.now = new Date('2026-10-08T14:00:00Z');
+      jasmine.clock().tick(60_000);
+      await settle();
+
+      expect(facade.joinState()).toBe('started');
+      expect(facade.canJoin()).toBeTrue();
+      expect(port.requested).toEqual(['atlas']);
+    });
+
+    it('asks for the next ceremony by itself when the window to join closes', async () => {
+      start('2026-10-08T14:14:00Z');
+      facade.follow(signal('atlas'));
+      await settle();
+      expect(facade.joinState()).toBe('started');
       expect(port.requested).toEqual(['atlas']);
       port.answers['atlas'] = of(
         aDashboard({
@@ -178,11 +193,12 @@ describe('TeamDashboardFacade', () => {
             type: 'daily',
             startsAt: '2026-10-09T14:00:00Z',
             joinOpensAt: '2026-10-09T13:50:00Z',
+            joinClosesAt: '2026-10-09T14:15:00Z',
           },
         }),
       );
 
-      clock.now = new Date('2026-10-08T14:00:00Z');
+      clock.now = new Date('2026-10-08T14:15:00Z');
       jasmine.clock().tick(60_000);
       await settle();
 

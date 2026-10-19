@@ -155,6 +155,7 @@ describe('HttpTeamsApi', () => {
         type: 'daily',
         starts_at: '2026-10-08T14:00:00Z',
         join_opens_at: '2026-10-08T13:50:00Z',
+        join_closes_at: '2026-10-08T14:15:00Z',
       },
       can_configure: true,
     };
@@ -179,6 +180,7 @@ describe('HttpTeamsApi', () => {
           type: 'daily',
           startsAt: '2026-10-08T14:00:00Z',
           joinOpensAt: '2026-10-08T13:50:00Z',
+          joinClosesAt: '2026-10-08T14:15:00Z',
         },
         canConfigure: true,
       });

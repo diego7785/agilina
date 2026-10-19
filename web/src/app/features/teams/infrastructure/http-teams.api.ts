@@ -51,7 +51,12 @@ interface TeamDashboardResponse {
     end_date: string;
     day: { number: number; total: number; phase: SprintPhase };
   } | null;
-  next_ceremony: { type: 'daily'; starts_at: string; join_opens_at: string } | null;
+  next_ceremony: {
+    type: 'daily';
+    starts_at: string;
+    join_opens_at: string;
+    join_closes_at: string;
+  } | null;
   can_configure: boolean;
 }
 
@@ -134,6 +139,7 @@ function toDashboard(response: TeamDashboardResponse): TeamDashboard {
             type: response.next_ceremony.type,
             startsAt: response.next_ceremony.starts_at,
             joinOpensAt: response.next_ceremony.join_opens_at,
+            joinClosesAt: response.next_ceremony.join_closes_at,
           },
     canConfigure: response.can_configure,
   };

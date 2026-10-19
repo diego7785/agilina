@@ -93,6 +93,7 @@
         "title": "Meeting room",
         "description": "Your virtual Scrum Master for the Daily Stand-up",
         "join": "Join the room",
+        "started": "The daily has already started: you can still join.",
         "opens_at": "Opens at {{ time }}",
         "no_ceremony": "No ceremonies scheduled."
       }

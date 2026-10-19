@@ -4,7 +4,7 @@ import { rxResource } from '@angular/core/rxjs-interop';
 import { NOW } from '@core/time/now';
 
 import { TeamsPort } from './teams.port';
-import { joinState, nextJoinChange } from '../domain/join-window';
+import { canJoin, joinState, nextJoinChange } from '../domain/join-window';
 import {
   type DashboardSprint,
   type DashboardTeam,
@@ -20,9 +20,10 @@ const MAX_TIMER_DELAY_MS = 2_147_483_647;
  * State of a team's dashboard: the team, its sprint, its next ceremony and whether the room is
  * open to join, all from one read of the API. Provided by the page, so it lives and dies with it.
  *
- * The room opens and the ceremony starts at known instants, so a timer moves the state at those
- * moments without the person reloading: when the window opens the room becomes joinable, and
- * when the ceremony starts the dashboard asks again for the next one.
+ * The room opens, the ceremony starts and the window to join closes at known instants, so a
+ * timer moves the state at those moments without the person reloading: when the window opens
+ * the room becomes joinable, it stays so for whoever arrives late, and when the window closes
+ * the dashboard asks again for the next ceremony.
  *
  * A failed request (a team the user does not belong to, for example) becomes the `failed` state;
  * the HTTP interceptor has already logged it, so it is not logged again here.
@@ -54,6 +55,8 @@ export class TeamDashboardFacade {
   /** Whether the API already answered: until then there is nothing to say about the sprint. */
   readonly known = computed(() => this.dashboard() !== null);
   readonly joinState = computed(() => joinState(this.nextCeremony(), this.instant()));
+  /** Whether the room may be joined right now, before the ceremony starts or arriving late. */
+  readonly canJoin = computed(() => canJoin(this.joinState()));
 
   readonly loading = this.current.isLoading;
   readonly failed = computed(() => this.current.status() === 'error');
@@ -90,8 +93,11 @@ export class TeamDashboardFacade {
   private advance(): void {
     this.instant.set(this.now());
     const ceremony = this.nextCeremony();
-    // Once it has started, the one that comes next is the API's to say.
-    if (ceremony !== null && this.instant().getTime() >= new Date(ceremony.startsAt).getTime()) {
+    // Once its window has closed, the one that comes next is the API's to say.
+    if (
+      ceremony !== null &&
+      this.instant().getTime() >= new Date(ceremony.joinClosesAt).getTime()
+    ) {
       this.current.reload();
     }
   }

@@ -94,6 +94,7 @@
         "description": "Tu Scrum Master virtual para la reunión diaria",
         "join": "Unirse a la sala",
         "opens_at": "Se habilita a las {{ time }}",
+        "started": "La reunión diaria ya empezó: todavía puedes entrar.",
         "no_ceremony": "No hay ceremonias programadas."
       }
     },
