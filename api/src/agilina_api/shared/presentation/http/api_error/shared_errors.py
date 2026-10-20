@@ -25,6 +25,8 @@ class SharedErrors:
     NOT_A_WORKER = ApiError(403, "not_a_worker", "Only the agent worker may do this.")
     # Teams and identity (an invitation to a team) both answer it.
     TEAM_NOT_FOUND = ApiError(404, "team_not_found", "The team does not exist.")
+    # Teams (editing the sprint) and ceremonies (joining the daily) both answer it.
+    NO_ACTIVE_SPRINT = ApiError(409, "no_active_sprint", "The team has no active sprint.")
     VALIDATION = ApiError(422, "validation_error", "The request is not valid.")
     NOT_FOUND = ApiError(404, "not_found", "The resource does not exist.")
     METHOD_NOT_ALLOWED = ApiError(405, "method_not_allowed", "The method is not allowed here.")

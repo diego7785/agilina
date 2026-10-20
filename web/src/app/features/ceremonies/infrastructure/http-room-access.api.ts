@@ -10,8 +10,8 @@ import { type RoomAccess } from '../domain/room-access';
 import { RoomFailure, type RoomFailureKind } from '../domain/room-failure';
 
 /**
- * Body of the 201 answer of POST /v1/teams/{team_id}/dailies/current/token, as AGI-59 proposes
- * it. That story is still being built: if its contract changes, only this file changes.
+ * Body of the 201 answer of POST /v1/teams/{team_id}/dailies/current/token (AGI-59). The API
+ * contract stays in this file: if it changes, only this file changes.
  */
 interface RoomTokenResponse {
   room_name: string;
@@ -24,6 +24,7 @@ const FAILURES: Readonly<Record<string, RoomFailureKind>> = {
   not_a_team_member: 'no_access',
   not_a_daily_participant: 'no_access',
   no_active_sprint: 'no_active_sprint',
+  daily_not_open: 'daily_not_open',
   room_service_unavailable: 'service_unavailable',
 };
 

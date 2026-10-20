@@ -1,0 +1,44 @@
+<div class="flex items-center gap-2">
+  <agl-combo-box
+    class="w-20"
+    inputMode="numeric"
+    placeholder="--"
+    [inputId]="inputId()"
+    [options]="hours"
+    [parse]="parseHour"
+    [ariaLabel]="hourLabel()"
+    [invalid]="invalid()"
+    [describedBy]="describedBy()"
+    [testId]="testId()"
+    [value]="parts().hour"
+    (valueChange)="choose('hour', $event)"
+  />
+  <span class="font-semibold text-muted" aria-hidden="true">:</span>
+  <agl-combo-box
+    class="w-20"
+    inputMode="numeric"
+    placeholder="--"
+    [inputId]="inputId() + '-minute'"
+    [options]="minutes"
+    [parse]="parseMinute"
+    [ariaLabel]="minuteLabel()"
+    [invalid]="invalid()"
+    [describedBy]="describedBy()"
+    [testId]="suffixed(testId(), 'minute')"
+    [value]="parts().minute"
+    (valueChange)="choose('minute', $event)"
+  />
+  <agl-combo-box
+    class="w-24"
+    placeholder="--"
+    [inputId]="inputId() + '-period'"
+    [options]="periods()"
+    [parse]="parsePeriod"
+    [ariaLabel]="periodLabel()"
+    [invalid]="invalid()"
+    [describedBy]="describedBy()"
+    [testId]="suffixed(testId(), 'period')"
+    [value]="parts().period"
+    (valueChange)="choose('period', $event)"
+  />
+</div>

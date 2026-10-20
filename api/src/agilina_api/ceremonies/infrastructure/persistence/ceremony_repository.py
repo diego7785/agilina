@@ -4,6 +4,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,11 +21,53 @@ from agilina_api.shared.infrastructure.database.types import violated_constraint
 from agilina_shared import CeremonyResult
 
 RESULT_PRIMARY_KEY = "ceremony_result_pkey"
+OCCURRENCE_UNIQUE = "ceremony_occurrence_unique"
 
 
 class SqlAlchemyCeremonyRepository(CeremonyRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    async def add_or_get(self, ceremony: Ceremony) -> Ceremony:
+        """Insert the ceremony or, when its occurrence already has one, read that one.
+
+        ``ON CONFLICT DO NOTHING`` on ``ceremony_occurrence_unique`` makes the second of two
+        concurrent inserts wait for the first and then insert nothing; its next statement sees
+        the committed row (READ COMMITTED), so both get the same ceremony.
+        """
+        inserted = (
+            await self._session.execute(
+                insert(CeremonyRow)
+                .values(
+                    id=ceremony.id,
+                    team_id=ceremony.team_id,
+                    sprint_id=ceremony.sprint_id,
+                    scheduled_at=ceremony.scheduled_at,
+                )
+                .on_conflict_do_nothing(constraint=OCCURRENCE_UNIQUE)
+                .returning(CeremonyRow.id)
+            )
+        ).scalar_one_or_none()
+        if inserted is not None:
+            return ceremony
+        stored_id, digest = (
+            await self._session.execute(
+                select(CeremonyRow.id, CeremonyResultRow.payload_sha256)
+                .outerjoin(CeremonyResultRow, CeremonyResultRow.ceremony_id == CeremonyRow.id)
+                .where(
+                    CeremonyRow.team_id == ceremony.team_id,
+                    CeremonyRow.sprint_id == ceremony.sprint_id,
+                    CeremonyRow.scheduled_at == ceremony.scheduled_at,
+                )
+            )
+        ).one()
+        return Ceremony(
+            ceremony_id=stored_id,
+            team_id=ceremony.team_id,
+            sprint_id=ceremony.sprint_id,
+            scheduled_at=ceremony.scheduled_at,
+            result_digest=digest,
+        )
 
     async def lock(self, ceremony_id: UUID) -> Ceremony | None:
         """Load the ceremony and **lock its row** until the transaction ends.

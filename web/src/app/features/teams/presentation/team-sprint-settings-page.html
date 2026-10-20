@@ -116,17 +116,19 @@
               <label for="sprint-daily-time" class="mb-1.5 text-sm font-medium">
                 {{ t('daily_time') }}
               </label>
-              <input
-                aglTextField
-                id="sprint-daily-time"
-                name="dailyTime"
-                type="time"
-                data-testid="sprint-daily-time"
-                aria-describedby="sprint-daily-time-problem sprint-zone-hint"
-                [attr.aria-invalid]="timeProblem() !== null"
-                [ngModel]="dailyTime()"
-                (ngModelChange)="changeDailyTime($event)"
-                (blur)="timeTouched.set(true)"
+              <agl-time-picker
+                inputId="sprint-daily-time"
+                testId="sprint-daily-time"
+                describedBy="sprint-daily-time-problem sprint-zone-hint"
+                [hourLabel]="t('calendar.hour')"
+                [minuteLabel]="t('calendar.minutes')"
+                [periodLabel]="t('calendar.period')"
+                [amLabel]="t('calendar.am')"
+                [pmLabel]="t('calendar.pm')"
+                [invalid]="timeProblem() !== null"
+                [value]="dailyTime()"
+                (valueChange)="changeDailyTime($event)"
+                (touched)="timeTouched.set(true)"
               />
               <p
                 id="sprint-daily-time-problem"

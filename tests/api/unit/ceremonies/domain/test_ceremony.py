@@ -1,10 +1,11 @@
-"""The Ceremony aggregate: one result per ceremony, spoken only by its participants (AGI-64,
-AGI-126)."""
+"""The Ceremony aggregate: one per occurrence of the daily (AGI-59), with one result spoken
+only by its participants (AGI-64, AGI-126)."""
 
 import pytest
 
+from agilina_api.ceremonies.domain.ceremony import Ceremony
 from agilina_api.ceremonies.domain.errors import NotAParticipantError, ResultAlreadyReceivedError
-from tests.api.builders import CeremonyBuilder, next_id
+from tests.api.builders import DAILY_TIME, CeremonyBuilder, next_id
 
 DIGEST = "a" * 64
 OTHER_DIGEST = "b" * 64
@@ -71,3 +72,16 @@ def test_the_ceremony_knows_its_team_sprint_and_instant():
     assert ceremony.id == builder.ceremony_id
     assert (ceremony.team_id, ceremony.sprint_id) == (builder.team_id, builder.sprint_id)
     assert ceremony.scheduled_at == builder.scheduled_at
+
+
+def test_a_scheduled_ceremony_has_its_occurrence_and_no_result_yet():
+    ceremony_id, team_id, sprint_id = next_id(), next_id(), next_id()
+
+    ceremony = Ceremony.schedule(
+        ceremony_id=ceremony_id, team_id=team_id, sprint_id=sprint_id, scheduled_at=DAILY_TIME
+    )
+
+    assert ceremony.id == ceremony_id
+    assert (ceremony.team_id, ceremony.sprint_id) == (team_id, sprint_id)
+    assert ceremony.scheduled_at == DAILY_TIME
+    assert ceremony.result_digest is None

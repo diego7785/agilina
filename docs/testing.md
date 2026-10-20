@@ -66,7 +66,7 @@ await InvitationBuilder().for_team(team.id).saved_in(uow.invitations)
 | `SprintBuilder` | Un sprint activo del 2026-10-05 al 2026-10-16 con la daily a las 09:00 de America/Bogota (HU-07); `for_team(equipo)` llama a la daily a sus integrantes activos, `with_period`, `with_daily_time`, `with_participants` (en orden de turno) y `closed()` / `planned()` (se restauran tal como se guardan: cerrar un sprint llega con HU-10) |
 | `StartSprintBuilder`, `ReconfigureSprintBuilder` | Un admin configura el sprint o edita el activo (HU-07), con los mismos valores por defecto que `SprintBuilder` |
 | `ContactBuilder`, `TeamContactsBuilder`, `EmailMessageBuilder` | Datos de lectura y mensajes de correo |
-| `CeremonyBuilder`, `RosterBuilder` | Una ceremonia guardada, programada en la daily por defecto (AGI-64); `for_sprint(sprint)` la pone en ese sprint de su equipo y `scheduled_at_instant` cambia el instante. El *roster* es lo que ceremonies lee de teams: idioma, modo, calendario del sprint y `with_participant` en el siguiente turno. En integración, `stored_ceremony(session_factory, CeremonyBuilder().for_sprint(sprint))` escribe la fila, porque nada crea ceremonias todavía |
+| `CeremonyBuilder`, `RosterBuilder` | Una ceremonia guardada, programada en la daily por defecto (AGI-64); `for_sprint(sprint)` la pone en ese sprint de su equipo y `scheduled_at_instant` cambia el instante. El *roster* es lo que ceremonies lee de teams: idioma, modo, calendario del sprint y `with_participant` en el siguiente turno. En integración, `stored_ceremony(session_factory, CeremonyBuilder().for_sprint(sprint))` escribe la fila directamente, sin pasar por `JoinCurrentDaily` (AGI-59), que solo las crea dentro de la ventana de la daily |
 
 Reglas:
 
@@ -114,6 +114,7 @@ En `tests/api/doubles/`, uno por puerto, en memoria. Los que más se usan:
 | `FakeMemberContacts` | `MemberContactsDirectory` | El nombre y el correo de cada integrante; los demás no tienen cuenta |
 | `FakeAuthenticatedWorkers` | `AuthenticatedWorkers` | El token del worker y el de una persona; cualquier otro no es válido (AGI-64) |
 | `FakeCeremonyQueries`, `FakeCeremonyRoster`, `FakeParticipantNames` | `CeremonyQueries`, `CeremonyRoster`, `ParticipantNames` | Las ceremonias, el *roster* del sprint activo de cada equipo y los nombres de los participantes (AGI-64) |
+| `FakeRooms` | `Rooms` (LiveKit) | Las salas que abre (`opened`) y las admisiones que firma (`admissions`), cada una con un token determinista; con `unavailable=True` falla como un LiveKit caído o sin claves (AGI-59) |
 
 ### Flujos de punta a punta
 
@@ -171,7 +172,7 @@ sin preguntar (`--use-fake-device-for-media-stream` con el permiso `microphone` 
 - **Firefox:** el de Playwright no logró establecer el audio (ICE) con un LiveKit local; sus pruebas
   terminan saltadas con el motivo. Firefox de escritorio se verifica a mano (AGI-135).
 
-La sala real necesita la emisión del token (AGI-59) y un servidor de LiveKit: sin ellos, la sala
+La sala real necesita un servidor de LiveKit con sus claves en el `.env`: sin él, la sala
 responde con un fallo y sus pruebas se saltan con el motivo, en vez de fallar. Que dos personas se
 escuchen se verifica a mano (AGI-135).
 

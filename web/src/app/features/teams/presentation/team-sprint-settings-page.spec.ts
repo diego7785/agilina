@@ -244,6 +244,33 @@ describe('TeamSprintSettingsPage', () => {
     await harness.fixture.whenStable();
   }
 
+  /** The three boxes of the daily's time: hour, minutes and a. m. or p. m. */
+  function timeBoxes(): [HTMLInputElement, HTMLInputElement, HTMLInputElement] {
+    return [
+      field('Hora de la reunión diaria'),
+      page.querySelector<HTMLInputElement>('#sprint-daily-time-minute')!,
+      page.querySelector<HTMLInputElement>('#sprint-daily-time-period')!,
+    ];
+  }
+
+  /** The daily's time the form holds (`HH:MM`), or empty while a part is missing. */
+  function timeIn(): string {
+    return page.querySelector('agl-time-picker')!.getAttribute('data-value') ?? '';
+  }
+
+  /** Types a time (`HH:MM`, 24 hours) in the three boxes; an empty one clears the hour. */
+  async function setTime(time: string): Promise<void> {
+    const [hour, minute, period] = timeBoxes();
+    if (time === '') {
+      await type(hour, '');
+      return;
+    }
+    const [hours, minutes] = time.split(':').map(Number) as [number, number];
+    await type(hour, String(hours % 12 === 0 ? 12 : hours % 12));
+    await type(minute, String(minutes).padStart(2, '0'));
+    await type(period, hours < 12 ? 'a. m.' : 'p. m.');
+  }
+
   /** The checkbox of a member among the daily's participants. */
   function checkbox(name: string): HTMLInputElement {
     const found = Array.from(page.querySelectorAll('fieldset label')).find(
@@ -289,10 +316,9 @@ describe('TeamSprintSettingsPage', () => {
   }
 
   /** The time of the daily the form starts with: 09:00. A different one is something to save. */
-  const dailyTimeLabel = 'Hora de la reunión diaria';
 
   async function makeChange(time = '10:30'): Promise<void> {
-    await type(field(dailyTimeLabel), time);
+    await setTime(time);
   }
 
   /** The sprint the API answers once the daily moved to 10:30. */
@@ -332,7 +358,7 @@ describe('TeamSprintSettingsPage', () => {
     await open();
     await pickDate('Inicio', '2026-10-19');
     await pickDate('Fin', '2026-10-30');
-    await type(field('Hora de la reunión diaria'), '09:30');
+    await setTime('09:30');
     await toggle('Ana Gil');
     await submit();
 
@@ -356,7 +382,7 @@ describe('TeamSprintSettingsPage', () => {
     expect(dateIn('Inicio')).toBe('');
     expect(dateIn('Fin')).toBe('');
     expect(text(field('Inicio'))).toBe('Elige una fecha');
-    expect(field('Hora de la reunión diaria').value).toBe('');
+    expect(timeBoxes().map((box) => box.value)).toEqual(['', '', '']);
     expect(checkbox('Ana Gil').checked).toBeFalse();
     expect(turns()).toEqual([]);
     expect(text(page)).toContain(
@@ -382,9 +408,9 @@ describe('TeamSprintSettingsPage', () => {
     expect(dateIn('Inicio')).toBe('2026-10-05');
     expect(text(field('Inicio'))).toBe('5 de octubre de 2026');
     expect(dateIn('Fin')).toBe('2026-10-16');
-    const time = field('Hora de la reunión diaria');
-    expect(time.type).toBe('time');
-    expect(time.value).toBe('09:00');
+    expect(field('Hora de la reunión diaria').getAttribute('role')).toBe('combobox');
+    expect(timeBoxes().map((box) => box.value)).toEqual(['09', '00', 'a. m.']);
+    expect(timeIn()).toBe('09:00');
   });
 
   it('shows the time of the anchor when no daily is left in the sprint', async () => {
@@ -396,7 +422,7 @@ describe('TeamSprintSettingsPage', () => {
     };
     await open();
 
-    expect(field('Hora de la reunión diaria').value).toBe('08:15');
+    expect(timeIn()).toBe('08:15');
   });
 
   it('says the times are in the browser zone and the zone the daily was saved in', async () => {
@@ -468,7 +494,8 @@ describe('TeamSprintSettingsPage', () => {
       .querySelector('[role="dialog"]')!
       .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await harness.fixture.whenStable();
-    await type(field('Hora de la reunión diaria'), '');
+    field('Hora de la reunión diaria').dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    await harness.fixture.whenStable();
 
     expect(text(page)).toContain('Elige la fecha de inicio.');
     expect(text(page)).toContain('Elige la hora de la reunión diaria.');
@@ -590,13 +617,39 @@ describe('TeamSprintSettingsPage', () => {
   });
 
   // ------------------------------------------------------- saving (CA1–CA5) --
+  it('starts the hour, the minutes and a. m. or p. m. empty when the team has no sprint', async () => {
+    sprints.current = null;
+    await open();
+
+    expect(timeBoxes().map((box) => box.value)).toEqual(['', '', '']);
+    expect(timeBoxes().map((box) => box.getAttribute('aria-label'))).toEqual([
+      'Hora',
+      'Minutos',
+      'a. m. o p. m.',
+    ]);
+    expect(timeIn()).toBe('');
+  });
+
+  it('keeps no time until the hour, the minutes and a. m. or p. m. are all chosen', async () => {
+    sprints.current = null;
+    await open();
+    const [hour, minute, period] = timeBoxes();
+
+    await type(hour, '2');
+    await type(minute, '45');
+    expect(timeIn()).toBe('');
+
+    await type(period, 'p');
+    expect(timeIn()).toBe('14:45');
+  });
+
   it('creates the sprint when the team has none, with the daily in UTC and the browser zone', async () => {
     sprints.current = null;
     await open();
 
     await pickDate('Inicio', '2026-10-19');
     await pickDate('Fin', '2026-10-30');
-    await type(field('Hora de la reunión diaria'), '09:30');
+    await setTime('09:30');
     await toggle('Carla Ruiz');
     await toggle('Ana Gil');
     await submit();

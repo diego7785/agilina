@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agilina_api import __version__
 from agilina_api.bootstrap.tenants import TenantContainers, from_container
+from agilina_api.ceremonies.presentation.http import dailies_router
 from agilina_api.ceremonies.presentation.http import dependencies as ceremonies_dependencies
 from agilina_api.ceremonies.presentation.http import router as ceremonies_router
 from agilina_api.ceremonies.presentation.http.errors import CEREMONIES_ERRORS
@@ -114,6 +115,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router.router)
     app.include_router(tenancy_router.router)
     app.include_router(ceremonies_router.router)
+    app.include_router(dailies_router.router)
     app.include_router(identity_router.router)
     app.include_router(teams_router.router)
     app.include_router(users_router.router)
@@ -186,6 +188,9 @@ def create_app() -> FastAPI:
         ),
         ceremonies_dependencies.get_deliver_ceremony_result_handler: from_container(
             lambda container: container.deliver_ceremony_result
+        ),
+        ceremonies_dependencies.get_join_current_daily_handler: from_container(
+            lambda container: container.join_current_daily
         ),
         get_authenticated_users: from_container(lambda container: container.authenticated_users),
         get_authenticated_workers: from_container(

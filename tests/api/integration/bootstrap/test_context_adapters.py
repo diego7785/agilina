@@ -17,7 +17,13 @@ from agilina_api.teams.application.dtos import MemberContact
 from agilina_api.teams.infrastructure.persistence.sql_sprint_queries import SqlSprintQueries
 from agilina_api.teams.infrastructure.persistence.team_queries import SqlTeamQueries
 from agilina_shared.enums import Language, OperationMode, TeamRole
-from tests.api.builders import AppUserBuilder, SprintBuilder, TeamBuilder, next_id
+from tests.api.builders import (
+    DAILY_LOCAL_TIME,
+    AppUserBuilder,
+    SprintBuilder,
+    TeamBuilder,
+    next_id,
+)
 from tests.api.doubles import FakeClock
 from tests.api.integration.support import stored_sprint, stored_team, stored_user
 
@@ -130,10 +136,12 @@ async def test_the_roster_is_the_team_language_mode_and_the_active_sprint_in_tur
     roster = await _roster(session_factory).roster_of(team_id=team.id, sprint_id=sprint.id)
 
     assert roster == RosterRecord(
+        sprint_id=sprint.id,
         language=Language.ES,
         mode=OperationMode.AUTONOMOUS,
         start_date=sprint.period.start,
         end_date=sprint.period.end,
+        daily_time=DAILY_LOCAL_TIME,
         time_zone="America/Bogota",
         participants=(
             RosterParticipant(user_id=carla.id, role=TeamRole.MEMBER, turn_order=1),

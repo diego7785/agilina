@@ -29,6 +29,23 @@ class Ceremony(AggregateRoot[UUID]):
         self._scheduled_at = scheduled_at
         self._result_digest = result_digest
 
+    @classmethod
+    def schedule(
+        cls, *, ceremony_id: UUID, team_id: UUID, sprint_id: UUID, scheduled_at: datetime
+    ) -> "Ceremony":
+        """A new ceremony for one occurrence of the sprint's daily, with no result yet (AGI-59).
+
+        Each occurrence has its own ceremony, and with it its own room: the repository keeps it
+        to one per team, sprint and instant (``CeremonyRepository.add_or_get``).
+        """
+        return cls(
+            ceremony_id=ceremony_id,
+            team_id=team_id,
+            sprint_id=sprint_id,
+            scheduled_at=scheduled_at,
+            result_digest=None,
+        )
+
     @property
     def team_id(self) -> UUID:
         return self._team_id

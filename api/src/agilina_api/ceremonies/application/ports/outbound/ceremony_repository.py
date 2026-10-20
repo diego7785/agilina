@@ -12,6 +12,16 @@ class CeremonyRepository(Protocol):
     """In ``application`` and not in ``domain``: storing the result takes the shared contract,
     which the domain must not know (it imports Pydantic)."""
 
+    async def add_or_get(self, ceremony: Ceremony) -> Ceremony:
+        """Store ``ceremony`` unless its occurrence (its team, sprint and ``scheduled_at``)
+        already has one, and return the ceremony the occurrence has: the one just stored or
+        the stored one, with its own id.
+
+        Idempotent per occurrence and safe under concurrency: two participants who join at the
+        same time get the same ceremony, and so the same room (AGI-59).
+        """
+        ...
+
     async def lock(self, ceremony_id: UUID) -> Ceremony | None:
         """The ceremony with the digest of its result, or ``None``; its row stays **locked**
         until the transaction ends, so two deliveries of the same ceremony never interleave.

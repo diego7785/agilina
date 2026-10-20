@@ -73,7 +73,7 @@ async def stored_sprint(session_factory: SessionFactory, builder: SprintBuilder)
 
 
 async def stored_ceremony(session_factory: SessionFactory, builder: CeremonyBuilder) -> UUID:
-    """A committed ceremony, written as a row: nothing creates ceremonies yet (AGI-59). Its
+    """A committed ceremony, written as a row without going through the repository. Its
     sprint must already be stored, in the same team (``CeremonyBuilder.for_sprint``), because
     the database requires it. Returns its id."""
     record = builder.build()

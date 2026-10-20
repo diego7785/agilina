@@ -35,6 +35,23 @@ def test_the_graph_is_built_without_postgres_keycloak_or_a_mail_server():
     assert container.get_active_sprint is not None
     assert container.get_ceremony_context is not None
     assert container.deliver_ceremony_result is not None
+    assert container.join_current_daily is not None
+
+
+def test_the_room_token_is_signed_with_the_livekit_project_the_web_connects_to(monkeypatch):
+    """The secret is read from configuration and stays in the adapter (AGI-59)."""
+    monkeypatch.setenv("AGILINA_LIVEKIT_URL", "wss://livekit.example.test")
+    monkeypatch.setenv("AGILINA_LIVEKIT_API_KEY", "a-key")
+    monkeypatch.setenv("AGILINA_LIVEKIT_API_SECRET", "a-secret")
+    get_settings.cache_clear()
+
+    container = _container()
+
+    join = container.join_current_daily
+    assert join._room_server_url == "wss://livekit.example.test"  # noqa: SLF001
+    assert join._rooms is container.rooms  # noqa: SLF001
+    assert container.rooms._api_key == "a-key"  # noqa: SLF001
+    assert container.rooms._api_secret == "a-secret"  # noqa: SLF001
 
 
 def test_the_links_of_the_emails_open_the_web_of_the_tenant_from_its_public_url(monkeypatch):
@@ -106,3 +123,4 @@ async def test_closing_the_container_closes_what_it_opened():
 
     assert container.identity_provider._client.is_closed is True  # noqa: SLF001
     assert container.access_token_verifier._client.is_closed is True  # noqa: SLF001
+    assert container.rooms._client.is_closed is True  # noqa: SLF001

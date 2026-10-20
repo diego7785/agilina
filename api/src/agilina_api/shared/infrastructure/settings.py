@@ -89,7 +89,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------- livekit --
     livekit_url: str = ""
     livekit_api_key: str = ""
-    livekit_api_secret: str = ""
+    livekit_api_secret: SecretStr = SecretStr("")
 
     # ------------------------------------------------------ model services --
     stt_url: str = "http://localhost:8001"

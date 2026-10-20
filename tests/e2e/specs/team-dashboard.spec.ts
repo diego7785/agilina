@@ -40,6 +40,14 @@ function bogotaTimeIn(minutes: number): string {
   }).format(new Date(Date.now() + minutes * 60_000));
 }
 
+/** Types a time (`HH:MM`, 24 hours) in the hour, minutes and a. m. or p. m. boxes. */
+async function fillDailyTime(time: string): Promise<void> {
+  const [hours, minutes] = time.split(':').map(Number) as [number, number];
+  await page.getByTestId('sprint-daily-time').fill(String(hours % 12 === 0 ? 12 : hours % 12));
+  await page.getByTestId('sprint-daily-time-minute').fill(String(minutes).padStart(2, '0'));
+  await page.getByTestId('sprint-daily-time-period').fill(hours < 12 ? 'a' : 'p');
+}
+
 /** A calendar date in Bogota, `YYYY-MM-DD`, some days from today. */
 function bogotaDateIn(days: number): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: ZONE }).format(
@@ -119,7 +127,7 @@ test('Settings → Sprint keeps the team header and marks Settings as the curren
 test('with a sprint whose daily is hours away, the dashboard shows day 1 and the room closed', async () => {
   await pickDate('sprint-start-date', bogotaDateIn(0));
   await pickDate('sprint-end-date', bogotaDateIn(9));
-  await page.getByTestId('sprint-daily-time').fill(bogotaTimeIn(180));
+  await fillDailyTime(bogotaTimeIn(180));
   await page.getByTestId(`sprint-participant-${EMAIL}`).locator('input').check();
   await expect(page.getByTestId('sprint-submit')).toHaveText('Guardar');
   await page.getByTestId('sprint-submit').click();
@@ -161,7 +169,7 @@ test('when the daily is minutes away the room is open, and pressing it takes to 
   await openSprintSettings();
   // Saved as it is, there is nothing to send; a new time turns the button on.
   await expect(page.getByTestId('sprint-submit')).toBeDisabled();
-  await page.getByTestId('sprint-daily-time').fill(bogotaTimeIn(5));
+  await fillDailyTime(bogotaTimeIn(5));
   await expect(page.getByTestId('sprint-submit')).toBeEnabled();
   await page.getByTestId('sprint-submit').click();
   await expect(page.getByTestId('toast-success').last()).toHaveText(/Sprint guardado\./);

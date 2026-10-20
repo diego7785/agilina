@@ -230,6 +230,16 @@ describe('RoomPage', () => {
       expect(page.querySelector('[data-testid="room-retry"]')).toBeNull();
     });
 
+    it('says the daily is not open, and only offers to go back', async () => {
+      access.failure = new RoomFailure('daily_not_open');
+
+      const page = await open();
+
+      expect(text(page, 'room-failure-message')).toContain('no está abierta');
+      expect(page.querySelector('[data-testid="room-retry"]')).toBeNull();
+      expect(page.querySelector('[data-testid="room-back"]')).not.toBeNull();
+    });
+
     it('says the room is not available, and offers to try again', async () => {
       access.failure = new RoomFailure('service_unavailable');
 

@@ -17,6 +17,10 @@ they name the team in the query (``?team_id=``), because a user has a different 
 team. ``current_team_member_by_query`` and ``current_team_admin_by_query`` are the same two
 dependencies for them, with the same answers in the same order.
 
+The route a participant joins the daily's room by (``/v1/teams/{team_id}/dailies/…``) is a
+person's, so it declares ``Depends(current_team_member)`` like any other route of a team; being
+among the daily's participants is a rule of its use case, not a dependency.
+
 The routes of the agent worker (``/v1/ceremonies``) are not a person's: they declare
 ``Depends(current_worker)``, which answers ``401 not_authenticated`` without a valid token
 and ``403 not_a_worker`` with a person's.

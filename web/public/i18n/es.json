@@ -298,6 +298,11 @@
       },
       "calendar": {
         "choose_date": "Elige una fecha",
+        "hour": "Hora",
+        "minutes": "Minutos",
+        "period": "a. m. o p. m.",
+        "am": "a. m.",
+        "pm": "p. m.",
         "previous_month": "Mes anterior",
         "next_month": "Mes siguiente"
       },
@@ -423,6 +428,7 @@
       "failure": {
         "no_access": "No tienes acceso a esta sala.",
         "no_active_sprint": "Tu equipo no tiene un sprint activo, así que no hay reunión diaria a la que entrar.",
+        "daily_not_open": "La reunión diaria no está abierta ahora: puedes entrar desde diez minutos antes hasta quince minutos después de su hora.",
         "service_unavailable": "La sala no está disponible en este momento.",
         "token_rejected": "No pudimos validar tu acceso a la sala.",
         "connection_lost": "Perdimos la conexión con la sala y no pudimos recuperarla.",

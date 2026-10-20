@@ -350,17 +350,17 @@ async def test_an_admin_edits_the_active_sprint_and_gets_it_back(api):
     assert api.members_uow.sprints.saved == [sprint.id] and api.members_uow.committed is True
 
 
-async def test_editing_without_an_active_sprint_answers_404_no_active_sprint(api):
+async def test_editing_without_an_active_sprint_answers_409_no_active_sprint(api):
     response = await api.request(
         "PUT", f"/{api.atlas}/sprints/active", TOKEN_ANA, json=_sprint_body(api)
     )
 
-    assert response.status_code == 404
+    assert response.status_code == 409
     assert response.json()["error"]["code"] == "no_active_sprint"
     assert api.members_uow.committed is False
 
 
-async def test_a_sprint_closed_before_it_is_read_back_answers_404_no_active_sprint(api):
+async def test_a_sprint_closed_before_it_is_read_back_answers_409_no_active_sprint(api):
     """Saving and reading back are two steps: if the sprint stops being active in between
     (HU-10 will close sprints), the answer says so instead of failing."""
     api.app.dependency_overrides[deps.get_get_active_sprint_handler] = _returning(
@@ -369,7 +369,7 @@ async def test_a_sprint_closed_before_it_is_read_back_answers_404_no_active_spri
 
     response = await api.request("POST", f"/{api.atlas}/sprints", TOKEN_ANA, json=_sprint_body(api))
 
-    assert response.status_code == 404
+    assert response.status_code == 409
     assert response.json()["error"]["code"] == "no_active_sprint"
 
 
@@ -603,9 +603,18 @@ async def test_the_openapi_documents_the_sprint_routes_and_their_errors(api):
     # 400 and the 404 of the tenant come with every signed-in route (AD-29).
     assert set(create["responses"]) == {"201", "400", "401", "403", "404", "409", "422", "500"}
     assert set(active["get"]["responses"]) == {"200", "400", "401", "403", "404", "422", "500"}
-    assert set(active["put"]["responses"]) == {"200", "400", "401", "403", "404", "422", "500"}
+    assert set(active["put"]["responses"]) == {
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "500",
+    }
     assert "`not_a_team_admin`" in create["responses"]["403"]["description"]
-    assert "`no_active_sprint`" in active["put"]["responses"]["404"]["description"]
+    assert "`no_active_sprint`" in active["put"]["responses"]["409"]["description"]
     assert "`team_not_found`" in active["put"]["responses"]["404"]["description"]
     assert "`not_a_team_member`" in active["get"]["responses"]["403"]["description"]
     for operation in (create, active["get"], active["put"]):
@@ -626,7 +635,8 @@ async def test_the_openapi_documents_each_rule_of_the_sprint_with_its_code(api):
         assert all(f"`{code}`" in refused for code in SPRINT_RULES)
         assert all(f"`{code}`" in operation["description"] for code in SPRINT_RULES)
     assert "`active_sprint_exists`" in create["responses"]["409"]["description"]
-    assert "409" not in edit["responses"]
+    # Editing answers 409 only without an active sprint, never ``active_sprint_exists``.
+    assert "`active_sprint_exists`" not in edit["responses"]["409"]["description"]
     request = spec["components"]["schemas"]["SprintRequest"]
     assert all(f"`{code}`" in request["description"] for code in SPRINT_RULES)
     member = spec["paths"]["/v1/users/{user_id}"]["delete"]

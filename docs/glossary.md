@@ -52,7 +52,7 @@ Si aparece un concepto nuevo, se agrega aquí antes de usarlo.
 
 | Código (EN) | Español | Qué es |
 | --- | --- | --- |
-| `Ceremony` | Ceremonia | Una ocurrencia de la reunión. Hoy solo existe el tipo `daily` |
+| `Ceremony` | Ceremonia | Una ocurrencia de la reunión. Hoy solo existe el tipo `daily`: hay una ceremonia por cada ocurrencia de la daily (equipo, sprint e instante, únicos), y con ella una sala nueva cada día |
 | Daily | Reunión diaria | La reunión diaria de pie (*stand-up*). En la interfaz y en los correos en español se dice «reunión diaria», no «daily» ni «Daily Stand-up»; en inglés, «daily» o «daily stand-up» (ver «Textos e i18n» en la guía de la web) |
 | Join window (`join_opens_at`, `join_closes_at`) | Ventana para unirse | El tiempo en que un participante puede entrar a la sala de una ceremonia: desde diez minutos antes de su inicio (`JOIN_WINDOW_LEAD`) hasta quince minutos después (`JOIN_WINDOW_TAIL`, sin incluirlo), para que quien llega tarde todavía entre (AGI-60). Fuera de ella, «Unirse a la sala» está deshabilitado. La daily que se puede unir es `joinable_daily_at`: la que está en curso dentro de esos quince minutos o, si no, la siguiente. Cuando la ceremonia sea un registro (AGI-62, HU-17), la ventana terminará al cerrarse |
 | `Sprint.number` | Número del sprint | El número del sprint en su equipo («Sprint 12»): 1 para el primero y, desde ahí, el mayor que el equipo haya tenido más uno, cerrado o no. Lo asigna la API al guardar (`SprintRepository.next_number`, con el equipo bloqueado), no se envía ni se edita y nunca se reutiliza. No es el día del sprint (`day.number`, el «N» de «día N de M») |

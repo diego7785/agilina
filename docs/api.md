@@ -82,7 +82,7 @@ Toda respuesta de error lleva `Cache-Control: no-store`.
 | 404 | `member_not_found` | La persona no es miembro activo del equipo: nunca lo fue o ya la retiraron | — |
 | 409 | `last_admin` | El cambio dejaría al equipo sin admin: a su único admin no se le baja el rol ni se le retira, tampoco por su propia mano | — |
 | 409 | `sprint_in_progress` | El equipo tiene un sprint en curso: los roles no cambian mientras dure | — |
-| 404 | `no_active_sprint` | El equipo no tiene un sprint activo que editar | — |
+| 409 | `no_active_sprint` | El equipo no tiene un sprint activo | — |
 | 409 | `active_sprint_exists` | El equipo ya tiene un sprint activo: se edita, no se crea otro | — |
 | 422 | `sprint_ends_before_start` | La fecha de fin del sprint es anterior a la de inicio | — |
 | 422 | `invalid_time_zone` | La zona horaria no es una zona IANA conocida | — |
@@ -96,6 +96,9 @@ Toda respuesta de error lleva `Cache-Control: no-store`.
 | 409 | `pending_invitation_exists` | Otra invitación a la misma persona se emitía en ese mismo instante | — |
 | 404 | `ceremony_not_found` | La ceremonia no existe, su sprint ya no es el activo del equipo o está agendada antes de que empiece (la misma respuesta) | — |
 | 409 | `result_already_received` | La ceremonia ya tiene otro resultado: se cierra una sola vez | — |
+| 403 | `not_a_daily_participant` | El usuario es miembro del equipo, pero no está entre los participantes de la daily del sprint activo (tampoco el admin) | — |
+| 409 | `daily_not_open` | La ventana para unirse a la daily no está abierta: va de diez minutos antes de su hora a quince minutos después (`joinable_daily_at`) | — |
+| 503 | `room_service_unavailable` | El servidor de salas (LiveKit) no responde, falla o no está configurado | — |
 
 ## Salud
 
@@ -484,7 +487,7 @@ Esa comprobación va antes que las reglas del sprint: con un sprint activo, la r
 | 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
 | 403 | error `not_a_team_member` / `not_a_team_admin` | No es miembro del equipo, o lo es pero no es admin |
 | 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y el cambio (solo una carrera) |
-| 404 | error `no_active_sprint` | El sprint se guardó, pero dejó de estar activo antes de leerlo para responder (solo una carrera) |
+| 409 | error `no_active_sprint` | El sprint se guardó, pero dejó de estar activo antes de leerlo para responder (solo una carrera) |
 | 409 | error `active_sprint_exists` | El equipo ya tiene un sprint activo, o una alta simultánea tomó el mismo número; nada se guarda |
 | 422 | error `validation_error` | `team_id` no es un UUID, falta un campo, una fecha o un `user_id` no es válido, `daily_time` no trae desfase o hay un campo desconocido (`number` incluido) |
 | 422 | error `sprint_ends_before_start` / `invalid_time_zone` | El fin es anterior al inicio, o la zona no es una zona IANA conocida; nada se guarda |
@@ -519,12 +522,53 @@ guarda y participantes con su orden. El sprint sigue activo. Solo para los admin
 | 401 | error `not_authenticated` | Sin token, o no es válido |
 | 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
 | 403 | error `not_a_team_member` / `not_a_team_admin` | No es miembro del equipo, o lo es pero no es admin |
-| 404 | error `no_active_sprint` | El equipo no tiene un sprint activo; nada cambia |
+| 409 | error `no_active_sprint` | El equipo no tiene un sprint activo; nada cambia |
 | 404 | error `team_not_found` | El equipo dejó de existir entre la verificación de acceso y el cambio (solo una carrera) |
 | 422 | error `validation_error` | `team_id` no es un UUID, falta un campo, una fecha o un `user_id` no es válido, `daily_time` no trae desfase o hay un campo desconocido (`number` incluido) |
 | 422 | error `sprint_ends_before_start` / `invalid_time_zone` | El fin es anterior al inicio, o la zona no es una zona IANA conocida; nada cambia |
 | 422 | error `no_daily_participants` / `duplicate_daily_participant` / `daily_participant_not_a_member` | La daily no tiene participantes, uno se repite o uno no es miembro activo del equipo; nada cambia |
 | 500 | error `internal_error` | Fallo inesperado |
+
+## Sala de la daily
+
+Quién puede entrar a la sala de la daily (AGI-59). Requiere tenant y sesión; el usuario es siempre
+el del token. El token de LiveKit se emite en el momento en que se pide, nunca viaja en el enlace
+de la convocatoria, y la clave de API de LiveKit no sale de la API.
+
+### `POST /v1/teams/{team_id}/dailies/current/token`
+
+El token de acceso a la sala de la daily de hoy del equipo. Sin cuerpo. La API verifica, en este
+orden, que el equipo tenga un sprint activo, que quien pide esté entre los participantes guardados
+de su daily (ser miembro no basta, tampoco para el admin) y que la ventana para unirse esté abierta
+(de diez minutos antes de la hora de la daily a quince minutos después, la misma regla que el dashboard: `joinable_daily_at`). Solo entonces guarda la ceremonia
+de esa daily, o encuentra la que ya existe, abre su sala en LiveKit y firma el token. Cada daily
+tiene su propia sala, `<tenant>-<ceremony_id>` (`room_name_for`): dos participantes de la misma
+daily entran a la misma sala, y la daily del día siguiente usa otra. El token lleva la identidad
+`str(user_id)`, sirve solo para esa sala, permite publicar el micrófono y escuchar a los demás, y
+vence a las dos horas. Como la respuesta lleva una credencial, va con `Cache-Control: no-store`.
+
+```json
+{
+  "room_name": "acme-0b7f9a52-3c1d-4e8a-9f20-6d4c2b1a8e57",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…",
+  "expires_at": "2026-10-19T16:00:00Z",
+  "livekit_url": "wss://YOUR-PROJECT.livekit.cloud"
+}
+```
+
+| Estado | Cuerpo | Cuándo |
+| --- | --- | --- |
+| 201 | `{room_name, token, expires_at, livekit_url}` | Quien pide es participante de la daily y la ventana está abierta |
+| 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
+| 401 | error `not_authenticated` | Sin token, o no es válido (antes que cualquier `403`) |
+| 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
+| 403 | error `not_a_team_member` | No es miembro: ajeno, retirado o inexistente (la misma respuesta). Un enlace reenviado a alguien de afuera termina aquí |
+| 403 | error `not_a_daily_participant` | Es miembro del equipo, pero no participante de la daily; no se crea la ceremonia ni se abre la sala |
+| 409 | error `no_active_sprint` | El equipo no tiene un sprint activo |
+| 409 | error `daily_not_open` | La ventana para unirse a la daily de hoy no está abierta |
+| 422 | error `validation_error` | `team_id` no es un UUID |
+| 500 | error `internal_error` | Fallo inesperado |
+| 503 | error `room_service_unavailable` | LiveKit no responde, falla o faltan sus claves; la ceremonia queda guardada y reintentar entra a la misma sala |
 
 ## Ceremonias (contrato del worker)
 
