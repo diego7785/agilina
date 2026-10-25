@@ -4,12 +4,17 @@ import pytest
 
 from agilina_api.bootstrap.context_adapters import (
     IdentityBackedMemberContacts,
+    IdentityBackedParticipantContacts,
     IdentityBackedParticipantNames,
     TeamsBackedCeremonyRoster,
     TeamsBackedContacts,
     TeamsBackedMembership,
 )
-from agilina_api.ceremonies.application.dtos import RosterParticipant, RosterRecord
+from agilina_api.ceremonies.application.dtos import (
+    ParticipantContact,
+    RosterParticipant,
+    RosterRecord,
+)
 from agilina_api.identity.domain.errors import AlreadyTeamMemberError, UnknownTeamError
 from agilina_api.identity.infrastructure.persistence.user_contacts import SqlUserContacts
 from agilina_api.shared.infrastructure.database.unit_of_work import SqlAlchemyUnitOfWork
@@ -176,4 +181,20 @@ async def test_the_names_of_the_participants_are_their_full_names_active_or_not(
     assert await names.names_of([ana.id, disabled.id, next_id()]) == {
         ana.id: "Ana Gil",
         disabled.id: "Bruno Díaz",
+    }
+
+
+# ------------------------------------------------ participant contacts (AGI-61) --
+async def test_the_contacts_of_the_participants_are_their_name_and_email_active_or_not(
+    session_factory,
+):
+    ana = await stored_user(session_factory, AppUserBuilder().with_unique_email().named("Ana Gil"))
+    disabled = await stored_user(
+        session_factory, AppUserBuilder().with_unique_email().named("Bruno Díaz").disabled()
+    )
+    contacts = IdentityBackedParticipantContacts(SqlUserContacts(session_factory))
+
+    assert await contacts.contacts_of([ana.id, disabled.id, next_id()]) == {
+        ana.id: ParticipantContact(full_name="Ana Gil", email=ana.email.value),
+        disabled.id: ParticipantContact(full_name="Bruno Díaz", email=disabled.email.value),
     }

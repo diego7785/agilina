@@ -531,8 +531,8 @@ guarda y participantes con su orden. El sprint sigue activo. Solo para los admin
 
 ## Sala de la daily
 
-Quién puede entrar a la sala de la daily (AGI-59). Requiere tenant y sesión; el usuario es siempre
-el del token. El token de LiveKit se emite en el momento en que se pide, nunca viaja en el enlace
+Quién puede entrar a la sala de la daily (AGI-59) y a quiénes ve en ella (AGI-61). Requiere tenant y
+sesión; el usuario es siempre el del token. El token de LiveKit se emite en el momento en que se pide, nunca viaja en el enlace
 de la convocatoria, y la clave de API de LiveKit no sale de la API.
 
 ### `POST /v1/teams/{team_id}/dailies/current/token`
@@ -569,6 +569,40 @@ vence a las dos horas. Como la respuesta lleva una credencial, va con `Cache-Con
 | 422 | error `validation_error` | `team_id` no es un UUID |
 | 500 | error `internal_error` | Fallo inesperado |
 | 503 | error `room_service_unavailable` | LiveKit no responde, falla o faltan sus claves; la ceremonia queda guardada y reintentar entra a la misma sala |
+
+### `GET /v1/teams/{team_id}/dailies/current/participants`
+
+Los convocados de la daily del sprint activo, en orden de turno, para la pantalla de la sala: cada
+uno con su identidad en la sala de LiveKit (`str(user_id)`, la misma que firma su token), su nombre
+y su correo. La sala muestra así a todos los convocados, estén conectados o no. Un convocado cuya
+cuenta ya no existe se omite. La API verifica, en este orden, que el equipo tenga un sprint activo
+y que quien pide esté entre los participantes guardados de su daily (ser miembro no basta, tampoco
+para el admin); no exige que la ventana para unirse esté abierta. Como lleva correos, va con
+`Cache-Control: no-store`.
+
+```json
+{
+  "participants": [
+    {
+      "room_identity": "6f1c2a9e-8b4d-4c3a-9e7f-2d5b8a1c0e93",
+      "full_name": "Ana Pérez",
+      "email": "ana@example.com"
+    }
+  ]
+}
+```
+
+| Estado | Cuerpo | Cuándo |
+| --- | --- | --- |
+| 200 | `{participants: [{room_identity, full_name, email}]}` | Quien pide es participante de la daily del sprint activo |
+| 400 / 404 | error `tenant_required` / `tenant_not_found` | Tenant ausente o inválido |
+| 401 | error `not_authenticated` | Sin token, o no es válido (antes que cualquier `403`) |
+| 403 | error `account_not_active` | Token válido de alguien que no es usuario activo de la organización |
+| 403 | error `not_a_team_member` | No es miembro: ajeno, retirado o inexistente (la misma respuesta) |
+| 403 | error `not_a_daily_participant` | Es miembro del equipo, pero no participante de la daily, también siendo admin |
+| 409 | error `no_active_sprint` | El equipo no tiene un sprint activo |
+| 422 | error `validation_error` | `team_id` no es un UUID |
+| 500 | error `internal_error` | Fallo inesperado |
 
 ## Ceremonias (contrato del worker)
 

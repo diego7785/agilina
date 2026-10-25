@@ -37,6 +37,7 @@ NEEDED_ROLE = {
     ("put", "/v1/teams/{team_id}/sprints/active"): ADMIN,
     # A member, and on top of it a participant of the daily: a rule of the use case (AGI-59).
     ("post", "/v1/teams/{team_id}/dailies/current/token"): MEMBER,
+    ("get", "/v1/teams/{team_id}/dailies/current/participants"): MEMBER,
     ("get", "/v1/users/me"): MEMBER,
     ("get", "/v1/users"): ADMIN,
     ("get", "/v1/users/{user_id}"): ADMIN,

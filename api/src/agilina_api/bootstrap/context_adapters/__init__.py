@@ -8,6 +8,9 @@ the only place allowed to know them all.
 from agilina_api.bootstrap.context_adapters.identity_backed_member_contacts import (
     IdentityBackedMemberContacts,
 )
+from agilina_api.bootstrap.context_adapters.identity_backed_participant_contacts import (
+    IdentityBackedParticipantContacts,
+)
 from agilina_api.bootstrap.context_adapters.identity_backed_participant_names import (
     IdentityBackedParticipantNames,
 )
@@ -20,6 +23,7 @@ from agilina_api.bootstrap.context_adapters.teams_backed_membership import Teams
 
 __all__ = [
     "IdentityBackedMemberContacts",
+    "IdentityBackedParticipantContacts",
     "IdentityBackedParticipantNames",
     "TeamsBackedCeremonyRoster",
     "TeamsBackedContacts",
