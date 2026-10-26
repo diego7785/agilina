@@ -434,6 +434,19 @@ describe('LiveKitRoomAdapter', () => {
       ]);
     });
 
+    it('tells who is speaking, the participant and Agilina included, and when nobody is', () => {
+      room().emit(RoomEvent.ActiveSpeakersChanged, [
+        room().localParticipant,
+        { identity: 'agilina', isAgent: true },
+      ]);
+      room().emit(RoomEvent.ActiveSpeakersChanged, []);
+
+      expect(changes).toEqual([
+        { kind: 'speaking', identities: ['eva', 'agilina'] },
+        { kind: 'speaking', identities: [] },
+      ]);
+    });
+
     it('tells the connection is lost when the room drops it', () => {
       room().emit(RoomEvent.Disconnected, DisconnectReason.JOIN_FAILURE);
 
@@ -456,6 +469,7 @@ describe('LiveKitRoomAdapter', () => {
       old.emit(RoomEvent.Reconnected);
       old.arrive('ana');
       old.emit(RoomEvent.ParticipantDisconnected, { identity: 'ana', isAgent: false });
+      old.emit(RoomEvent.ActiveSpeakersChanged, [{ identity: 'ana', isAgent: false }]);
       old.emit(RoomEvent.Disconnected, DisconnectReason.JOIN_FAILURE);
 
       expect(changes).toEqual([]);

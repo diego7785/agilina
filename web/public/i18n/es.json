@@ -438,6 +438,7 @@
       "back_to_dashboard": "Volver al dashboard",
       "agilina": {
         "title": "Estado de Agilina",
+        "name": "Agilina",
         "present": "En la sala",
         "absent": "Aún no está en la sala"
       },
@@ -450,8 +451,10 @@
         "connected": "Conectado",
         "disconnected": "Desconectado",
         "self": "· tú",
+        "speaking": "Hablando",
         "unknown": "Participante"
       },
+      "speaking_announcement": "Está hablando: {{names}}",
       "actions": {
         "title": "Acciones"
       }

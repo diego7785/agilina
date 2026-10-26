@@ -205,7 +205,12 @@
           >
             {{ t('agilina.title') }}
           </h2>
-          <p class="font-display text-xl font-bold">{{ t('agilina.absent') }}</p>
+          <p class="font-display text-xl font-bold">
+            {{ t(agilinaPresent() ? 'agilina.present' : 'agilina.absent') }}
+          </p>
+          @if (agilinaSpeaking()) {
+            <agl-speaking-indicator class="mt-1" data-testid="room-agilina-speaking" />
+          }
         </div>
       </section>
       <section class="md:text-right" aria-labelledby="room-turn-title" data-testid="room-turn">
@@ -216,6 +221,13 @@
         <p class="font-display text-xl font-bold" aria-live="polite">{{ t('turn.none') }}</p>
       </section>
     </div>
+
+    <!-- Always in the room, so that a screen reader announces each change of who is speaking. -->
+    <p aria-live="polite" class="sr-only" data-testid="room-speaking-announcer">
+      @if (speakingNames(); as names) {
+        {{ t('speaking_announcement', { names }) }}
+      }
+    </p>
 
     <div class="mt-6 grid gap-6 md:grid-cols-[2fr_1fr] md:items-start">
       <section

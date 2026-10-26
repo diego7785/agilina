@@ -407,6 +407,114 @@ describe('RoomPage', () => {
     });
   });
 
+  // ----------------------- criteria 2 and 3: who is speaking and Agilina (AGI-138) --
+  describe('who is speaking and Agilina', () => {
+    const everyone = [
+      aPresence('user-eva', { local: true }),
+      aPresence('user-ana'),
+      aPresence('agilina', { agent: true }),
+    ];
+
+    beforeEach(() => {
+      invited.participants = [
+        aDailyParticipant('user-eva', 'Eva Prueba'),
+        aDailyParticipant('user-ana', 'Ana Gil'),
+      ];
+    });
+
+    /** The names of the rows that show the voice indicator. */
+    function speakingRows(page: HTMLElement): (string | undefined)[] {
+      return [...page.querySelectorAll<HTMLElement>('[data-testid="room-participants"] li')]
+        .filter((row) => row.querySelector('[data-testid="participant-speaking"]') !== null)
+        .map((row) => text(row, 'participant-name'));
+    }
+
+    it('says Agilina is in the room when an agent is, and not in the list', async () => {
+      const page = await open();
+
+      room.emit({ kind: 'presence', present: everyone });
+      await settle();
+
+      expect(text(page, 'room-agilina-status')).toBe('Estado de Agilina En la sala');
+      expect(page.querySelectorAll('[data-testid="room-participants"] li').length).toBe(2);
+
+      room.emit({ kind: 'presence', present: everyone.slice(0, 2) });
+      await settle();
+      expect(text(page, 'room-agilina-status')).toBe('Estado de Agilina Aún no está en la sala');
+    });
+
+    it('marks the row of who speaks and takes the mark away when they stop', async () => {
+      const page = await open();
+      room.emit({ kind: 'presence', present: everyone });
+      await settle();
+
+      room.emit({ kind: 'speaking', identities: ['user-ana'] });
+      await settle();
+      expect(speakingRows(page)).toEqual(['Ana Gil']);
+      expect(text(page, 'room-speaking-announcer')).toBe('Está hablando: Ana Gil');
+
+      room.emit({ kind: 'speaking', identities: [] });
+      await settle();
+      expect(speakingRows(page)).toEqual([]);
+      expect(text(page, 'room-speaking-announcer')).toBe('');
+    });
+
+    it('shows the voice indicator on Agilina when she speaks, and announces her', async () => {
+      const page = await open();
+      room.emit({ kind: 'presence', present: everyone });
+      await settle();
+
+      room.emit({ kind: 'speaking', identities: ['user-eva', 'agilina'] });
+      await settle();
+
+      expect(text(page, 'room-agilina-speaking')).toBe('Hablando');
+      expect(text(page, 'room-agilina-status')).toBe('Estado de Agilina En la sala Hablando');
+      expect(speakingRows(page)).toEqual(['Eva Prueba']);
+      expect(text(page, 'room-speaking-announcer')).toBe('Está hablando: Eva Prueba, Agilina');
+    });
+
+    it('announces someone with no name as «Participante»', async () => {
+      const page = await open();
+      room.emit({ kind: 'presence', present: [...everyone, aPresence('guest-1')] });
+      room.emit({ kind: 'speaking', identities: ['guest-1'] });
+      await settle();
+
+      expect(text(page, 'room-speaking-announcer')).toBe('Está hablando: Participante');
+    });
+
+    it('keeps the announcer in the room, polite and only for screen readers', async () => {
+      const page = await open();
+
+      const announcer = page.querySelector('[data-testid="room-speaking-announcer"]');
+      expect(announcer?.getAttribute('aria-live')).toBe('polite');
+      expect(announcer?.classList).toContain('sr-only');
+      expect(text(page, 'room-speaking-announcer')).toBe('');
+      expect(page.querySelector('[data-testid="room-agilina-speaking"]')).toBeNull();
+    });
+
+    it('does not mistake who speaks for whose turn it is', async () => {
+      const page = await open();
+      room.emit({ kind: 'presence', present: everyone });
+      room.emit({ kind: 'speaking', identities: ['user-ana', 'agilina'] });
+      await settle();
+
+      expect(text(page, 'room-turn')).toBe('Turno de Sin turno activo');
+    });
+
+    it('stops marking anyone once the connection is lost', async () => {
+      const page = await open();
+      room.emit({ kind: 'presence', present: everyone });
+      room.emit({ kind: 'speaking', identities: ['user-ana'] });
+      await settle();
+
+      room.emit({ kind: 'lost' });
+      await settle();
+
+      expect(page.querySelector('[data-testid="participant-speaking"]')).toBeNull();
+      expect(page.querySelector('[data-testid="room-speaking-announcer"]')).toBeNull();
+    });
+  });
+
   describe('the audio of the others', () => {
     it('offers to turn it on when the browser blocked it', async () => {
       const page = await open();

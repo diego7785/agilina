@@ -438,6 +438,7 @@
       "back_to_dashboard": "Back to dashboard",
       "agilina": {
         "title": "Agilina status",
+        "name": "Agilina",
         "present": "In the room",
         "absent": "Not in the room yet"
       },
@@ -450,8 +451,10 @@
         "connected": "Connected",
         "disconnected": "Disconnected",
         "self": "· you",
+        "speaking": "Speaking",
         "unknown": "Participant"
       },
+      "speaking_announcement": "Speaking: {{names}}",
       "actions": {
         "title": "Actions"
       }

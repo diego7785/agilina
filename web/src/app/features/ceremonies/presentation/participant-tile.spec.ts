@@ -11,6 +11,7 @@ const ANA: ParticipantRow = {
   name: 'Ana Gil',
   email: 'ana@example.test',
   connected: true,
+  speaking: false,
   self: false,
 };
 
@@ -68,6 +69,25 @@ describe('ParticipantTile', () => {
     expect(text(tile, 'participant-name')).toBe('Participante');
     expect(tile.querySelector('[aria-hidden="true"]')?.textContent.trim()).toBe('P');
     expect(tile.querySelector('[data-testid="participant-email"]')).toBeNull();
+  });
+
+  it('shows no voice indicator while the person is silent', async () => {
+    const tile = await render(ANA);
+
+    expect(tile.querySelector('[data-testid="participant-speaking"]')).toBeNull();
+    expect(tile.querySelector('agl-participant-tile > div')!.classList).not.toContain('ring-2');
+  });
+
+  it('marks who is speaking with a ring, an icon and «Hablando», not only with colour', async () => {
+    const tile = await render({ ...ANA, speaking: true });
+
+    const indicator = tile.querySelector('[data-testid="participant-speaking"]');
+    expect(text(tile, 'participant-speaking')).toBe('Hablando');
+    expect(indicator?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    expect(indicator?.querySelector('span')?.classList).toContain('sr-only');
+    expect(indicator?.querySelector('span')?.classList).toContain('sm:not-sr-only');
+    expect(tile.querySelector('agl-participant-tile > div')!.classList).toContain('ring-2');
+    expect(tile.querySelector('agl-participant-tile > div')!.classList).toContain('ring-success');
   });
 
   it('leaves the email out when there is none', async () => {

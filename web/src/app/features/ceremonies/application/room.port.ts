@@ -7,15 +7,17 @@ import { type RoomPresence } from '../domain/room-presence';
 /**
  * Something that happened to the connection while the participant was in the room: the network
  * dropped and it is being recovered, it came back, it could not be recovered (or the room closed
- * it), the browser blocked or allowed again the playback of the others' audio, or someone entered
- * or left: `present` is everyone in the room now, the participant included.
+ * it), the browser blocked or allowed again the playback of the others' audio, someone entered
+ * or left (`present` is everyone in the room now, the participant included), or who is speaking
+ * changed (`identities` are those speaking now, the participant and Agilina included).
  */
 export type RoomChange =
   | { readonly kind: 'reconnecting' }
   | { readonly kind: 'reconnected' }
   | { readonly kind: 'lost' }
   | { readonly kind: 'audio_blocked'; readonly blocked: boolean }
-  | { readonly kind: 'presence'; readonly present: readonly RoomPresence[] };
+  | { readonly kind: 'presence'; readonly present: readonly RoomPresence[] }
+  | { readonly kind: 'speaking'; readonly identities: readonly string[] };
 
 /**
  * Port towards the audio room, in the words of the product: no type of the SDK crosses it. The

@@ -5,6 +5,7 @@ import {
   DisconnectReason,
   type LocalAudioTrack,
   MediaDeviceFailure,
+  type Participant,
   type RemoteParticipant,
   type RemoteTrack,
   type Room,
@@ -160,6 +161,12 @@ export class LiveKitRoomAdapter implements RoomPort {
       })
       .on(RoomEvent.AudioPlaybackStatusChanged, () => {
         this.emitFor(room, { kind: 'audio_blocked', blocked: !room.canPlaybackAudio });
+      })
+      .on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
+        this.emitFor(room, {
+          kind: 'speaking',
+          identities: speakers.map((speaker) => speaker.identity),
+        });
       });
   }
 

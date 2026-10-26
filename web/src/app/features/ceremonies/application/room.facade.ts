@@ -30,6 +30,8 @@ import { type RoomPresence } from '../domain/room-presence';
  * again here.
  * The list of participants (AGI-61) joins the invited, asked for on each connection once in, with
  * who the room says is in it; if the invited cannot be read, it lists only who is in the room.
+ * It also follows who is speaking, as LiveKit tells it, and whether Agilina (the agent in the
+ * room) is there and speaking.
  */
 @Injectable()
 export class RoomFacade {
@@ -49,6 +51,7 @@ export class RoomFacade {
   private readonly currentAudioBlocked = signal(false);
   private readonly invitees = signal<readonly DailyParticipant[]>([]);
   private readonly present = signal<readonly RoomPresence[]>([]);
+  private readonly speaking = signal<readonly string[]>([]);
 
   readonly status = this.currentStatus.asReadonly();
   readonly microphone = this.currentMicrophone.asReadonly();
@@ -56,7 +59,15 @@ export class RoomFacade {
   readonly failure = this.currentFailure.asReadonly();
   readonly audioBlocked = this.currentAudioBlocked.asReadonly();
   /** The invited in turn order, connected or not, then whoever else is in the room. */
-  readonly participants = computed(() => participantRows(this.invitees(), this.present()));
+  readonly participants = computed(() =>
+    participantRows(this.invitees(), this.present(), this.speaking()),
+  );
+  readonly agilinaPresent = computed(() => this.present().some((presence) => presence.agent));
+  readonly agilinaSpeaking = computed(() =>
+    this.present().some(
+      (presence) => presence.agent && this.speaking().includes(presence.identity),
+    ),
+  );
 
   constructor() {
     this.room.changes.pipe(takeUntilDestroyed()).subscribe((change) => {
@@ -109,6 +120,7 @@ export class RoomFacade {
     this.currentMicrophone.set('pending');
     this.currentAudioBlocked.set(false);
     this.present.set([]);
+    this.speaking.set([]);
     try {
       await this.room.disconnect();
       const asked = await this.room.requestMicrophone();
@@ -183,6 +195,7 @@ export class RoomFacade {
     this.currentStatus.set('failed');
     this.currentFailure.set('connection_lost');
     this.present.set([]);
+    this.speaking.set([]);
   }
 
   private stopReconnectTimer(): void {
@@ -197,6 +210,8 @@ export class RoomFacade {
       case 'reconnecting':
         if (this.currentStatus() === 'connected') {
           this.currentStatus.set('reconnecting');
+          // Nobody is heard while the connection is down; LiveKit tells the speakers again after.
+          this.speaking.set([]);
           this.reconnectTimer = setTimeout(() => {
             this.giveUp();
           }, RECONNECT_BUDGET_MS);
@@ -219,6 +234,9 @@ export class RoomFacade {
         return;
       case 'presence':
         this.present.set(change.present);
+        return;
+      case 'speaking':
+        this.speaking.set(change.identities);
         return;
     }
   }

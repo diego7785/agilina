@@ -8,7 +8,7 @@ describe('participantRows', () => {
   const luis = aDailyParticipant('user-luis', 'Luis Mora');
 
   it('lists every invited person in turn order, connected or not', () => {
-    const rows = participantRows([luis, eva, ana], [aPresence('user-eva', { local: true })]);
+    const rows = participantRows([luis, eva, ana], [aPresence('user-eva', { local: true })], []);
 
     expect(rows).toEqual([
       {
@@ -16,6 +16,7 @@ describe('participantRows', () => {
         name: 'Luis Mora',
         email: 'luis@example.test',
         connected: false,
+        speaking: false,
         self: false,
       },
       {
@@ -23,6 +24,7 @@ describe('participantRows', () => {
         name: 'Eva Prueba',
         email: 'eva@example.test',
         connected: true,
+        speaking: false,
         self: true,
       },
       {
@@ -30,6 +32,7 @@ describe('participantRows', () => {
         name: 'Ana Gil',
         email: 'ana@example.test',
         connected: false,
+        speaking: false,
         self: false,
       },
     ]);
@@ -39,6 +42,7 @@ describe('participantRows', () => {
     const rows = participantRows(
       [eva, ana, luis],
       [aPresence('user-luis'), aPresence('user-eva', { local: true })],
+      [],
     );
 
     expect(rows.map((row) => [row.identity, row.connected, row.self])).toEqual([
@@ -52,21 +56,23 @@ describe('participantRows', () => {
     const rows = participantRows(
       [eva],
       [aPresence('user-eva', { local: true }), aPresence('agilina', { agent: true })],
+      [],
     );
 
     expect(rows.map((row) => row.identity)).toEqual(['user-eva']);
-    expect(participantRows([], [aPresence('agilina', { agent: true })])).toEqual([]);
+    expect(participantRows([], [aPresence('agilina', { agent: true })], [])).toEqual([]);
   });
 
   it('adds whoever is in the room without being invited, after the invited and with no name', () => {
     const rows = participantRows(
       [eva],
       [aPresence('user-eva', { local: true }), aPresence('guest-1'), aPresence('guest-2')],
+      [],
     );
 
     expect(rows.slice(1)).toEqual([
-      { identity: 'guest-1', name: '', email: null, connected: true, self: false },
-      { identity: 'guest-2', name: '', email: null, connected: true, self: false },
+      { identity: 'guest-1', name: '', email: null, connected: true, speaking: false, self: false },
+      { identity: 'guest-2', name: '', email: null, connected: true, speaking: false, self: false },
     ]);
   });
 
@@ -74,16 +80,51 @@ describe('participantRows', () => {
     const rows = participantRows(
       [],
       [aPresence('user-eva', { local: true }), aPresence('user-ana')],
+      [],
     );
 
     expect(rows).toEqual([
-      { identity: 'user-eva', name: '', email: null, connected: true, self: true },
-      { identity: 'user-ana', name: '', email: null, connected: true, self: false },
+      { identity: 'user-eva', name: '', email: null, connected: true, speaking: false, self: true },
+      {
+        identity: 'user-ana',
+        name: '',
+        email: null,
+        connected: true,
+        speaking: false,
+        self: false,
+      },
+    ]);
+  });
+
+  it('marks as speaking only the rows whose identity is speaking, invited or not', () => {
+    const rows = participantRows(
+      [eva, ana],
+      [aPresence('user-eva', { local: true }), aPresence('user-ana'), aPresence('guest-1')],
+      ['user-ana', 'guest-1'],
+    );
+
+    expect(rows.map((row) => [row.identity, row.speaking])).toEqual([
+      ['user-eva', false],
+      ['user-ana', true],
+      ['guest-1', true],
+    ]);
+  });
+
+  it('never shows as speaking someone invited who is not in the room, nor Agilina as a row', () => {
+    const rows = participantRows(
+      [eva, ana],
+      [aPresence('user-eva', { local: true }), aPresence('agilina', { agent: true })],
+      ['user-ana', 'agilina'],
+    );
+
+    expect(rows.map((row) => [row.identity, row.connected, row.speaking])).toEqual([
+      ['user-eva', true, false],
+      ['user-ana', false, false],
     ]);
   });
 
   it('shows every invited person disconnected when nobody is in the room', () => {
-    const rows = participantRows([eva, ana], []);
+    const rows = participantRows([eva, ana], [], []);
 
     expect(rows.every((row) => !row.connected && !row.self)).toBeTrue();
     expect(rows.length).toBe(2);

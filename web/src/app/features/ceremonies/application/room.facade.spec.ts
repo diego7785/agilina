@@ -347,7 +347,14 @@ describe('RoomFacade', () => {
 
       expect(facade.status()).toBe('connected');
       expect(facade.participants()).toEqual([
-        { identity: 'user-eva', name: '', email: null, connected: true, self: true },
+        {
+          identity: 'user-eva',
+          name: '',
+          email: null,
+          connected: true,
+          speaking: false,
+          self: true,
+        },
       ]);
     });
 
@@ -410,6 +417,104 @@ describe('RoomFacade', () => {
       await settle();
 
       expect(rows()).toEqual([['user-ana', false, false]]);
+    });
+  });
+
+  describe('who is speaking and Agilina (AGI-61)', () => {
+    const eva = aDailyParticipant('user-eva', 'Eva Prueba');
+    const ana = aDailyParticipant('user-ana', 'Ana Gil');
+    const everyone = [
+      aPresence('user-eva', { local: true }),
+      aPresence('user-ana'),
+      aPresence('agilina', { agent: true }),
+    ];
+
+    /** The identities of the rows that are speaking. */
+    function speakers(): string[] {
+      return facade
+        .participants()
+        .filter((row) => row.speaking)
+        .map((row) => row.identity);
+    }
+
+    beforeEach(async () => {
+      invited.participants = [eva, ana];
+      facade.join('atlas');
+      await settle();
+    });
+
+    it('says Agilina is not in the room until an agent is', () => {
+      room.emit({ kind: 'presence', present: [aPresence('user-eva', { local: true })] });
+
+      expect(facade.agilinaPresent()).toBeFalse();
+      expect(facade.agilinaSpeaking()).toBeFalse();
+
+      room.emit({ kind: 'presence', present: everyone });
+
+      expect(facade.agilinaPresent()).toBeTrue();
+      expect(facade.agilinaSpeaking()).toBeFalse();
+    });
+
+    it('follows who is speaking, the participant and Agilina included', () => {
+      room.emit({ kind: 'presence', present: everyone });
+
+      room.emit({ kind: 'speaking', identities: ['user-ana'] });
+      expect(speakers()).toEqual(['user-ana']);
+      expect(facade.agilinaSpeaking()).toBeFalse();
+
+      room.emit({ kind: 'speaking', identities: ['user-eva', 'agilina'] });
+      expect(speakers()).toEqual(['user-eva']);
+      expect(facade.agilinaSpeaking()).toBeTrue();
+
+      room.emit({ kind: 'speaking', identities: [] });
+      expect(speakers()).toEqual([]);
+      expect(facade.agilinaSpeaking()).toBeFalse();
+    });
+
+    it('does not say Agilina speaks once she left the room', () => {
+      room.emit({ kind: 'presence', present: everyone });
+      room.emit({ kind: 'speaking', identities: ['agilina'] });
+
+      room.emit({ kind: 'presence', present: everyone.slice(0, 2) });
+
+      expect(facade.agilinaPresent()).toBeFalse();
+      expect(facade.agilinaSpeaking()).toBeFalse();
+    });
+
+    it('forgets who was speaking once the connection is lost', () => {
+      room.emit({ kind: 'presence', present: everyone });
+      room.emit({ kind: 'speaking', identities: ['user-ana', 'agilina'] });
+
+      room.emit({ kind: 'lost' });
+      // Whoever is in the room again, nobody speaks until the room says so.
+      room.emit({ kind: 'presence', present: everyone });
+
+      expect(speakers()).toEqual([]);
+      expect(facade.agilinaSpeaking()).toBeFalse();
+    });
+
+    it('forgets who was speaking while it reconnects', () => {
+      room.emit({ kind: 'presence', present: everyone });
+      room.emit({ kind: 'speaking', identities: ['user-ana', 'agilina'] });
+
+      room.emit({ kind: 'reconnecting' });
+
+      expect(speakers()).toEqual([]);
+      expect(facade.agilinaSpeaking()).toBeFalse();
+    });
+
+    it('forgets who was speaking when it enters again', async () => {
+      room.emit({ kind: 'presence', present: everyone });
+      room.emit({ kind: 'speaking', identities: ['user-ana', 'agilina'] });
+
+      facade.retry();
+      await settle();
+      room.emit({ kind: 'presence', present: everyone });
+
+      expect(facade.status()).toBe('connected');
+      expect(speakers()).toEqual([]);
+      expect(facade.agilinaPresent()).toBeTrue();
+      expect(facade.agilinaSpeaking()).toBeFalse();
     });
   });
 
