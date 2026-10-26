@@ -1,0 +1,160 @@
+// The mascot's look and motion: keyframes that Tailwind utilities do not express (web/README.md,
+// «Estilos»). Colors come only from the --agl-* tokens.
+:host {
+  display: block;
+}
+
+svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.skin {
+  fill: var(--agl-mascot-skin);
+}
+
+.hair {
+  fill: var(--agl-mascot-hair);
+}
+
+.blouse,
+.earpiece {
+  fill: var(--agl-accent);
+}
+
+.blush {
+  fill: var(--agl-mascot-blush);
+  opacity: 0.45;
+}
+
+.pupil,
+.mic {
+  fill: var(--agl-text);
+}
+
+.shine {
+  fill: var(--agl-accent-text);
+}
+
+.brow,
+.headset,
+.smile {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.brow {
+  stroke: var(--agl-mascot-hair);
+  stroke-width: 1;
+}
+
+.headset {
+  stroke: var(--agl-text);
+  stroke-width: 1.5;
+}
+
+.smile {
+  stroke: var(--agl-text);
+  stroke-width: 1.4;
+}
+
+.talk {
+  display: none;
+  fill: var(--agl-text);
+}
+
+.body,
+.eyes,
+.talk {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.body {
+  transform-origin: center bottom;
+  animation: float 3.2s ease-in-out infinite;
+}
+
+.eyes {
+  animation: blink 4.5s ease-in-out infinite;
+}
+
+:host(.speaking) {
+  .body {
+    animation: bounce 0.6s ease-in-out infinite;
+  }
+
+  .smile {
+    display: none;
+  }
+
+  .talk {
+    display: inline;
+    animation: talk 0.28s ease-in-out infinite alternate;
+  }
+}
+
+:host(.absent) {
+  filter: grayscale(1);
+  opacity: 0.5;
+
+  .body,
+  .eyes {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .body,
+  .eyes,
+  :host(.speaking) .body,
+  :host(.speaking) .talk {
+    animation: none;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-1.5px);
+  }
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-2px) scale(1.04);
+  }
+}
+
+@keyframes blink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+
+  94% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes talk {
+  from {
+    transform: scaleY(0.35);
+  }
+
+  to {
+    transform: scaleY(1);
+  }
+}

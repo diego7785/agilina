@@ -5,6 +5,7 @@ import { TranslocoDirective, translateSignal } from '@jsverse/transloco';
 import { TenantContext } from '@core/tenant/tenant-context';
 import { Button } from '@shared/ui/button';
 
+import { AgilinaAvatar } from './agilina-avatar';
 import { ParticipantTile } from './participant-tile';
 import { SpeakingIndicator } from './speaking-indicator';
 import { RoomFacade } from '../application/room.facade';
@@ -19,7 +20,14 @@ import { isRetriable } from '../domain/room-failure';
  */
 @Component({
   selector: 'agl-room-page',
-  imports: [RouterLink, TranslocoDirective, Button, ParticipantTile, SpeakingIndicator],
+  imports: [
+    RouterLink,
+    TranslocoDirective,
+    Button,
+    AgilinaAvatar,
+    ParticipantTile,
+    SpeakingIndicator,
+  ],
   providers: [RoomFacade],
   templateUrl: './room-page.html',
 })

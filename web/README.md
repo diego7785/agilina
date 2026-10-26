@@ -313,7 +313,11 @@ Un solo estilo para todos los formularios (el de `/:tenant/activate`, el de `/:t
 - **Quién habla** (AGI-61): `RoomPort` traduce los oradores activos de LiveKit
   (`ActiveSpeakersChanged`) al cambio `speaking`, con las identidades que hablan. La fila de quien
   habla lleva `agl-speaking-indicator` (el ícono de voz y «Hablando») y un anillo; si es Agilina,
-  el indicador va en la tarjeta Estado de Agilina. Una región `aria-live` siempre presente
+  el indicador va en la tarjeta Estado de Agilina, donde ella es una mujer con diadema y micrófono
+  (`agl-agilina-avatar`, un SVG con los tokens `--agl-mascot-*` de piel, pelo y rubor): en reposo
+  flota y parpadea, al hablar abre y cierra la boca y rebota, y fuera de la sala
+  queda en gris. Su movimiento está en `agilina-avatar.scss` (keyframes que las utilidades no
+  expresan) y se detiene con `prefers-reduced-motion`; es decorativa (`aria-hidden`). Una región `aria-live` siempre presente
   (`room-speaking-announcer`) anuncia quién habla, y «Turno de» también es `aria-live`: no se
   depende solo del color. Mientras la sala reconecta nadie aparece hablando.
 - **Silenciar micrófono** (AGI-61), arriba en Acciones mientras el micrófono está activo: silencia
