@@ -435,7 +435,25 @@
         "unexpected": "Something went wrong joining the room."
       },
       "retry": "Try again",
-      "back_to_dashboard": "Back to dashboard"
+      "back_to_dashboard": "Back to dashboard",
+      "agilina": {
+        "title": "Agilina status",
+        "present": "In the room",
+        "absent": "Not in the room yet"
+      },
+      "turn": {
+        "title": "Turn of",
+        "none": "No active turn"
+      },
+      "participants": {
+        "title": "Participants",
+        "connected": "Connected",
+        "disconnected": "Disconnected",
+        "self": "· you"
+      },
+      "actions": {
+        "title": "Actions"
+      }
     }
   }
 }

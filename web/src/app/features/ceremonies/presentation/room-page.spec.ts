@@ -271,6 +271,46 @@ describe('RoomPage', () => {
     });
   });
 
+  // ------------------------------------------------ the layout of the room (AGI-61) --
+  describe('the layout', () => {
+    it('shows the status of Agilina, the turn, the participants and the actions', async () => {
+      const page = await open();
+
+      expect(text(page, 'room-agilina-status')).toBe('Estado de Agilina Aún no está en la sala');
+      expect(text(page, 'room-turn')).toBe('Turno de Sin turno activo');
+      expect(text(page, 'room-participants')).toBe('Participantes');
+      expect(text(page, 'room-actions')).toBe('Acciones');
+      expect(text(page, 'room-status')).toBe('Conectado');
+      expect(text(page, 'microphone-on')).toBe('Micrófono activo');
+    });
+
+    it('does not show the room while it is connecting', async () => {
+      room.connect = () => new Promise<void>(() => undefined);
+
+      const page = await open();
+
+      expect(page.querySelector('[data-testid="room-participants"]')).toBeNull();
+      expect(page.querySelector('[data-testid="room-agilina-status"]')).toBeNull();
+    });
+
+    it('does not show the room when it could not enter', async () => {
+      access.failure = new RoomFailure('no_access');
+
+      const page = await open();
+
+      expect(page.querySelector('[data-testid="room-participants"]')).toBeNull();
+      expect(page.querySelector('[data-testid="room-actions"]')).toBeNull();
+      expect(page.querySelector('[data-testid="room-failure"]')).not.toBeNull();
+    });
+
+    it('shows no transcript', async () => {
+      const page = await open();
+
+      expect(page.querySelector('[data-testid*="transcript"]')).toBeNull();
+      expect(page.textContent).not.toMatch(/transcrip|subt[ií]tulo/i);
+    });
+  });
+
   describe('the audio of the others', () => {
     it('offers to turn it on when the browser blocked it', async () => {
       const page = await open();

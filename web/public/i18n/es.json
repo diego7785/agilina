@@ -435,7 +435,25 @@
         "unexpected": "Algo salió mal al entrar a la sala."
       },
       "retry": "Reintentar",
-      "back_to_dashboard": "Volver al dashboard"
+      "back_to_dashboard": "Volver al dashboard",
+      "agilina": {
+        "title": "Estado de Agilina",
+        "present": "En la sala",
+        "absent": "Aún no está en la sala"
+      },
+      "turn": {
+        "title": "Turno de",
+        "none": "Sin turno activo"
+      },
+      "participants": {
+        "title": "Participantes",
+        "connected": "Conectado",
+        "disconnected": "Desconectado",
+        "self": "· tú"
+      },
+      "actions": {
+        "title": "Acciones"
+      }
     }
   }
 }

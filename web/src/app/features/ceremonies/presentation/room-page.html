@@ -166,5 +166,81 @@
         </div>
       }
     </div>
+
+    <div
+      class="mt-6 flex flex-col gap-4 rounded-2xl border border-border bg-surface p-6 shadow-sm md:flex-row md:items-center md:justify-between"
+    >
+      <section
+        class="flex items-center gap-4"
+        aria-labelledby="room-agilina-title"
+        data-testid="room-agilina-status"
+      >
+        <span
+          class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent"
+          aria-hidden="true"
+        >
+          <!-- Lucide "bot" icon. -->
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="size-6"
+          >
+            <path d="M12 8V4H8" />
+            <rect width="16" height="12" x="4" y="8" rx="2" />
+            <path d="M2 14h2" />
+            <path d="M20 14h2" />
+            <path d="M15 13v2" />
+            <path d="M9 13v2" />
+          </svg>
+        </span>
+        <div>
+          <h2
+            id="room-agilina-title"
+            class="text-xs font-semibold tracking-wide text-muted uppercase"
+          >
+            {{ t('agilina.title') }}
+          </h2>
+          <p class="font-display text-xl font-bold">{{ t('agilina.absent') }}</p>
+        </div>
+      </section>
+      <section class="md:text-right" aria-labelledby="room-turn-title" data-testid="room-turn">
+        <h2 id="room-turn-title" class="text-xs font-semibold tracking-wide text-muted uppercase">
+          {{ t('turn.title') }}
+        </h2>
+        <!-- A live region from the start, so that a screen reader announces each new turn. -->
+        <p class="font-display text-xl font-bold" aria-live="polite">{{ t('turn.none') }}</p>
+      </section>
+    </div>
+
+    <div class="mt-6 grid gap-6 md:grid-cols-[2fr_1fr] md:items-start">
+      <section
+        class="min-w-0 rounded-2xl border border-border bg-surface p-6 shadow-sm"
+        aria-labelledby="room-participants-title"
+        data-testid="room-participants"
+      >
+        <h2 id="room-participants-title" class="font-display text-lg font-semibold">
+          {{ t('participants.title') }}
+        </h2>
+        <ul class="mt-4 grid gap-2">
+          @for (row of participants; track row.identity) {
+            <li><agl-participant-tile [row]="row" /></li>
+          }
+        </ul>
+      </section>
+      <section
+        class="min-w-0 rounded-2xl border border-border bg-surface p-6 shadow-sm"
+        aria-labelledby="room-actions-title"
+        data-testid="room-actions"
+      >
+        <h2 id="room-actions-title" class="font-display text-lg font-semibold">
+          {{ t('actions.title') }}
+        </h2>
+      </section>
+    </div>
   }
 </section>

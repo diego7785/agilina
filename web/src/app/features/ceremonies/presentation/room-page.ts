@@ -5,18 +5,20 @@ import { TranslocoDirective } from '@jsverse/transloco';
 import { TenantContext } from '@core/tenant/tenant-context';
 import { Button } from '@shared/ui/button';
 
+import { ParticipantTile } from './participant-tile';
 import { RoomFacade } from '../application/room.facade';
+import { type ParticipantRow } from '../domain/participant-row';
 import { isRetriable } from '../domain/room-failure';
 
 /**
  * The room of the team's daily (AGI-60): entering it turns the microphone on, and the page says
  * how the connection is, what happened to the microphone and what to do about it. A participant
- * without a microphone stays as a listener. Who is in the room and who speaks arrive with
- * AGI-61, on this same page. Leaving the page leaves the room.
+ * without a microphone stays as a listener. In the room it shows the status of Agilina, whose
+ * turn it is, the participants and the actions (AGI-61). Leaving the page leaves the room.
  */
 @Component({
   selector: 'agl-room-page',
-  imports: [RouterLink, TranslocoDirective, Button],
+  imports: [RouterLink, TranslocoDirective, Button, ParticipantTile],
   providers: [RoomFacade],
   templateUrl: './room-page.html',
 })
@@ -31,6 +33,8 @@ export class RoomPage implements OnInit {
   protected readonly microphone = this.facade.microphone;
   protected readonly failure = this.facade.failure;
   protected readonly audioBlocked = this.facade.audioBlocked;
+  /** Empty until the room reports who is in it (AGI-137). */
+  protected readonly participants: readonly ParticipantRow[] = [];
   protected readonly inRoom = computed(
     () => this.status() === 'connected' || this.status() === 'reconnecting',
   );

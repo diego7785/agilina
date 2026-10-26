@@ -4,6 +4,7 @@ import { TranslocoDirective } from '@jsverse/transloco';
 
 import { ShellContext } from '@core/shell/shell-context';
 import { TenantContext } from '@core/tenant/tenant-context';
+import { initialsOf } from '@shared/utils/initials';
 
 /**
  * Top bar of every screen: the brand and, inside a team, the team's name and the label of
@@ -23,13 +24,5 @@ export class Header {
   protected readonly tenant = inject(TenantContext);
   /** Asks the team selector to list the teams even when the person has only one. */
   protected readonly chooseTeam = { choose: true };
-  /** The first letters of the first two words of the name, in capitals. */
-  protected readonly initials = computed(() =>
-    (this.team()?.userName ?? '')
-      .split(/\s+/)
-      .filter((word) => word.length > 0)
-      .slice(0, 2)
-      .map((word) => word.charAt(0).toUpperCase())
-      .join(''),
-  );
+  protected readonly initials = computed(() => initialsOf(this.team()?.userName ?? ''));
 }
