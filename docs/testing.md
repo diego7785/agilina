@@ -153,24 +153,24 @@ a una persona nueva a un equipo nuevo de cada tenant en cada ejecución). Son po
 siguen en las pruebas de cada capa. Aún no corren en la CI.
 
 Los recorridos corren en Chromium (proyecto `chromium`), una vez y en orden, porque comparten las
-cuentas que crean. La sala de la reunión diaria (`room.spec.ts`, AGI-60) corre además en Firefox:
-los proyectos `room-chromium` y `room-firefox` dependen de `chromium` (así la persona ya está
-activada y su equipo tiene una daily a minutos) y le dan al navegador un micrófono falso que concede
-sin preguntar (`--use-fake-device-for-media-stream` con el permiso `microphone` en Chromium;
-`media.navigator.streams.fake` y `media.navigator.permission.disabled` en Firefox).
+cuentas que crean. La sala de la reunión diaria (`room.spec.ts`, AGI-60) va en su propio proyecto,
+`room-chromium`, que depende de `chromium` (así la persona ya está activada y su equipo tiene una
+daily a minutos) y le da al navegador un micrófono falso que concede sin preguntar
+(`--use-fake-device-for-media-stream` con el permiso `microphone`).
 
 - **Chromium completo** (`channel: 'chromium'`): el *headless shell* que Playwright usa por defecto
   no tiene micrófono (`getUserMedia` responde `NotSupportedError`).
-- **Micrófono rechazado:** un navegador aparte que lo niega (`--deny-permission-prompts`;
-  `permissions.default.microphone: 2`), con `context.clearPermissions()` porque el runner le pasa a
-  todo contexto los permisos del proyecto. Sin micrófono, Chromium esconde sus IP locales tras
-  nombres mDNS que un LiveKit en la misma máquina no alcanza; por eso ese navegador lleva
-  `--disable-features=WebRtcHideLocalIpsWithMdns` (con LiveKit Cloud no hace falta: hay TURN).
+- **Micrófono rechazado:** un Chromium aparte que lo niega (`--deny-permission-prompts`), con
+  `context.clearPermissions()` porque el runner le pasa a todo contexto los permisos del proyecto.
+  Sin micrófono, Chromium esconde sus IP locales tras nombres mDNS que un LiveKit en la misma
+  máquina no alcanza; por eso ese navegador lleva `--disable-features=WebRtcHideLocalIpsWithMdns`
+  (con LiveKit Cloud no hace falta: hay TURN).
 - **Red caída:** no se prueba aquí. Playwright no corta una conexión ya abierta a `localhost`
   (`setOffline` no la toca); la cubren las pruebas de `RoomFacade` y la prueba a mano (pausar el
   servidor de LiveKit).
-- **Firefox:** el de Playwright no logró establecer el audio (ICE) con un LiveKit local; sus pruebas
-  terminan saltadas con el motivo. Firefox de escritorio se verifica a mano (AGI-135).
+- **Firefox:** no corre en Playwright. El Firefox que trae Playwright no establece el audio (ICE)
+  con LiveKit, ni local ni Cloud (tampoco por TURN); Firefox de escritorio se verifica a mano
+  (AGI-135).
 
 La sala real necesita un servidor de LiveKit con sus claves en el `.env`: sin él, la sala
 responde con un fallo y sus pruebas se saltan con el motivo, en vez de fallar. Que dos personas se
