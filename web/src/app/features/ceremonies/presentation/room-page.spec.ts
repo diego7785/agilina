@@ -289,7 +289,7 @@ describe('RoomPage', () => {
       expect(text(page, 'room-agilina-status')).toBe('Estado de Agilina Aún no está en la sala');
       expect(text(page, 'room-turn')).toBe('Turno de Sin turno activo');
       expect(text(page, 'room-participants')).toBe('Participantes');
-      expect(text(page, 'room-actions')).toBe('Acciones');
+      expect(page.querySelector('#room-actions-title')?.textContent.trim()).toBe('Acciones');
       expect(text(page, 'room-status')).toBe('Conectado');
       expect(text(page, 'microphone-on')).toBe('Micrófono activo');
     });
@@ -318,6 +318,59 @@ describe('RoomPage', () => {
 
       expect(page.querySelector('[data-testid*="transcript"]')).toBeNull();
       expect(page.textContent).not.toMatch(/transcrip|subt[ií]tulo/i);
+    });
+  });
+
+  // ------------------------------- criterion 4: the actions and leaving (AGI-139) --
+  describe('the actions', () => {
+    it('shows the controls of the ceremony disabled, and says they are not available yet', async () => {
+      const page = await open();
+      const calls = [...room.calls];
+
+      for (const [testId, label] of [
+        ['room-start-daily', 'Iniciar reunión diaria'],
+        ['room-end-turn', 'Terminar turno'],
+        ['room-end-ceremony', 'Terminar ceremonia'],
+      ] as const) {
+        const button = page.querySelector<HTMLButtonElement>(`[data-testid="${testId}"]`)!;
+        expect(button.textContent.trim()).toBe(label);
+        expect(button.disabled).toBeTrue();
+        expect(button.getAttribute('aria-describedby')).toBe('room-actions-unavailable');
+        button.click();
+      }
+      await settle();
+
+      expect(text(page, 'room-actions-unavailable')).toBe('Todavía no están disponibles.');
+      expect(page.querySelector('#room-actions-unavailable')).not.toBeNull();
+      expect(room.calls).toEqual(calls);
+    });
+
+    it('leaves the room and goes back to the dashboard', async () => {
+      const page = await open();
+      const before = room.disconnects;
+
+      expect(text(page, 'room-leave')).toBe('Salir de la sala');
+      expect(page.querySelector('[data-testid="room-leave"]')?.getAttribute('href')).toBe(
+        '/acme/teams/atlas',
+      );
+      click(page, 'room-leave');
+      await settle();
+
+      expect(TestBed.inject(Router).url).toBe('/acme/teams/atlas');
+      expect(room.disconnects).toBe(before + 1);
+    });
+
+    it('offers to leave while reconnecting, and only to go back when the room is lost', async () => {
+      const page = await open();
+
+      room.emit({ kind: 'reconnecting' });
+      await settle();
+      expect(page.querySelector('[data-testid="room-leave"]')).not.toBeNull();
+
+      room.emit({ kind: 'lost' });
+      await settle();
+      expect(page.querySelector('[data-testid="room-leave"]')).toBeNull();
+      expect(page.querySelector('[data-testid="room-back"]')).not.toBeNull();
     });
   });
 

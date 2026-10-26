@@ -252,6 +252,77 @@
         <h2 id="room-actions-title" class="font-display text-lg font-semibold">
           {{ t('actions.title') }}
         </h2>
+        <!-- Disabled for everyone until their stories (AGI-71, AGI-73, AGI-78). -->
+        <div class="mt-4 flex flex-col gap-3">
+          <button
+            aglButton
+            variant="secondary"
+            type="button"
+            class="w-full"
+            disabled
+            aria-describedby="room-actions-unavailable"
+            data-testid="room-start-daily"
+          >
+            {{ t('actions.start_daily') }}
+          </button>
+          <button
+            aglButton
+            variant="secondary"
+            type="button"
+            class="w-full"
+            disabled
+            aria-describedby="room-actions-unavailable"
+            data-testid="room-end-turn"
+          >
+            {{ t('actions.end_turn') }}
+          </button>
+          <button
+            aglButton
+            variant="secondary"
+            type="button"
+            class="w-full"
+            disabled
+            aria-describedby="room-actions-unavailable"
+            data-testid="room-end-ceremony"
+          >
+            {{ t('actions.end_ceremony') }}
+          </button>
+        </div>
+        <p
+          id="room-actions-unavailable"
+          class="mt-2 text-sm text-muted"
+          data-testid="room-actions-unavailable"
+        >
+          {{ t('actions.unavailable') }}
+        </p>
+        <div class="mt-6 border-t border-border pt-4">
+          <!-- Leaving the page leaves the room (RoomFacade's onDestroy). -->
+          <a
+            aglButton
+            variant="secondary"
+            class="w-full"
+            [routerLink]="dashboardPath()"
+            data-testid="room-leave"
+          >
+            <!-- Lucide "log-out" icon. -->
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="size-4"
+              aria-hidden="true"
+            >
+              <path d="m16 17 5-5-5-5" />
+              <path d="M21 12H9" />
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            </svg>
+            {{ t('actions.leave') }}
+          </a>
+        </div>
       </section>
     </div>
   }

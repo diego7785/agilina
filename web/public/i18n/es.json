@@ -456,7 +456,12 @@
       },
       "speaking_announcement": "Está hablando: {{names}}",
       "actions": {
-        "title": "Acciones"
+        "title": "Acciones",
+        "start_daily": "Iniciar reunión diaria",
+        "end_turn": "Terminar turno",
+        "end_ceremony": "Terminar ceremonia",
+        "unavailable": "Todavía no están disponibles.",
+        "leave": "Salir de la sala"
       }
     }
   }
