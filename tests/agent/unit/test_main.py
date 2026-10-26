@@ -12,7 +12,18 @@ from agilina_agent import main
 from agilina_agent.infrastructure.http_agilina_api import HttpAgilinaApi
 from agilina_agent.infrastructure.pending_results import PendingResults
 from agilina_agent.infrastructure.settings import Settings
-from agilina_agent.main import agilina_api, entrypoint, resend_pending, worker_options
+from agilina_agent.infrastructure.speech_synthesizers import (
+    ElevenLabsSynthesizer,
+    RecordingSynthesizer,
+)
+from agilina_agent.main import (
+    agilina_api,
+    entrypoint,
+    resend_pending,
+    speech_synthesizer,
+    worker_options,
+)
+from tests.agent.doubles import FakeJobContext
 from tests.shared.builders import TENANT, CeremonyResultBuilder
 
 # Nothing listens on the discard port: every connection is refused at once.
@@ -75,3 +86,25 @@ def test_the_agent_can_listen_speak_and_publish_its_state_but_not_data(tmp_path:
     assert not permissions.can_publish_data
     # Agilina must show up in the participant list.
     assert not permissions.hidden
+
+
+def test_without_an_elevenlabs_key_the_voice_is_simulated(tmp_path: Path) -> None:
+    ctx = FakeJobContext("acme-room")
+
+    synthesizer = speech_synthesizer(_settings(tmp_path), ctx)  # type: ignore[arg-type]
+
+    assert isinstance(synthesizer, RecordingSynthesizer)
+    assert ctx.shutdown_callbacks == []
+
+
+def test_with_an_elevenlabs_key_the_voice_is_real_and_closes_with_the_job(
+    tmp_path: Path,
+) -> None:
+    settings = _settings(tmp_path)
+    settings.elevenlabs_api_key = "test-key"
+    ctx = FakeJobContext("acme-room")
+
+    synthesizer = speech_synthesizer(settings, ctx)  # type: ignore[arg-type]
+
+    assert isinstance(synthesizer, ElevenLabsSynthesizer)
+    assert ctx.shutdown_callbacks == [synthesizer.close]

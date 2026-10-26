@@ -1,5 +1,6 @@
 """The part of a LiveKit job the room job touches: connecting, the room name, the
-agent's own attributes, waiting for the first person and the shutdown callbacks."""
+agent's own attributes, waiting for the first person and the shutdown callbacks; and the
+voice session the real synthesizer speaks through."""
 
 import asyncio
 from collections.abc import Callable, Coroutine
@@ -48,3 +49,29 @@ class FakeJobContext:
 
     def add_shutdown_callback(self, callback: Callable[..., Coroutine[Any, Any, None]]) -> None:
         self.shutdown_callbacks.append(callback)
+
+
+class FakeSpeech:
+    interrupted = False
+
+    async def wait_for_playout(self) -> None:
+        return None
+
+
+class FakeAgentSession:
+    """Records how the voice session is started, what it says and whether it closes."""
+
+    def __init__(self) -> None:
+        self.started: list[dict[str, Any]] = []
+        self.said: list[str] = []
+        self.closed = False
+
+    async def start(self, **options: Any) -> None:
+        self.started.append(options)
+
+    def say(self, text: str) -> FakeSpeech:
+        self.said.append(text)
+        return FakeSpeech()
+
+    async def aclose(self) -> None:
+        self.closed = True

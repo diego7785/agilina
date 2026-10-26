@@ -23,14 +23,19 @@ import httpx
 from livekit.agents import JobContext, WorkerOptions, WorkerPermissions, cli
 from livekit.protocol.models import TrackSource
 
+from agilina_agent.application.ports import SpeechSynthesizer
 from agilina_agent.infrastructure.http_agilina_api import REQUEST_TIMEOUT, HttpAgilinaApi
 from agilina_agent.infrastructure.logging_setup import configure_logging, get_logger
 from agilina_agent.infrastructure.pending_results import PendingResults
 from agilina_agent.infrastructure.settings import Settings, get_settings
-from agilina_agent.infrastructure.speech_synthesizers import RecordingSynthesizer
+from agilina_agent.infrastructure.speech_synthesizers import (
+    ElevenLabsSynthesizer,
+    RecordingSynthesizer,
+)
 from agilina_agent.infrastructure.whisper_transcriber import WhisperTranscriber
 from agilina_agent.infrastructure.worker_tokens import KeycloakWorkerTokens
 from agilina_agent.presentation.room_job import RoomJob
+from agilina_shared.enums import Language
 
 logger = get_logger(__name__)
 
@@ -60,6 +65,23 @@ async def resend_pending(settings: Settings) -> None:
         await api.close()
 
 
+def speech_synthesizer(settings: Settings, ctx: JobContext) -> SpeechSynthesizer:
+    """The real voice with an ElevenLabs key; without it the simulated one, so the
+    ceremony also runs locally and in the tests."""
+    if not settings.elevenlabs_api_key:
+        return RecordingSynthesizer()
+    synthesizer = ElevenLabsSynthesizer(
+        ctx.room,
+        api_key=settings.elevenlabs_api_key,
+        voice_by_language={
+            Language.ES: settings.elevenlabs_voice_es,
+            Language.EN: settings.elevenlabs_voice_en,
+        },
+    )
+    ctx.add_shutdown_callback(synthesizer.close)
+    return synthesizer
+
+
 async def entrypoint(ctx: JobContext) -> None:
     """Runs once per ceremony, in its own subprocess: wires the job here."""
     settings = get_settings()
@@ -71,7 +93,7 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.add_shutdown_callback(transcriber.close)
     job = RoomJob(
         api=api,
-        synthesizer=RecordingSynthesizer(),
+        synthesizer=speech_synthesizer(settings, ctx),
         transcriber=transcriber,
         default_language=settings.default_language,
     )
@@ -108,7 +130,7 @@ def run() -> None:
     cli.run_app(worker_options(settings))
 
 
-__all__ = ["entrypoint", "run", "worker_options"]
+__all__ = ["entrypoint", "run", "speech_synthesizer", "worker_options"]
 
 if __name__ == "__main__":
     run()

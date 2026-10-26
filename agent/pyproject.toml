@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "agilina-shared",
     "livekit-agents>=1.0",
+    "livekit-plugins-elevenlabs==1.8.4",  # plugins pin livekit-agents to their own version
     "httpx>=0.27",
     "pydantic-settings>=2.4",
 ]
