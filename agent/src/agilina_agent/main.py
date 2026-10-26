@@ -9,7 +9,8 @@ with the permissions the worker declared, and this module launches a dedicated
 subprocess that joins that room as one more participant.
 
 What is here is the skeleton that shows the life cycle: join the room, ask the
-API for the ceremony context, announce itself and wait. Before registering, the
+API for the ceremony context, publish its state, greet the first person and
+wait on standby without transcribing. Before registering, the
 worker resends once the results kept on disk that the API never accepted. Full
 facilitation arrives with the Release 1 and 2 stories; the logic that already
 exists lives in ``agilina_agent.domain.facilitation`` and is tested without a
@@ -27,6 +28,7 @@ from agilina_agent.infrastructure.logging_setup import configure_logging, get_lo
 from agilina_agent.infrastructure.pending_results import PendingResults
 from agilina_agent.infrastructure.settings import Settings, get_settings
 from agilina_agent.infrastructure.speech_synthesizers import RecordingSynthesizer
+from agilina_agent.infrastructure.whisper_transcriber import WhisperTranscriber
 from agilina_agent.infrastructure.worker_tokens import KeycloakWorkerTokens
 from agilina_agent.presentation.room_job import RoomJob
 
@@ -63,9 +65,14 @@ async def entrypoint(ctx: JobContext) -> None:
     settings = get_settings()
     configure_logging(settings.log_level)
 
+    api = agilina_api(settings)
+    transcriber = WhisperTranscriber(settings.stt_url)
+    ctx.add_shutdown_callback(api.close)
+    ctx.add_shutdown_callback(transcriber.close)
     job = RoomJob(
-        api=agilina_api(settings),
+        api=api,
         synthesizer=RecordingSynthesizer(),
+        transcriber=transcriber,
         default_language=settings.default_language,
     )
     await job.run(ctx)

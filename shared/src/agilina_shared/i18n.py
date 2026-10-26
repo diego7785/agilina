@@ -15,6 +15,12 @@ TEMPLATES: dict[str, dict[Language, str]] = {
         Language.EN: "Hi, I'm Agilina. We're on day {day} of {total} of the sprint. "
         "Let's start the daily stand-up.",
     },
+    "standby_greeting": {
+        Language.ES: "Hola, soy Agilina. Estamos en el día {day} de {total} del sprint. "
+        "Cuando estén listos, pulsen «Iniciar reunión diaria».",
+        Language.EN: "Hi, I'm Agilina. We're on day {day} of {total} of the sprint. "
+        "When you're ready, press “Start the daily stand-up”.",
+    },
     "hand_over_turn": {
         Language.ES: "{name}, es tu turno.",
         Language.EN: "{name}, it's your turn.",
