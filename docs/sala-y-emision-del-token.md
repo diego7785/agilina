@@ -2,7 +2,8 @@
 
 La web entra a la sala de la daily (AGI-60) con un token que emite la API (AGI-59). Las dos
 historias se desarrollaron en paralelo y se integraron con el contrato que quedó en
-[api.md](api.md). Esta página dice qué espera la web de ese endpoint y qué falta verificar.
+[api.md](api.md). Esta página dice qué espera la web de ese endpoint y de la lista de convocados
+de la pantalla de la sala (AGI-61), y qué falta verificar.
 
 ## Lo que la web espera de la API
 
@@ -42,6 +43,23 @@ Tres requisitos que el endpoint debe cumplir para que la sala funcione como est�
 3. **El nombre de la sala sale de `room_name_for(tenant, ceremony_id)`**
    ([room_name.py](../shared/src/agilina_shared/room_name.py)), el que el worker sabe leer.
 
+### `GET /v1/teams/{team_id}/dailies/current/participants`
+
+Requiere tenant, sesión, un sprint activo y que quien pide sea convocado de su daily (ser miembro
+no basta, tampoco para el admin), pero no la ventana para unirse. Lo pide `HttpDailyParticipantsApi`
+([http-daily-participants.api.ts](../web/src/app/features/ceremonies/infrastructure/http-daily-participants.api.ts))
+en cada conexión a la sala (AGI-61), para dar nombre y correo a la lista **Participantes**. La web
+espera, de cada convocado y en orden de turno, `room_identity` (la misma identidad que firma su
+token, para unirlo con quien está en la sala), `full_name` y `email` (el contrato completo está en
+[api.md](api.md)).
+
+```json
+{"participants": [{"room_identity": "6f1c2a9e-8b4d-4c3a-9e7f-2d5b8a1c0e93", "full_name": "Ana Pérez", "email": "ana@example.com"}]}
+```
+
+Cualquier error deja la sala igual de usable: la lista muestra solo a quienes están en la sala
+(como «Participante», sin correo) y el fallo ya lo registró `httpErrorLoggingInterceptor`.
+
 ## Pendiente de verificar con LiveKit
 
 AGI-59 ya está integrada y la web usa su contrato real. Falta probarlo contra un servidor de LiveKit
@@ -74,3 +92,26 @@ Llenar `AGILINA_LIVEKIT_URL`, `AGILINA_LIVEKIT_API_KEY` y `AGILINA_LIVEKIT_API_S
      entrar.» y la API emite el token; a los quince minutos ya no.
 
   La evidencia (capturas o video) va en el pull request.
+- **Verificación manual de la pantalla de la sala (AGI-61)**, con tres personas convocadas a la
+  daily al mismo tiempo (dos en escritorio y una en un celular, o en el modo de dispositivo de
+  DevTools a 375 px de ancho) y el worker levantado con `make agent`. Lo de una sola persona ya
+  lo comprueba [room.spec.ts](../tests/e2e/specs/room.spec.ts); esto es lo que necesita varias:
+  1. **Altas y bajas:** cada persona que entra pasa de Desconectado a Conectado en la lista de las
+     otras dos, y vuelve a Desconectado (atenuada) cuando pulsa **Salir de la sala**, que la lleva
+     al dashboard. Medir el tiempo (video a 30 cuadros por segundo o marcas de tiempo): menos de
+     1 s.
+  2. **Quién habla:** al hablar cada una, su fila muestra el ícono de voz, «Hablando» y el anillo
+     en las tres pantallas (también en la propia), en menos de 1 s, medido igual; al callar se
+     apaga.
+  3. **«· tú»:** cada persona ve «· tú» solo en su fila, con su nombre y su correo.
+  4. **Agilina:** con `make agent`, la tarjeta Estado de Agilina dice «En la sala» y Agilina no
+     aparece como fila de Participantes; cuando habla, el indicador de voz sale en la tarjeta.
+     Confirmar en los registros del worker (o en la consola de LiveKit) que entra como
+     participante de tipo agente (`participant.isAgent`); si no, la web la mostraría como
+     «Participante».
+  5. **Celular:** en 375 px la sala se apila en una columna (Estado de Agilina, Turno de,
+     Participantes y Acciones), nada se desplaza de lado y **Salir de la sala** se alcanza y
+     funciona.
+  6. **Sin transcripción:** ninguna pantalla muestra texto de lo que se dice.
+
+  La evidencia (el video o las capturas con las mediciones) va en el pull request.

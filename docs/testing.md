@@ -176,6 +176,15 @@ La sala real necesita un servidor de LiveKit con sus claves en el `.env`: sin é
 responde con un fallo y sus pruebas se saltan con el motivo, en vez de fallar. Que dos personas se
 escuchen se verifica a mano (AGI-135).
 
+De la pantalla de la sala (AGI-61), `room.spec.ts` comprueba lo que se ve con **una sola
+persona**: su fila en Participantes con «· tú», su correo y Conectado; las tres acciones visibles y
+deshabilitadas; que no hay transcripción; que **Salir de la sala** vuelve al dashboard y suelta el
+audio; y que a 375 px la sala se apila sin desplazarse de lado. Lo que necesita **tres personas**
+(altas y bajas, quién habla en menos de un segundo, Agilina en la sala con `make agent`) se
+verifica a mano, con la lista de
+[sala-y-emision-del-token.md](sala-y-emision-del-token.md#2-verificar) y la evidencia en el pull
+request.
+
 Una prueba de punta a punta encuentra los elementos por su `data-testid` (`page.getByTestId(…)`),
 nunca por su texto, su etiqueta, su rol o su clase: un texto o una etiqueta que cambian no la rompen.
 Lo que la persona lee se sigue comprobando, sobre el elemento encontrado así

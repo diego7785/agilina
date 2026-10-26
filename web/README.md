@@ -129,7 +129,7 @@ concepto se llame igual en todo el sistema:
 | `tenancy` | La página «no encontrada» de una dirección sin organización | Existe |
 | `identity` | Activación de la cuenta desde la invitación (`/activate`); inicio y cierre de sesión; la página de cuenta no activa (`/account-not-active`) | Activación existe (HU-02); la página de cuenta no activa con su botón de cerrar sesión, también (AGI-123); el resto llega con HU-03/04 |
 | `teams` | Equipo, integrantes, sprint, dashboard y pestaña de configuración (solo `admin`) | Existe: dashboard en `/:tenant/teams/:teamId` (HU-12), que lee `GET /v1/teams/{id}/dashboard` en una sola llamada y muestra el día N de M con su barra y el número del sprint («Sprint 12», que asigna la API), la próxima daily en la hora del navegador, el modo como etiqueta de solo lectura y la sala; «Unirse a la sala» es un enlace a la sala desde diez minutos antes de la daily hasta quince minutos después (`join-window.ts`, con un temporizador, sin recargar; en ese último tramo dice que la reunión diaria ya empezó) y fuera de la ventana un botón deshabilitado (AGI-60); Configuración → Sprint tiene el botón «Cerrar sprint activo» del mockup, sin función todavía (llega con AGI-81); el encabezado tiene las entradas Dashboard y Configuración y **Cambiar de equipo**, que lleva al selector aunque haya un solo equipo (`{ choose: true }`);  selector mínimo, creación y dashboard placeholder (HU-05); Configuración → Equipo en `/:tenant/teams/:teamId/settings` (HU-06): integrantes con su etiqueta de rol, invitar, cambiar el rol y eliminar; Configuración → Sprint en `/:tenant/teams/:teamId/settings/sprint` (HU-07): fechas, hora de la daily en la zona del navegador y participantes ordenados con subir y bajar, y la línea «Día N de M» del dashboard. El resto llega con sus historias |
-| `ceremonies` | La sala de la Daily: LiveKit, turnos y controles hacia el agente | Existe la sala en `/:tenant/teams/:teamId/room` (AGI-60): pide el token a la API, entra con `livekit-client`, activa el micrófono, escucha a todos y muestra el estado de la conexión y del micrófono (ver «Sala de LiveKit»). Los participantes, quién habla y los controles llegan con AGI-61 y las historias de la ceremonia |
+| `ceremonies` | La sala de la Daily: LiveKit, turnos y controles hacia el agente | Existe la sala en `/:tenant/teams/:teamId/room` (AGI-60): pide el token a la API, entra con `livekit-client`, activa el micrófono, escucha a todos y muestra el estado de la conexión y del micrófono (ver «Sala de LiveKit»). Con AGI-61 muestra **Estado de Agilina** (si está en la sala y si habla), **Turno de** («Sin turno activo» hasta que lleguen los turnos), **Participantes** (los convocados con iniciales, nombre, «· tú» en la fila propia, correo y Conectado o Desconectado, y quién habla) y **Acciones** (Iniciar reunión diaria, Terminar turno y Terminar ceremonia, deshabilitadas hasta AGI-71, AGI-73 y AGI-78) con **Salir de la sala**, que vuelve al dashboard. En el celular todo se apila en una columna. No muestra transcripción |
 
 ### Capas dentro de una funcionalidad
 
@@ -310,6 +310,14 @@ Un solo estilo para todos los formularios (el de `/:tenant/activate`, el de `/:t
   convocados en orden de turno, Conectado o Desconectado, y después quien esté en la sala sin estar
   convocado, como «Participante». Agilina nunca es una fila. Si la API no responde, la lista
   muestra solo a quienes están en la sala.
+- **Quién habla** (AGI-61): `RoomPort` traduce los oradores activos de LiveKit
+  (`ActiveSpeakersChanged`) al cambio `speaking`, con las identidades que hablan. La fila de quien
+  habla lleva `agl-speaking-indicator` (el ícono de voz y «Hablando») y un anillo; si es Agilina,
+  el indicador va en la tarjeta Estado de Agilina. Una región `aria-live` siempre presente
+  (`room-speaking-announcer`) anuncia quién habla, y «Turno de» también es `aria-live`: no se
+  depende solo del color. Mientras la sala reconecta nadie aparece hablando.
+- **Salir de la sala** es un enlace al dashboard: dejar la página sale de la sala y suelta el
+  micrófono (`RoomFacade`, en su `onDestroy`), y los demás ven la fila pasar a Desconectado.
 - La prueba del adaptador usa un `Room` falso que entrega `LIVEKIT_ROOM_FACTORY`: ninguna prueba
   unitaria abre una conexión.
 
