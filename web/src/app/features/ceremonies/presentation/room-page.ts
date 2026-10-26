@@ -16,7 +16,8 @@ import { isRetriable } from '../domain/room-failure';
  * how the connection is, what happened to the microphone and what to do about it. A participant
  * without a microphone stays as a listener. In the room it shows the status of Agilina, whose
  * turn it is, the participants and the actions (AGI-61), marks who is speaking and announces it
- * to a screen reader. Leaving the page leaves the room.
+ * to a screen reader. If Agilina could not join, it says so and the meeting goes on without her.
+ * Leaving the page leaves the room.
  */
 @Component({
   selector: 'agl-room-page',
@@ -45,6 +46,7 @@ export class RoomPage implements OnInit {
   protected readonly muted = this.facade.muted;
   protected readonly participants = this.facade.participants;
   protected readonly agilinaPresent = this.facade.agilinaPresent;
+  protected readonly agilinaStatus = this.facade.agilinaStatus;
   protected readonly agilinaSpeaking = this.facade.agilinaSpeaking;
   private readonly unknownName = translateSignal('ceremonies.room.participants.unknown');
   private readonly agilinaName = translateSignal('ceremonies.room.agilina.name');

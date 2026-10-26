@@ -440,8 +440,11 @@
       "agilina": {
         "title": "Estado de Agilina",
         "name": "Agilina",
-        "present": "En la sala",
-        "absent": "Aún no está en la sala"
+        "arriving": "Llegando…",
+        "standby": "En espera",
+        "no_facilitation": "Sin facilitación",
+        "unavailable": "No disponible",
+        "unavailable_notice": "Agilina no pudo unirse; la reunión puede continuar sin ella"
       },
       "turn": {
         "title": "Turno de",

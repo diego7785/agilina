@@ -22,6 +22,10 @@ import { type RoomChange, type RoomPort } from '../application/room.port';
 import { type MicrophoneState } from '../domain/microphone-state';
 import { type RoomAccess } from '../domain/room-access';
 import { RoomFailure, type RoomFailureKind } from '../domain/room-failure';
+import { type AgentState } from '../domain/room-presence';
+
+/** The participant attribute where the agent publishes its state (AGI-146). */
+const AGENT_STATE_ATTRIBUTE = 'agilina.state';
 
 /**
  * LiveKit adapter of the room port: the only place that knows `livekit-client`. Each connection
@@ -141,6 +145,10 @@ export class LiveKitRoomAdapter implements RoomPort {
       .on(RoomEvent.ParticipantConnected, () => {
         this.emitFor(room, presenceOf(room));
       })
+      // The agent told its state (standby, no facilitation).
+      .on(RoomEvent.ParticipantAttributesChanged, () => {
+        this.emitFor(room, presenceOf(room));
+      })
       // Someone's microphone was silenced, turned on, published or taken away.
       .on(RoomEvent.TrackMuted, () => {
         this.emitFor(room, presenceOf(room));
@@ -254,15 +262,23 @@ function presenceOf(room: Room, leaving?: string): RoomChange {
         agent: local.isAgent,
         local: true,
         muted: !local.isMicrophoneEnabled,
+        agentState: agentStateOf(local),
       },
       ...remote.map((participant) => ({
         identity: participant.identity,
         agent: participant.isAgent,
         local: false,
         muted: !participant.isMicrophoneEnabled,
+        agentState: agentStateOf(participant),
       })),
     ],
   };
+}
+
+/** The state an agent published, or `null` for anyone else or a value this page does not know. */
+function agentStateOf(participant: Participant): AgentState | null {
+  const state = participant.attributes[AGENT_STATE_ATTRIBUTE];
+  return participant.isAgent && (state === 'standby' || state === 'no_facilitation') ? state : null;
 }
 
 /** Why LiveKit did not let the participant in. */

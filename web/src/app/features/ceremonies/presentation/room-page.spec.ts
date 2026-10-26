@@ -286,7 +286,8 @@ describe('RoomPage', () => {
     it('shows the status of Agilina, the turn, the participants and the actions', async () => {
       const page = await open();
 
-      expect(text(page, 'room-agilina-status')).toBe('Estado de Agilina Aún no está en la sala');
+      expect(text(page, 'room-agilina-status')).toBe('Estado de Agilina Llegando…');
+      expect(page.querySelector('[data-testid="room-agilina-unavailable"]')).toBeNull();
       expect(text(page, 'room-turn')).toBe('Turno de Sin turno activo');
       expect(text(page, 'room-participants')).toBe('Participantes');
       expect(page.querySelector('#room-actions-title')?.textContent.trim()).toBe('Acciones');
@@ -492,7 +493,7 @@ describe('RoomPage', () => {
     const everyone = [
       aPresence('user-eva', { local: true }),
       aPresence('user-ana'),
-      aPresence('agilina', { agent: true }),
+      aPresence('agilina', { agent: true, agentState: 'standby' }),
     ];
 
     beforeEach(() => {
@@ -509,18 +510,50 @@ describe('RoomPage', () => {
         .map((row) => text(row, 'participant-name'));
     }
 
-    it('says Agilina is in the room when an agent is, and not in the list', async () => {
+    it('says the state Agilina published, and keeps her out of the list', async () => {
       const page = await open();
 
       room.emit({ kind: 'presence', present: everyone });
       await settle();
 
-      expect(text(page, 'room-agilina-status')).toBe('Estado de Agilina En la sala');
+      expect(text(page, 'room-agilina-status')).toBe('Estado de Agilina En espera');
       expect(page.querySelectorAll('[data-testid="room-participants"] li').length).toBe(2);
+
+      room.emit({
+        kind: 'presence',
+        present: [
+          ...everyone.slice(0, 2),
+          aPresence('agilina', { agent: true, agentState: 'no_facilitation' }),
+        ],
+      });
+      await settle();
+      expect(text(page, 'room-agilina-status')).toBe('Estado de Agilina Sin facilitación');
 
       room.emit({ kind: 'presence', present: everyone.slice(0, 2) });
       await settle();
-      expect(text(page, 'room-agilina-status')).toBe('Estado de Agilina Aún no está en la sala');
+      expect(text(page, 'room-agilina-status')).toBe('Estado de Agilina Llegando…');
+    });
+
+    it('says Agilina could not join once her time runs out, and keeps the room usable', async () => {
+      jasmine.clock().install();
+      try {
+        const page = await open();
+
+        jasmine.clock().tick(30_000);
+        await settle();
+
+        expect(text(page, 'room-agilina-status')).toBe('Estado de Agilina No disponible');
+        expect(text(page, 'room-agilina-unavailable')).toBe(
+          'Agilina no pudo unirse; la reunión puede continuar sin ella',
+        );
+        expect(page.querySelector('[data-testid="room-agilina-unavailable"]')?.role).toBe('alert');
+        expect(page.querySelector('[data-testid="room-mute"]')).not.toBeNull();
+        expect(page.querySelector('[data-testid="room-agilina-avatar"]')?.classList).toContain(
+          'absent',
+        );
+      } finally {
+        jasmine.clock().uninstall();
+      }
     });
 
     it('marks the row of who speaks and takes the mark away when they stop', async () => {
@@ -548,7 +581,7 @@ describe('RoomPage', () => {
       await settle();
 
       expect(text(page, 'room-agilina-speaking')).toBe('Hablando');
-      expect(text(page, 'room-agilina-status')).toBe('Estado de Agilina En la sala Hablando');
+      expect(text(page, 'room-agilina-status')).toBe('Estado de Agilina En espera Hablando');
       expect(speakingRows(page)).toEqual(['Eva Prueba']);
       expect(text(page, 'room-speaking-announcer')).toBe('Está hablando: Eva Prueba, Agilina');
     });

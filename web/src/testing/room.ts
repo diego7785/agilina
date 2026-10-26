@@ -6,7 +6,7 @@ import { type RoomChange, RoomPort } from '@features/ceremonies/application/room
 import { type DailyParticipant } from '@features/ceremonies/domain/daily-participant';
 import { type MicrophoneState } from '@features/ceremonies/domain/microphone-state';
 import { type RoomAccess } from '@features/ceremonies/domain/room-access';
-import { type RoomPresence } from '@features/ceremonies/domain/room-presence';
+import { type AgentState, type RoomPresence } from '@features/ceremonies/domain/room-presence';
 
 /** An access to the room of Atlas's daily; `n` tells one access from the next. */
 export function anAccess(n = 1): RoomAccess {
@@ -44,9 +44,10 @@ export function aPresence(
     agent = false,
     local = false,
     muted = false,
-  }: { agent?: boolean; local?: boolean; muted?: boolean } = {},
+    agentState = null,
+  }: { agent?: boolean; local?: boolean; muted?: boolean; agentState?: AgentState | null } = {},
 ): RoomPresence {
-  return { identity, agent, local, muted };
+  return { identity, agent, local, muted, agentState };
 }
 
 /** API double: it hands over `participants` each time, or the failure the test sets. */
