@@ -109,9 +109,15 @@
     <div class="mt-6 grid gap-4">
       @switch (microphone()) {
         @case ('on') {
-          <p class="text-sm font-medium text-success" data-testid="microphone-on">
-            {{ t('microphone.on') }}
-          </p>
+          @if (muted()) {
+            <p class="text-sm font-medium text-muted" data-testid="microphone-muted">
+              {{ t('microphone.muted') }}
+            </p>
+          } @else {
+            <p class="text-sm font-medium text-success" data-testid="microphone-on">
+              {{ t('microphone.on') }}
+            </p>
+          }
         }
         @case ('pending') {
           <p class="text-sm text-muted" data-testid="microphone-pending">
@@ -165,6 +171,199 @@
           </button>
         </div>
       }
+    </div>
+
+    <div
+      class="mt-6 flex flex-col gap-4 rounded-2xl border border-border bg-surface p-6 shadow-sm md:flex-row md:items-center md:justify-between"
+    >
+      <section
+        class="flex items-center gap-4"
+        aria-labelledby="room-agilina-title"
+        data-testid="room-agilina-status"
+      >
+        <agl-agilina-avatar
+          class="size-14 shrink-0"
+          data-testid="room-agilina-avatar"
+          [speaking]="agilinaSpeaking()"
+          [present]="agilinaPresent()"
+        />
+        <div>
+          <h2
+            id="room-agilina-title"
+            class="text-xs font-semibold tracking-wide text-muted uppercase"
+          >
+            {{ t('agilina.title') }}
+          </h2>
+          <p class="font-display text-xl font-bold">
+            {{ t(agilinaPresent() ? 'agilina.present' : 'agilina.absent') }}
+          </p>
+          @if (agilinaSpeaking()) {
+            <agl-speaking-indicator class="mt-1" data-testid="room-agilina-speaking" />
+          }
+        </div>
+      </section>
+      <section class="md:text-right" aria-labelledby="room-turn-title" data-testid="room-turn">
+        <h2 id="room-turn-title" class="text-xs font-semibold tracking-wide text-muted uppercase">
+          {{ t('turn.title') }}
+        </h2>
+        <!-- A live region from the start, so that a screen reader announces each new turn. -->
+        <p class="font-display text-xl font-bold" aria-live="polite">{{ t('turn.none') }}</p>
+      </section>
+    </div>
+
+    <!-- Always in the room, so that a screen reader announces each change of who is speaking. -->
+    <p aria-live="polite" class="sr-only" data-testid="room-speaking-announcer">
+      @if (speakingNames(); as names) {
+        {{ t('speaking_announcement', { names }) }}
+      }
+    </p>
+
+    <div class="mt-6 grid gap-6 md:grid-cols-[2fr_1fr] md:items-start">
+      <section
+        class="min-w-0 rounded-2xl border border-border bg-surface p-6 shadow-sm"
+        aria-labelledby="room-participants-title"
+        data-testid="room-participants"
+      >
+        <h2 id="room-participants-title" class="font-display text-lg font-semibold">
+          {{ t('participants.title') }}
+        </h2>
+        <ul class="mt-4 grid gap-2">
+          @for (row of participants(); track row.identity) {
+            <li data-testid="room-participant"><agl-participant-tile [row]="row" /></li>
+          }
+        </ul>
+      </section>
+      <section
+        class="min-w-0 rounded-2xl border border-border bg-surface p-6 shadow-sm"
+        aria-labelledby="room-actions-title"
+        data-testid="room-actions"
+      >
+        <h2 id="room-actions-title" class="font-display text-lg font-semibold">
+          {{ t('actions.title') }}
+        </h2>
+        @if (microphone() === 'on') {
+          <button
+            aglButton
+            variant="secondary"
+            type="button"
+            class="mt-4 w-full"
+            data-testid="room-mute"
+            (click)="toggleMute()"
+          >
+            @if (muted()) {
+              <!-- Lucide "mic-off" icon. -->
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="size-4"
+                aria-hidden="true"
+              >
+                <line x1="2" x2="22" y1="2" y2="22" />
+                <path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2" />
+                <path d="M5 10v2a7 7 0 0 0 12 5" />
+                <path d="M15 9.34V5a3 3 0 0 0-5.68-1.33" />
+                <path d="M9 9v3a3 3 0 0 0 5.12 2.12" />
+                <line x1="12" x2="12" y1="19" y2="22" />
+              </svg>
+              {{ t('actions.unmute') }}
+            } @else {
+              <!-- Lucide "mic" icon. -->
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="size-4"
+                aria-hidden="true"
+              >
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" x2="12" y1="19" y2="22" />
+              </svg>
+              {{ t('actions.mute') }}
+            }
+          </button>
+        }
+        <!-- Disabled for everyone until their stories (AGI-71, AGI-73, AGI-78). -->
+        <div class="mt-4 flex flex-col gap-3">
+          <button
+            aglButton
+            variant="secondary"
+            type="button"
+            class="w-full"
+            disabled
+            aria-describedby="room-actions-unavailable"
+            data-testid="room-start-daily"
+          >
+            {{ t('actions.start_daily') }}
+          </button>
+          <button
+            aglButton
+            variant="secondary"
+            type="button"
+            class="w-full"
+            disabled
+            aria-describedby="room-actions-unavailable"
+            data-testid="room-end-turn"
+          >
+            {{ t('actions.end_turn') }}
+          </button>
+          <button
+            aglButton
+            variant="secondary"
+            type="button"
+            class="w-full"
+            disabled
+            aria-describedby="room-actions-unavailable"
+            data-testid="room-end-ceremony"
+          >
+            {{ t('actions.end_ceremony') }}
+          </button>
+        </div>
+        <p
+          id="room-actions-unavailable"
+          class="mt-2 text-sm text-muted"
+          data-testid="room-actions-unavailable"
+        >
+          {{ t('actions.unavailable') }}
+        </p>
+        <div class="mt-6 border-t border-border pt-4">
+          <!-- Leaving the page leaves the room (RoomFacade's onDestroy). -->
+          <a
+            aglButton
+            variant="secondary"
+            class="w-full"
+            [routerLink]="dashboardPath()"
+            data-testid="room-leave"
+          >
+            <!-- Lucide "log-out" icon. -->
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="size-4"
+              aria-hidden="true"
+            >
+              <path d="m16 17 5-5-5-5" />
+              <path d="M21 12H9" />
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            </svg>
+            {{ t('actions.leave') }}
+          </a>
+        </div>
+      </section>
     </div>
   }
 </section>

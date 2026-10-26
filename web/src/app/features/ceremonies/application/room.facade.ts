@@ -1,14 +1,18 @@
-import { DestroyRef, inject, Injectable, signal } from '@angular/core';
+import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 
+import { DailyParticipantsPort } from './daily-participants.port';
 import { RoomAccessPort } from './room-access.port';
 import { type RoomChange, RoomPort } from './room.port';
 import { type ConnectionStatus } from '../domain/connection-status';
+import { type DailyParticipant } from '../domain/daily-participant';
 import { type MicrophoneState } from '../domain/microphone-state';
+import { participantRows } from '../domain/participant-rows';
 import { RECONNECT_BUDGET_MS } from '../domain/reconnect-budget';
 import { type RoomAccess } from '../domain/room-access';
 import { type RoomFailureKind, roomFailureKindOf } from '../domain/room-failure';
+import { type RoomPresence } from '../domain/room-presence';
 
 /**
  * State of the participant in the room of the daily (AGI-60): the connection, the microphone,
@@ -24,10 +28,15 @@ import { type RoomFailureKind, roomFailureKindOf } from '../domain/room-failure'
  * `RECONNECT_BUDGET_MS` the facade leaves the room (an attempt that hangs would otherwise keep
  * it reconnecting past the budget), and trying again asks for a new access as well. The adapters already logged what went wrong, so it is not logged
  * again here.
+ * The list of participants (AGI-61) joins the invited, asked for on each connection once in, with
+ * who the room says is in it; if the invited cannot be read, it lists only who is in the room.
+ * It also follows who is speaking, as LiveKit tells it, and whether Agilina (the agent in the
+ * room) is there and speaking.
  */
 @Injectable()
 export class RoomFacade {
   private readonly accessPort = inject(RoomAccessPort);
+  private readonly participantsPort = inject(DailyParticipantsPort);
   private readonly room = inject(RoomPort);
   private teamId: string | null = null;
   /** Increases with every attempt to join, so that a late answer of an old one is ignored. */
@@ -40,12 +49,28 @@ export class RoomFacade {
   private readonly currentMicrophone = signal<MicrophoneState>('pending');
   private readonly currentFailure = signal<RoomFailureKind | null>(null);
   private readonly currentAudioBlocked = signal(false);
+  private readonly currentMuted = signal(false);
+  private readonly invitees = signal<readonly DailyParticipant[]>([]);
+  private readonly present = signal<readonly RoomPresence[]>([]);
+  private readonly speaking = signal<readonly string[]>([]);
 
   readonly status = this.currentStatus.asReadonly();
   readonly microphone = this.currentMicrophone.asReadonly();
   /** Why the participant is out of the room, while the status is `failed`. */
   readonly failure = this.currentFailure.asReadonly();
   readonly audioBlocked = this.currentAudioBlocked.asReadonly();
+  /** Whether the participant silenced their microphone, which stays published (`on`). */
+  readonly muted = this.currentMuted.asReadonly();
+  /** The invited in turn order, connected or not, then whoever else is in the room. */
+  readonly participants = computed(() =>
+    participantRows(this.invitees(), this.present(), this.speaking()),
+  );
+  readonly agilinaPresent = computed(() => this.present().some((presence) => presence.agent));
+  readonly agilinaSpeaking = computed(() =>
+    this.present().some(
+      (presence) => presence.agent && this.speaking().includes(presence.identity),
+    ),
+  );
 
   constructor() {
     this.room.changes.pipe(takeUntilDestroyed()).subscribe((change) => {
@@ -73,9 +98,27 @@ export class RoomFacade {
   /** Asks for the microphone again, once the person allowed it or plugged one in. */
   async retryMicrophone(): Promise<void> {
     this.currentMicrophone.set('pending');
+    this.currentMuted.set(false);
     const state = await this.room.enableMicrophone();
     if (!this.destroyed) {
       this.currentMicrophone.set(state);
+    }
+  }
+
+  /**
+   * Silences the microphone or turns it on again. If it cannot be turned on again (the device was
+   * unplugged, say), the person stays as a listener with «Reintentar micrófono».
+   */
+  async toggleMute(): Promise<void> {
+    const muted = !this.currentMuted();
+    try {
+      await this.room.muteMicrophone(muted);
+      this.currentMuted.set(muted);
+    } catch {
+      if (!this.destroyed) {
+        this.currentMuted.set(false);
+        this.currentMicrophone.set('unavailable');
+      }
     }
   }
 
@@ -96,7 +139,10 @@ export class RoomFacade {
     this.currentStatus.set('connecting');
     this.currentFailure.set(null);
     this.currentMicrophone.set('pending');
+    this.currentMuted.set(false);
     this.currentAudioBlocked.set(false);
+    this.present.set([]);
+    this.speaking.set([]);
     try {
       await this.room.disconnect();
       const asked = await this.room.requestMicrophone();
@@ -108,6 +154,7 @@ export class RoomFacade {
         return;
       }
       this.currentStatus.set('connected');
+      void this.loadInvitees(teamId, current);
       const microphone = asked === 'on' ? await this.room.enableMicrophone() : asked;
       if (current()) {
         this.currentMicrophone.set(microphone);
@@ -143,6 +190,18 @@ export class RoomFacade {
     return firstValueFrom(this.accessPort.requestAccess(teamId));
   }
 
+  /** Without the invited (the adapter logged why), the list keeps only who is in the room. */
+  private async loadInvitees(teamId: string, current: () => boolean): Promise<void> {
+    try {
+      const invitees = await firstValueFrom(this.participantsPort.participantsOf(teamId));
+      if (current()) {
+        this.invitees.set(invitees);
+      }
+    } catch {
+      // Nothing else to do: the list shows who is in the room.
+    }
+  }
+
   /** The connection did not come back in time: leave the room and let the person try again. */
   private giveUp(): void {
     this.reconnectTimer = null;
@@ -157,6 +216,8 @@ export class RoomFacade {
   private lose(): void {
     this.currentStatus.set('failed');
     this.currentFailure.set('connection_lost');
+    this.present.set([]);
+    this.speaking.set([]);
   }
 
   private stopReconnectTimer(): void {
@@ -171,6 +232,8 @@ export class RoomFacade {
       case 'reconnecting':
         if (this.currentStatus() === 'connected') {
           this.currentStatus.set('reconnecting');
+          // Nobody is heard while the connection is down; LiveKit tells the speakers again after.
+          this.speaking.set([]);
           this.reconnectTimer = setTimeout(() => {
             this.giveUp();
           }, RECONNECT_BUDGET_MS);
@@ -190,6 +253,12 @@ export class RoomFacade {
         return;
       case 'audio_blocked':
         this.currentAudioBlocked.set(change.blocked);
+        return;
+      case 'presence':
+        this.present.set(change.present);
+        return;
+      case 'speaking':
+        this.speaking.set(change.identities);
         return;
     }
   }

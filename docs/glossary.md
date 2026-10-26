@@ -70,6 +70,7 @@ Si aparece un concepto nuevo, se agrega aquí antes de usarlo.
 | Wake word | Palabra de activación | Palabra con la que se le habla a Agilina durante la ceremonia |
 | Degraded mode | Modo degradado | La transcripción no responde: Agilina lo anuncia y la ceremonia sigue sin facilitación automática |
 | Room | Sala | La sala de audio de LiveKit de una ceremonia. Se llama `<tenant>-<ceremony_id>` (`room_name_for`) |
+| Agent participant (`participant.isAgent`) | Agilina en la sala | Agilina entra a la sala de LiveKit como participante de tipo `AGENT` (`participant.isAgent`), y así la reconoce la web: no es una fila de «Participantes», sino que se muestra aparte en «Estado de Agilina», con su presencia y si está hablando (AGI-61) |
 | Connection status | Estado de la conexión | Cómo está el participante en la sala: `connecting` (Conectando…), `connected` (Conectado), `reconnecting` (Reconectando…: se cayó la red y LiveKit lo intenta solo, hasta 30 s) y `failed` (Desconectado, con el motivo y, si sirve, **Reintentar**) |
 | Listener | Oyente | Participante que está en la sala sin micrófono (lo negó, no tiene o requiere HTTPS): escucha al equipo, pero nadie lo escucha. Puede reintentar el micrófono sin salir |
 | `room_identity` | Identidad de sala | Identidad con la que alguien entra a LiveKit, `str(user_id)`; con ella se atribuye lo que dice, sin diarización |

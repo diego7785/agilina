@@ -36,6 +36,7 @@ def test_the_graph_is_built_without_postgres_keycloak_or_a_mail_server():
     assert container.get_ceremony_context is not None
     assert container.deliver_ceremony_result is not None
     assert container.join_current_daily is not None
+    assert container.get_current_daily_participants is not None
 
 
 def test_the_room_token_is_signed_with_the_livekit_project_the_web_connects_to(monkeypatch):

@@ -5,9 +5,9 @@ active sprint with Ana in the round (nothing delivered for it yet), and another 
 to a sprint that is no longer active. The worker's token and a person's are told apart by
 ``FakeAuthenticatedWorkers``.
 
-``DailiesApi`` is the route of people (AGI-59): Ana is in the round of Atlas's daily, Bruno is
-the admin of Atlas but not in the round, Boreal has Ana as a member and no active sprint, and
-Olga has a session but no team, like someone the link was forwarded to."""
+``DailiesApi`` is the routes of people (AGI-59, AGI-61): Ana and then Carla are in the round of
+Atlas's daily, Bruno is the admin of Atlas but not in the round, Boreal has Ana as a member and
+no active sprint, and Olga has a session but no team, like someone the link was forwarded to."""
 
 from fastapi import Depends
 from httpx import ASGITransport, AsyncClient
@@ -19,8 +19,12 @@ from agilina_api.ceremonies.application.commands.deliver_ceremony_result import 
 from agilina_api.ceremonies.application.commands.join_current_daily import (
     JoinCurrentDailyHandler,
 )
+from agilina_api.ceremonies.application.dtos import ParticipantContact
 from agilina_api.ceremonies.application.queries.get_ceremony_context import (
     GetCeremonyContextHandler,
+)
+from agilina_api.ceremonies.application.queries.get_current_daily_participants import (
+    GetCurrentDailyParticipantsHandler,
 )
 from agilina_api.ceremonies.presentation.http import dependencies as deps
 from agilina_api.shared.application.tenancy import Tenant
@@ -43,6 +47,7 @@ from tests.api.doubles import (
     FakeCeremonyQueries,
     FakeCeremonyRoster,
     FakeClock,
+    FakeParticipantContacts,
     FakeParticipantNames,
     FakeRooms,
     FakeTeamAccess,
@@ -54,6 +59,7 @@ TOKEN_WORKER = "token-of-the-worker"
 TOKEN_PERSON = "token-of-a-person"
 TOKEN_ANA = "token-of-ana"
 TOKEN_BRUNO = "token-of-bruno"
+TOKEN_CARLA = "token-of-carla"
 TOKEN_OLGA = "token-of-olga"
 TOKEN_INACTIVE = "token-of-someone-not-active"
 LIVEKIT_URL = "wss://livekit.example.test"
@@ -133,28 +139,41 @@ class DailiesApi:
     """See the module: the clock stands at the start of Atlas's first daily."""
 
     def __init__(self) -> None:
-        self.ana, self.bruno, self.olga = next_id(), next_id(), next_id()
+        self.ana, self.bruno, self.carla, self.olga = next_id(), next_id(), next_id(), next_id()
         self.atlas, self.boreal = next_id(), next_id()
-        roster = RosterBuilder().with_participant(self.ana).build()
+        roster = RosterBuilder().with_participant(self.ana).with_participant(self.carla).build()
+        rosters = FakeCeremonyRoster({(self.atlas, roster.sprint_id): roster})
         self.repository = InMemoryCeremonyRepository()
         self.rooms = FakeRooms()
         self.clock = FakeClock(DAILY_TIME)
         handler = JoinCurrentDailyHandler(
             lambda: FakeCeremoniesUnitOfWork(self.repository),
-            FakeCeremonyRoster({(self.atlas, roster.sprint_id): roster}),
+            rosters,
             self.rooms,
             self.clock,
             LIVEKIT_URL,
             new_id=next_id,
         )
+        self.contacts = FakeParticipantContacts(
+            {
+                self.ana: ParticipantContact(full_name="Ana Gil", email="ana@acme.test"),
+                self.carla: ParticipantContact(full_name="Carla Ruiz", email="carla@acme.test"),
+            }
+        )
         users = FakeAuthenticatedUsers(
-            {TOKEN_ANA: self.ana, TOKEN_BRUNO: self.bruno, TOKEN_OLGA: self.olga},
+            {
+                TOKEN_ANA: self.ana,
+                TOKEN_BRUNO: self.bruno,
+                TOKEN_CARLA: self.carla,
+                TOKEN_OLGA: self.olga,
+            },
             inactive_tokens={TOKEN_INACTIVE},
         )
         access = FakeTeamAccess(
             {
                 (self.atlas, self.ana): TeamRole.MEMBER,
                 (self.atlas, self.bruno): TeamRole.ADMIN,
+                (self.atlas, self.carla): TeamRole.MEMBER,
                 (self.boreal, self.ana): TeamRole.MEMBER,
             }
         )
@@ -162,6 +181,9 @@ class DailiesApi:
         overrides = {
             get_tenant_directory: FakeTenantDirectory(TenantBuilder().build()),
             deps.get_join_current_daily_handler: handler,
+            deps.get_get_current_daily_participants_handler: GetCurrentDailyParticipantsHandler(
+                rosters, self.contacts
+            ),
             get_authenticated_users: users,
             get_team_access: access,
         }
@@ -177,6 +199,14 @@ class DailiesApi:
         async with self.client() as client:
             return await client.post(
                 f"/v1/teams/{team_id or self.atlas}/dailies/current/token",
+                headers=_headers(token, tenant),
+            )
+
+    async def participants(self, token: str | None = TOKEN_ANA, team_id=None, tenant="acme"):
+        """GET who is called to the daily of ``team_id`` (Atlas unless told otherwise)."""
+        async with self.client() as client:
+            return await client.get(
+                f"/v1/teams/{team_id or self.atlas}/dailies/current/participants",
                 headers=_headers(token, tenant),
             )
 

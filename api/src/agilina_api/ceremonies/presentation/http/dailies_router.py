@@ -1,8 +1,9 @@
-"""The ceremonies API for people: a participant of the daily joins today's room (AGI-59).
+"""The ceremonies API for people: a participant of the daily joins today's room (AGI-59) and
+sees who else is called to it (AGI-61).
 
 Unlike the worker's routes (``router``), these are a person's: they name the team in the path
 and declare ``Depends(current_team_member)``. Being a member is not enough to join, though: the
-rule of the participant lives in the use case, so the admin of the team gets ``403`` too when
+rule of the participant lives in the use cases, so the admin of the team gets ``403`` too when
 they are not among the daily's participants.
 """
 
@@ -12,9 +13,20 @@ from agilina_api.ceremonies.application.commands.join_current_daily import (
     JoinCurrentDaily,
     JoinCurrentDailyHandler,
 )
-from agilina_api.ceremonies.presentation.http.dependencies import get_join_current_daily_handler
+from agilina_api.ceremonies.application.queries.get_current_daily_participants import (
+    GetCurrentDailyParticipants,
+    GetCurrentDailyParticipantsHandler,
+)
+from agilina_api.ceremonies.presentation.http.dependencies import (
+    get_get_current_daily_participants_handler,
+    get_join_current_daily_handler,
+)
 from agilina_api.ceremonies.presentation.http.errors import CeremoniesErrors
-from agilina_api.ceremonies.presentation.http.schemas import RoomAdmissionResponse
+from agilina_api.ceremonies.presentation.http.schemas import (
+    DailyParticipantResponse,
+    DailyParticipantsResponse,
+    RoomAdmissionResponse,
+)
 from agilina_api.shared.application.access import TeamContext
 from agilina_api.shared.application.tenancy import Tenant
 from agilina_api.shared.presentation.http.access import current_team_member
@@ -82,4 +94,56 @@ async def join_current_daily(
         token=admission.token,
         expires_at=admission.expires_at,
         livekit_url=admission.livekit_url,
+    )
+
+
+CURRENT_DAILY_PARTICIPANTS_DESCRIPTION = """
+The participants of the active sprint's daily, in turn order, each with the identity they carry
+in the LiveKit room (`str(user_id)`), their full name and their email: the room shows who is
+called, connected or not. A participant whose account no longer exists is left out. It does not
+depend on the daily's window to join.
+
+Only a participant of that daily, as stored, gets it: any other member of the team, its admin
+included, is `403 not_a_daily_participant`, and someone outside the team is
+`403 not_a_team_member`. A team without an active sprint is `409 no_active_sprint`.
+"""
+
+
+@router.get(
+    "/current/participants",
+    response_model=DailyParticipantsResponse,
+    responses={
+        200: {"description": "The participants of the daily, in turn order"},
+        **errors_of(
+            SharedErrors.TENANT_REQUIRED,
+            SharedErrors.TENANT_NOT_FOUND,
+            SharedErrors.NOT_AUTHENTICATED,
+            SharedErrors.ACCOUNT_NOT_ACTIVE,
+            SharedErrors.NOT_A_TEAM_MEMBER,
+            CeremoniesErrors.NOT_A_DAILY_PARTICIPANT,
+            SharedErrors.NO_ACTIVE_SPRINT,
+            SharedErrors.VALIDATION,
+        ),
+    },
+    summary="See who is called to the team's current daily",
+    description=CURRENT_DAILY_PARTICIPANTS_DESCRIPTION,
+)
+async def get_current_daily_participants(
+    team: TeamContext = Depends(current_team_member),
+    handler: GetCurrentDailyParticipantsHandler = Depends(
+        get_get_current_daily_participants_handler
+    ),
+) -> DailyParticipantsResponse:
+    participants = await handler.handle(
+        GetCurrentDailyParticipants(team_id=team.team_id, user_id=team.user_id)
+    )
+    return DailyParticipantsResponse(
+        participants=[
+            DailyParticipantResponse(
+                room_identity=participant.room_identity,
+                full_name=participant.full_name,
+                email=participant.email,
+            )
+            for participant in participants
+        ]
     )

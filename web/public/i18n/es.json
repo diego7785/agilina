@@ -401,6 +401,7 @@
       },
       "microphone": {
         "on": "Micrófono activo",
+        "muted": "Micrófono silenciado",
         "pending": "Activando el micrófono…",
         "listener": "Mientras tanto estás en la sala como oyente: escuchas a tu equipo, pero no te escuchan.",
         "retry": "Reintentar micrófono",
@@ -435,7 +436,37 @@
         "unexpected": "Algo salió mal al entrar a la sala."
       },
       "retry": "Reintentar",
-      "back_to_dashboard": "Volver al dashboard"
+      "back_to_dashboard": "Volver al dashboard",
+      "agilina": {
+        "title": "Estado de Agilina",
+        "name": "Agilina",
+        "present": "En la sala",
+        "absent": "Aún no está en la sala"
+      },
+      "turn": {
+        "title": "Turno de",
+        "none": "Sin turno activo"
+      },
+      "participants": {
+        "title": "Participantes",
+        "connected": "Conectado",
+        "disconnected": "Desconectado",
+        "self": "· tú",
+        "speaking": "Hablando",
+        "muted": "Silenciado",
+        "unknown": "Participante"
+      },
+      "speaking_announcement": "Está hablando: {{names}}",
+      "actions": {
+        "title": "Acciones",
+        "mute": "Silenciar micrófono",
+        "unmute": "Activar micrófono",
+        "start_daily": "Iniciar reunión diaria",
+        "end_turn": "Terminar turno",
+        "end_ceremony": "Terminar ceremonia",
+        "unavailable": "Todavía no están disponibles.",
+        "leave": "Salir de la sala"
+      }
     }
   }
 }

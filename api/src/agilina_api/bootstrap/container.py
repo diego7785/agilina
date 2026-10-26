@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from agilina_api.bootstrap.context_adapters import (
     IdentityBackedMemberContacts,
+    IdentityBackedParticipantContacts,
     IdentityBackedParticipantNames,
     TeamsBackedCeremonyRoster,
     TeamsBackedContacts,
@@ -24,6 +25,9 @@ from agilina_api.ceremonies.application.commands.join_current_daily import (
 )
 from agilina_api.ceremonies.application.queries.get_ceremony_context import (
     GetCeremonyContextHandler,
+)
+from agilina_api.ceremonies.application.queries.get_current_daily_participants import (
+    GetCurrentDailyParticipantsHandler,
 )
 from agilina_api.ceremonies.infrastructure.livekit.livekit_rooms import LiveKitRooms
 from agilina_api.ceremonies.infrastructure.persistence.ceremony_queries import SqlCeremonyQueries
@@ -111,6 +115,7 @@ class Container:
     get_ceremony_context: GetCeremonyContextHandler
     deliver_ceremony_result: DeliverCeremonyResultHandler
     join_current_daily: JoinCurrentDailyHandler
+    get_current_daily_participants: GetCurrentDailyParticipantsHandler
     team_queries: TeamQueries
     authenticated_users: AuthenticatedUsers
     authenticated_workers: AuthenticatedWorkers
@@ -231,6 +236,9 @@ def build_container(settings: Settings, tenant: Tenant) -> Container:
         # The web connects to the same LiveKit project whose keys sign the token.
         join_current_daily=JoinCurrentDailyHandler(
             ceremonies_uow, ceremony_roster, rooms, clock, settings.livekit_url
+        ),
+        get_current_daily_participants=GetCurrentDailyParticipantsHandler(
+            ceremony_roster, IdentityBackedParticipantContacts(user_contacts)
         ),
         team_queries=team_queries,
         authenticated_users=KeycloakAuthenticatedUsers(access_token_verifier, session_factory),

@@ -15,6 +15,11 @@
   --agl-accent-text: oklch(99% 0.005 265);
   --agl-error: oklch(58% 0.21 25);
   --agl-success: oklch(52% 0.15 150);
+
+  /* Agilina's mascot in the room (agilina-avatar): her skin, hair and blush. */
+  --agl-mascot-skin: oklch(84% 0.06 60);
+  --agl-mascot-hair: oklch(33% 0.07 40);
+  --agl-mascot-blush: oklch(72% 0.12 20);
 }
 
 /* Tailwind reads the tokens as its theme, so `bg-surface`, `text-muted` or `border-border`

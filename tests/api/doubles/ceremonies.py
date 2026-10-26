@@ -8,7 +8,11 @@ from types import TracebackType
 from typing import Self
 from uuid import UUID
 
-from agilina_api.ceremonies.application.dtos import CeremonyRecord, RosterRecord
+from agilina_api.ceremonies.application.dtos import (
+    CeremonyRecord,
+    ParticipantContact,
+    RosterRecord,
+)
 from agilina_api.ceremonies.application.errors import RoomServiceUnavailableError
 from agilina_api.ceremonies.domain.ceremony import Ceremony
 from agilina_shared import CeremonyResult
@@ -48,6 +52,19 @@ class FakeParticipantNames:
 
     async def names_of(self, user_ids: Collection[UUID]) -> dict[UUID, str]:
         return {user_id: self.names[user_id] for user_id in user_ids if user_id in self.names}
+
+
+class FakeParticipantContacts:
+    """The name and email of the users the test gives it; anyone else has no account. It records
+    each set of ids it is asked for."""
+
+    def __init__(self, contacts: dict[UUID, ParticipantContact] | None = None) -> None:
+        self.contacts = contacts or {}
+        self.asked: list[list[UUID]] = []
+
+    async def contacts_of(self, user_ids: Collection[UUID]) -> dict[UUID, ParticipantContact]:
+        self.asked.append(list(user_ids))
+        return {user_id: self.contacts[user_id] for user_id in user_ids if user_id in self.contacts}
 
 
 @dataclass(frozen=True)

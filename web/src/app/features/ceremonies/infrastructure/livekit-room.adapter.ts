@@ -5,6 +5,8 @@ import {
   DisconnectReason,
   type LocalAudioTrack,
   MediaDeviceFailure,
+  type Participant,
+  type RemoteParticipant,
   type RemoteTrack,
   type Room,
   RoomEvent,
@@ -58,7 +60,8 @@ export class LiveKitRoomAdapter implements RoomPort {
       throw new RoomFailure(connectionFailureOf(error));
     }
     this.logger.info('Room joined');
-    this.changeStream.next({ kind: 'audio_blocked', blocked: !room.canPlaybackAudio });
+    this.emitFor(room, { kind: 'audio_blocked', blocked: !room.canPlaybackAudio });
+    this.emitFor(room, presenceOf(room));
   }
 
   async requestMicrophone(): Promise<MicrophoneState> {
@@ -100,6 +103,11 @@ export class LiveKitRoomAdapter implements RoomPort {
     }
   }
 
+  async muteMicrophone(muted: boolean): Promise<void> {
+    // The SDK mutes the published microphone track, so the others see it muted, not gone.
+    await this.room?.localParticipant.setMicrophoneEnabled(!muted);
+  }
+
   async resumeAudio(): Promise<void> {
     await this.room?.startAudio();
   }
@@ -128,6 +136,32 @@ export class LiveKitRoomAdapter implements RoomPort {
       .on(RoomEvent.Reconnected, () => {
         this.logger.info('Room reconnected');
         this.emitFor(room, { kind: 'reconnected' });
+        this.emitFor(room, presenceOf(room));
+      })
+      .on(RoomEvent.ParticipantConnected, () => {
+        this.emitFor(room, presenceOf(room));
+      })
+      // Someone's microphone was silenced, turned on, published or taken away.
+      .on(RoomEvent.TrackMuted, () => {
+        this.emitFor(room, presenceOf(room));
+      })
+      .on(RoomEvent.TrackUnmuted, () => {
+        this.emitFor(room, presenceOf(room));
+      })
+      .on(RoomEvent.TrackPublished, () => {
+        this.emitFor(room, presenceOf(room));
+      })
+      .on(RoomEvent.TrackUnpublished, () => {
+        this.emitFor(room, presenceOf(room));
+      })
+      .on(RoomEvent.LocalTrackPublished, () => {
+        this.emitFor(room, presenceOf(room));
+      })
+      .on(RoomEvent.LocalTrackUnpublished, () => {
+        this.emitFor(room, presenceOf(room));
+      })
+      .on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
+        this.emitFor(room, presenceOf(room, participant.identity));
       })
       .on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
         if (this.room !== room || reason === DisconnectReason.CLIENT_INITIATED) {
@@ -151,6 +185,12 @@ export class LiveKitRoomAdapter implements RoomPort {
       })
       .on(RoomEvent.AudioPlaybackStatusChanged, () => {
         this.emitFor(room, { kind: 'audio_blocked', blocked: !room.canPlaybackAudio });
+      })
+      .on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
+        this.emitFor(room, {
+          kind: 'speaking',
+          identities: speakers.map((speaker) => speaker.identity),
+        });
       });
   }
 
@@ -195,6 +235,34 @@ export class LiveKitRoomAdapter implements RoomPort {
     }
     return this.audio;
   }
+}
+
+/**
+ * Everyone in the room now, the participant first. The one who `leaving` names is left out, in
+ * case the SDK still holds them while it tells they left.
+ */
+function presenceOf(room: Room, leaving?: string): RoomChange {
+  const local = room.localParticipant;
+  const remote = [...room.remoteParticipants.values()].filter(
+    (participant) => participant.identity !== leaving,
+  );
+  return {
+    kind: 'presence',
+    present: [
+      {
+        identity: local.identity,
+        agent: local.isAgent,
+        local: true,
+        muted: !local.isMicrophoneEnabled,
+      },
+      ...remote.map((participant) => ({
+        identity: participant.identity,
+        agent: participant.isAgent,
+        local: false,
+        muted: !participant.isMicrophoneEnabled,
+      })),
+    ],
+  };
 }
 
 /** Why LiveKit did not let the participant in. */

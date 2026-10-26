@@ -14,6 +14,12 @@ import { WEB } from '../playwright.config';
  * The real room needs a LiveKit server whose keys the API has (it issues the token): without it the
  * room answers with a failure and these tests are skipped, saying why.
  *
+ * AGI-61 as one person can check it: her own row in Participantes, the actions shown but not yet
+ * available, no live transcript, «Salir de la sala» back to the dashboard and the room on a
+ * phone. Who else comes and goes, who is speaking (in under a second) and Agilina in the room
+ * need several people and the agent: they are checked by hand with three people, one on a phone
+ * (AGI-135 and AGI-61, in docs/sala-y-emision-del-token.md).
+ *
  * Firefox, and whether two people hear each other, are checked by hand (AGI-135): the Firefox
  * that Playwright ships does not set up WebRTC with LiveKit (its ICE fails, TURN included).
  */
@@ -110,4 +116,64 @@ test('leaving the room for the dashboard leaves the room', async ({ page }) => {
 
   await expect(page.getByTestId('join-room')).toBeVisible();
   await expect(page.locator('[data-testid="remote-audio"]')).toHaveCount(0);
+});
+
+test('her own row in the participants says it is her, connected', async ({ page }) => {
+  await signIn(page);
+  await enterRoom(page);
+
+  const own = page
+    .getByTestId('room-participant')
+    .filter({ has: page.getByTestId('participant-self') });
+  await expect(own).toHaveCount(1);
+  await expect(own.getByTestId('participant-self')).toHaveText('· tú');
+  await expect(own.getByTestId('participant-email')).toHaveText(EMAIL);
+  await expect(own.getByTestId('participant-presence')).toHaveText('Conectado');
+});
+
+test('the actions are shown, not yet available, and there is no live transcript', async ({
+  page,
+}) => {
+  await signIn(page);
+  await enterRoom(page);
+
+  for (const action of ['room-start-daily', 'room-end-turn', 'room-end-ceremony']) {
+    await expect(page.getByTestId(action)).toBeVisible();
+    await expect(page.getByTestId(action)).toBeDisabled();
+  }
+  await expect(page.getByTestId('room-actions-unavailable')).toBeVisible();
+  // A guard against a live transcript added later; criterion 5 is checked by hand (AGI-140).
+  await expect(page.locator('[data-testid*="transcript"]')).toHaveCount(0);
+});
+
+test('«Salir de la sala» takes her back to the dashboard and out of the room', async ({ page }) => {
+  await signIn(page);
+  await enterRoom(page);
+
+  await page.getByTestId('room-leave').click();
+
+  await expect(page).toHaveURL(new RegExp(`/${TENANT}/teams/[0-9a-f-]{36}$`));
+  await expect(page.getByTestId('join-room')).toBeVisible();
+  await expect(page.locator('[data-testid="remote-audio"]')).toHaveCount(0);
+});
+
+test('on a phone the room stacks, nothing scrolls sideways and she can still leave', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await signIn(page);
+  await enterRoom(page);
+
+  await expect(page.getByTestId('room-participants')).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+  const participants = await page.getByTestId('room-participants').boundingBox();
+  const actions = await page.getByTestId('room-actions').boundingBox();
+  expect(actions!.y).toBeGreaterThan(participants!.y + participants!.height - 1);
+  await page.getByTestId('room-leave').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('room-leave')).toBeInViewport();
+  await page.getByTestId('room-leave').click();
+  await expect(page).toHaveURL(new RegExp(`/${TENANT}/teams/[0-9a-f-]{36}$`));
 });

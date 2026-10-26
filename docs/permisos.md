@@ -47,11 +47,17 @@ token que falta o no vale recibe `401 not_authenticated`.
 | Ver el sprint activo | `GET /v1/teams/{team_id}/sprints/active` | miembro | ✅ | ✅ |
 | Editar el sprint activo | `PUT /v1/teams/{team_id}/sprints/active` | admin | ❌ | ✅ |
 | Entrar a la sala de la daily de hoy (token de LiveKit) ¹ | `POST /v1/teams/{team_id}/dailies/current/token` | miembro | ✅ | ✅ |
+| Ver a los convocados de la daily en curso (nombre y correo) ² | `GET /v1/teams/{team_id}/dailies/current/participants` | miembro | ✅ | ✅ |
 
 ¹ Ser miembro no basta: además hay que estar entre los participantes de la daily del sprint activo,
 también siendo admin. Un miembro que no fue convocado recibe `403 not_a_daily_participant`; la regla
 la evalúa el caso de uso contra los participantes guardados del sprint, nunca contra el token ni la
 web (AGI-59).
+
+² La misma regla del convocado: solo quien está entre los participantes de la daily del sprint activo
+ve el nombre y el correo de los demás convocados; cualquier otro miembro, también el admin no
+convocado, recibe `403 not_a_daily_participant`. No depende de que la ventana de la daily esté
+abierta (AGI-61).
 
 Las rutas de `/v1/users` nombran el equipo en la query (`?team_id=`): un usuario tiene un rol distinto
 en cada equipo. `GET /v1/users/me` solo devuelve a quien llama; las demás rutas de usuarios son del
@@ -69,8 +75,8 @@ Las rutas de ceremonias (`/v1/ceremonies/*`) son **solo del worker del agente** 
 token de una persona, `403 not_a_worker`. El worker se reconoce por el cliente al que se emitió el
 token (`azp`, `agilina-worker`), que no es un rol de equipo. Al revés, el token del worker en una ruta
 de persona responde `403 account_not_active`: es válido, pero no es de ningún usuario de la
-organización. La ruta para entrar a la sala de la daily (`/v1/teams/{team_id}/dailies/…`) sí es de
-personas y está en la matriz.
+organización. Las rutas de la sala de la daily (`/v1/teams/{team_id}/dailies/…`) sí son de
+personas y están en la matriz.
 
 ## Acciones planeadas
 

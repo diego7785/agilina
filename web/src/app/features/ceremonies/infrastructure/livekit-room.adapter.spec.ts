@@ -24,12 +24,20 @@ class FakeRoom {
   canPlaybackAudio = true;
   audioStarts = 0;
   disconnects = 0;
+  readonly remoteParticipants = new Map<
+    string,
+    { identity: string; isAgent: boolean; isMicrophoneEnabled: boolean }
+  >();
   readonly localParticipant = {
+    identity: 'eva',
+    isAgent: false,
+    isMicrophoneEnabled: false,
     setMicrophoneEnabled: (enabled: boolean): Promise<undefined> => {
       if (this.microphoneFailure !== null) {
         return Promise.reject(this.microphoneFailure);
       }
       this.microphoneEnabled = enabled;
+      this.localParticipant.isMicrophoneEnabled = enabled;
       return Promise.resolve(undefined);
     },
     publishTrack: (track: unknown, options: unknown): Promise<undefined> => {
@@ -44,6 +52,13 @@ class FakeRoom {
   on(event: string, listener: Listener): this {
     this.listeners.set(event, [...(this.listeners.get(event) ?? []), listener]);
     return this;
+  }
+
+  /** Someone enters the room, as the SDK tells it: in the map first, then the event. */
+  arrive(identity: string, isAgent = false): void {
+    const participant = { identity, isAgent, isMicrophoneEnabled: true };
+    this.remoteParticipants.set(identity, participant);
+    this.emit(RoomEvent.ParticipantConnected, participant);
   }
 
   emit(event: string, ...args: unknown[]): void {
@@ -103,6 +118,8 @@ describe('LiveKitRoomAdapter', () => {
   let microphoneFailure: Error | null;
   /** What the next room created fails with when it connects. */
   let nextConnectFailure: Error | null;
+  /** Who is already in the next room created when the participant enters it. */
+  let nextRemotes: { identity: string; isAgent: boolean; isMicrophoneEnabled: boolean }[];
   const microphoneProvider = {
     provide: LIVEKIT_MICROPHONE,
     useValue: () => {
@@ -124,6 +141,7 @@ describe('LiveKitRoomAdapter', () => {
     microphones = [];
     microphoneFailure = null;
     nextConnectFailure = null;
+    nextRemotes = [];
     logger = new FakeLogger();
     TestBed.configureTestingModule({
       providers: [
@@ -136,6 +154,9 @@ describe('LiveKitRoomAdapter', () => {
           useValue: () => {
             const created = new FakeRoom();
             created.connectFailure = nextConnectFailure;
+            for (const remote of nextRemotes) {
+              created.remoteParticipants.set(remote.identity, remote);
+            }
             rooms.push(created);
             return created as unknown as Room;
           },
@@ -170,7 +191,36 @@ describe('LiveKitRoomAdapter', () => {
     it('says at once whether the browser lets it play the others', async () => {
       await adapter.connect(anAccess());
 
-      expect(changes).toEqual([{ kind: 'audio_blocked', blocked: false }]);
+      expect(changes[0]).toEqual({ kind: 'audio_blocked', blocked: false });
+    });
+
+    it('tells who is in the room once in, the participant first and Agilina as an agent', async () => {
+      nextRemotes = [
+        { identity: 'ana', isAgent: false, isMicrophoneEnabled: true },
+        { identity: 'agilina', isAgent: true, isMicrophoneEnabled: true },
+      ];
+
+      await adapter.connect(anAccess());
+
+      expect(changes).toEqual([
+        { kind: 'audio_blocked', blocked: false },
+        {
+          kind: 'presence',
+          present: [
+            { identity: 'eva', agent: false, local: true, muted: true },
+            { identity: 'ana', agent: false, local: false, muted: false },
+            { identity: 'agilina', agent: true, local: false, muted: false },
+          ],
+        },
+      ]);
+    });
+
+    it('tells nobody is in the room when it could not enter', async () => {
+      nextConnectFailure = ConnectionError.timeout('slow');
+
+      await expectAsync(adapter.connect(anAccess())).toBeRejected();
+
+      expect(changes).toEqual([]);
     });
 
     const connectionFailures: readonly [string, () => Error, string][] = [
@@ -324,8 +374,101 @@ describe('LiveKitRoomAdapter', () => {
       room().emit(RoomEvent.Reconnecting);
       room().emit(RoomEvent.Reconnected);
 
-      expect(changes).toEqual([{ kind: 'reconnecting' }, { kind: 'reconnected' }]);
+      expect(changes.slice(0, 2)).toEqual([{ kind: 'reconnecting' }, { kind: 'reconnected' }]);
       expect(logger.entries.map((e) => e.message)).toContain('Room reconnecting');
+    });
+
+    it('tells everyone in the room again when someone silences or turns on their microphone', async () => {
+      room().arrive('ana');
+      await adapter.muteMicrophone(false);
+      changes = [];
+
+      room().remoteParticipants.get('ana')!.isMicrophoneEnabled = false;
+      room().emit(RoomEvent.TrackMuted);
+
+      expect(changes).toEqual([
+        {
+          kind: 'presence',
+          present: [
+            { identity: 'eva', agent: false, local: true, muted: false },
+            { identity: 'ana', agent: false, local: false, muted: true },
+          ],
+        },
+      ]);
+    });
+
+    it('tells everyone in the room each time someone arrives', () => {
+      room().arrive('ana');
+      room().arrive('agilina', true);
+
+      expect(changes).toEqual([
+        {
+          kind: 'presence',
+          present: [
+            { identity: 'eva', agent: false, local: true, muted: true },
+            { identity: 'ana', agent: false, local: false, muted: false },
+          ],
+        },
+        {
+          kind: 'presence',
+          present: [
+            { identity: 'eva', agent: false, local: true, muted: true },
+            { identity: 'ana', agent: false, local: false, muted: false },
+            { identity: 'agilina', agent: true, local: false, muted: false },
+          ],
+        },
+      ]);
+    });
+
+    it('leaves out who leaves, even while the SDK still holds them', () => {
+      room().arrive('ana');
+      room().arrive('luis');
+      changes = [];
+
+      room().emit(RoomEvent.ParticipantDisconnected, { identity: 'ana', isAgent: false });
+
+      expect(changes).toEqual([
+        {
+          kind: 'presence',
+          present: [
+            { identity: 'eva', agent: false, local: true, muted: true },
+            { identity: 'luis', agent: false, local: false, muted: false },
+          ],
+        },
+      ]);
+    });
+
+    it('tells everyone in the room again once it is back', () => {
+      room().arrive('ana');
+      changes = [];
+
+      room().emit(RoomEvent.Reconnecting);
+      room().emit(RoomEvent.Reconnected);
+
+      expect(changes).toEqual([
+        { kind: 'reconnecting' },
+        { kind: 'reconnected' },
+        {
+          kind: 'presence',
+          present: [
+            { identity: 'eva', agent: false, local: true, muted: true },
+            { identity: 'ana', agent: false, local: false, muted: false },
+          ],
+        },
+      ]);
+    });
+
+    it('tells who is speaking, the participant and Agilina included, and when nobody is', () => {
+      room().emit(RoomEvent.ActiveSpeakersChanged, [
+        room().localParticipant,
+        { identity: 'agilina', isAgent: true },
+      ]);
+      room().emit(RoomEvent.ActiveSpeakersChanged, []);
+
+      expect(changes).toEqual([
+        { kind: 'speaking', identities: ['eva', 'agilina'] },
+        { kind: 'speaking', identities: [] },
+      ]);
     });
 
     it('tells the connection is lost when the room drops it', () => {
@@ -347,6 +490,10 @@ describe('LiveKitRoomAdapter', () => {
       changes = [];
 
       old.emit(RoomEvent.Reconnecting);
+      old.emit(RoomEvent.Reconnected);
+      old.arrive('ana');
+      old.emit(RoomEvent.ParticipantDisconnected, { identity: 'ana', isAgent: false });
+      old.emit(RoomEvent.ActiveSpeakersChanged, [{ identity: 'ana', isAgent: false }]);
       old.emit(RoomEvent.Disconnected, DisconnectReason.JOIN_FAILURE);
 
       expect(changes).toEqual([]);
@@ -384,6 +531,14 @@ describe('LiveKitRoomAdapter', () => {
 
       expect(changes).toEqual([{ kind: 'audio_blocked', blocked: true }]);
       expect(room().audioStarts).toBe(1);
+    });
+
+    it('silences the published microphone and turns it on again (AGI-61)', async () => {
+      await adapter.muteMicrophone(false);
+      expect(room().microphoneEnabled).toBeTrue();
+
+      await adapter.muteMicrophone(true);
+      expect(room().microphoneEnabled).toBeFalse();
     });
   });
 

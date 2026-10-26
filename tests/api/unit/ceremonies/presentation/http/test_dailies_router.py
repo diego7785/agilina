@@ -1,5 +1,10 @@
-"""POST /v1/teams/{team_id}/dailies/current/token: the token of today's room is issued only to
-a participant of the daily, at the moment it is asked for (AGI-59)."""
+"""The routes of people on the team's current daily.
+
+POST /v1/teams/{team_id}/dailies/current/token: the token of today's room is issued only to
+a participant of the daily, at the moment it is asked for (AGI-59).
+
+GET /v1/teams/{team_id}/dailies/current/participants: only a participant of the daily sees who
+else is called to it, with their names and emails (AGI-61)."""
 
 import logging
 from datetime import timedelta
@@ -11,12 +16,14 @@ from tests.api.builders import DAILY_TIME
 from tests.api.unit.ceremonies.presentation.http.support import (
     LIVEKIT_URL,
     TOKEN_BRUNO,
+    TOKEN_CARLA,
     TOKEN_INACTIVE,
     TOKEN_OLGA,
     DailiesApi,
 )
 
 PATH = "/v1/teams/{team_id}/dailies/current/token"
+PARTICIPANTS_PATH = "/v1/teams/{team_id}/dailies/current/participants"
 
 
 @pytest.fixture
@@ -165,3 +172,104 @@ async def test_the_openapi_documents_the_route_and_every_answer(api):
     assert "`room_service_unavailable`" in responses["503"]["description"]
     assert "requestBody" not in operation
     assert [p["name"] for p in operation["parameters"]] == ["team_id", TENANT_HEADER]
+
+
+# ---------------------------------------------- who is called to the daily (AGI-61) --
+async def test_a_participant_sees_who_is_called_in_turn_order_with_name_and_email(api):
+    response = await api.participants()
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "participants": [
+            {"room_identity": str(api.ana), "full_name": "Ana Gil", "email": "ana@acme.test"},
+            {
+                "room_identity": str(api.carla),
+                "full_name": "Carla Ruiz",
+                "email": "carla@acme.test",
+            },
+        ]
+    }
+    assert response.headers["cache-control"] == "no-store"
+
+
+async def test_every_participant_sees_the_same_list(api):
+    ana = await api.participants()
+    carla = await api.participants(token=TOKEN_CARLA)
+
+    assert carla.status_code == 200
+    assert carla.json() == ana.json()
+
+
+async def test_the_list_does_not_depend_on_the_window_of_the_daily(api):
+    """An hour after the start the token is 409 daily_not_open; the list is still there."""
+    api.clock.advance(hours=1)
+
+    response = await api.participants()
+
+    assert response.status_code == 200
+    assert len(response.json()["participants"]) == 2
+
+
+async def test_a_member_who_is_not_in_the_round_sees_nobody_even_the_admin(api):
+    response = await api.participants(token=TOKEN_BRUNO)
+
+    assert response.status_code == 403
+    assert _error(response)["code"] == "not_a_daily_participant"
+    assert "participants" not in response.json()
+    assert api.contacts.asked == []
+
+
+async def test_someone_outside_the_team_sees_nobody(api):
+    response = await api.participants(token=TOKEN_OLGA)
+
+    assert response.status_code == 403
+    assert _error(response)["code"] == "not_a_team_member"
+    assert api.contacts.asked == []
+
+
+async def test_without_a_session_the_list_is_401(api):
+    response = await api.participants(token=None)
+
+    assert response.status_code == 401
+    assert _error(response)["code"] == "not_authenticated"
+    assert api.contacts.asked == []
+
+
+async def test_an_account_that_is_not_active_does_not_see_the_list(api):
+    response = await api.participants(token=TOKEN_INACTIVE)
+
+    assert response.status_code == 403
+    assert _error(response)["code"] == "account_not_active"
+
+
+async def test_a_team_without_an_active_sprint_has_no_list_409(api):
+    response = await api.participants(team_id=api.boreal)
+
+    assert response.status_code == 409
+    assert _error(response)["code"] == "no_active_sprint"
+
+
+async def test_the_list_of_a_team_id_that_is_not_a_uuid_answers_422(api):
+    response = await api.participants(team_id="not-a-uuid")
+
+    assert response.status_code == 422
+    assert _error(response)["code"] == "validation_error"
+
+
+async def test_the_openapi_documents_the_list_and_every_answer(api):
+    async with api.client() as client:
+        spec = (await client.get("/openapi.json")).json()
+
+    operation = spec["paths"][PARTICIPANTS_PATH]["get"]
+    responses = operation["responses"]
+    assert operation["tags"] == ["ceremonies"]
+    assert set(responses) == {"200", "400", "401", "403", "404", "409", "422", "500"}
+    assert responses["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/DailyParticipantsResponse"
+    }
+    for code in ("`account_not_active`", "`not_a_team_member`", "`not_a_daily_participant`"):
+        assert code in responses["403"]["description"]
+    assert "`no_active_sprint`" in responses["409"]["description"]
+    assert "`daily_not_open`" not in responses["409"]["description"]
+    # The tenant comes from the container, as in GET …/dashboard: test_authentication checks it.
+    assert [p["name"] for p in operation["parameters"]] == ["team_id"]

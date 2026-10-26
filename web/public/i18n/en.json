@@ -401,6 +401,7 @@
       },
       "microphone": {
         "on": "Microphone on",
+        "muted": "Microphone muted",
         "pending": "Turning the microphone on…",
         "listener": "Meanwhile you are in the room as a listener: you hear your team, but they don't hear you.",
         "retry": "Retry microphone",
@@ -435,7 +436,37 @@
         "unexpected": "Something went wrong joining the room."
       },
       "retry": "Try again",
-      "back_to_dashboard": "Back to dashboard"
+      "back_to_dashboard": "Back to dashboard",
+      "agilina": {
+        "title": "Agilina status",
+        "name": "Agilina",
+        "present": "In the room",
+        "absent": "Not in the room yet"
+      },
+      "turn": {
+        "title": "Turn of",
+        "none": "No active turn"
+      },
+      "participants": {
+        "title": "Participants",
+        "connected": "Connected",
+        "disconnected": "Disconnected",
+        "self": "· you",
+        "speaking": "Speaking",
+        "muted": "Muted",
+        "unknown": "Participant"
+      },
+      "speaking_announcement": "Speaking: {{names}}",
+      "actions": {
+        "title": "Actions",
+        "mute": "Mute microphone",
+        "unmute": "Unmute microphone",
+        "start_daily": "Start the daily stand-up",
+        "end_turn": "End turn",
+        "end_ceremony": "End the ceremony",
+        "unavailable": "Not available yet.",
+        "leave": "Leave the room"
+      }
     }
   }
 }

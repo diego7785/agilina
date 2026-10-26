@@ -192,6 +192,9 @@ def create_app() -> FastAPI:
         ceremonies_dependencies.get_join_current_daily_handler: from_container(
             lambda container: container.join_current_daily
         ),
+        ceremonies_dependencies.get_get_current_daily_participants_handler: from_container(
+            lambda container: container.get_current_daily_participants
+        ),
         get_authenticated_users: from_container(lambda container: container.authenticated_users),
         get_authenticated_workers: from_container(
             lambda container: container.authenticated_workers
