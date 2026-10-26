@@ -2,9 +2,11 @@
 
     make agent     → registers the worker in LiveKit and waits for jobs
 
-The worker opens an outbound connection to LiveKit and registers. When a
-ceremony room is created, LiveKit offers the job over that connection and this
-module launches the subprocess that joins the room as one more participant.
+The worker opens an outbound connection to LiveKit and registers without a
+name, so LiveKit dispatches every new room to it. When a ceremony room is
+created, LiveKit offers the job over that connection, issues the agent's token
+with the permissions the worker declared, and this module launches a dedicated
+subprocess that joins that room as one more participant.
 
 What is here is the skeleton that shows the life cycle: join the room, ask the
 API for the ceremony context, announce itself and wait. Before registering, the
@@ -17,7 +19,8 @@ room or audio.
 import asyncio
 
 import httpx
-from livekit.agents import JobContext, WorkerOptions, cli
+from livekit.agents import JobContext, WorkerOptions, WorkerPermissions, cli
+from livekit.protocol.models import TrackSource
 
 from agilina_agent.infrastructure.http_agilina_api import REQUEST_TIMEOUT, HttpAgilinaApi
 from agilina_agent.infrastructure.logging_setup import configure_logging, get_logger
@@ -68,23 +71,37 @@ async def entrypoint(ctx: JobContext) -> None:
     await job.run(ctx)
 
 
+def worker_options(settings: Settings) -> WorkerOptions:
+    """Registers without agent_name (automatic dispatch) and with least privilege:
+    listen, speak through the microphone source (where the voice is published) and
+    publish its state attribute; no camera, screen or data channel. WorkerPermissions
+    offers no roomAdmin, so the agent never gets it."""
+    return WorkerOptions(
+        entrypoint_fnc=entrypoint,
+        ws_url=settings.livekit_url,
+        api_key=settings.livekit_api_key,
+        api_secret=settings.livekit_api_secret,
+        permissions=WorkerPermissions(
+            can_publish=True,
+            can_publish_sources=[TrackSource.MICROPHONE],
+            can_subscribe=True,
+            can_publish_data=False,
+            can_update_metadata=True,
+            hidden=False,
+        ),
+    )
+
+
 def run() -> None:
     settings = get_settings()
     configure_logging(settings.log_level)
     asyncio.run(resend_pending(settings))
     logger.info("Registering the worker in %s", settings.livekit_url or "(not configured)")
 
-    cli.run_app(
-        WorkerOptions(
-            entrypoint_fnc=entrypoint,
-            ws_url=settings.livekit_url,
-            api_key=settings.livekit_api_key,
-            api_secret=settings.livekit_api_secret,
-        )
-    )
+    cli.run_app(worker_options(settings))
 
 
-__all__ = ["entrypoint", "run"]
+__all__ = ["entrypoint", "run", "worker_options"]
 
 if __name__ == "__main__":
     run()

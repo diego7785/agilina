@@ -6,12 +6,13 @@ from pathlib import Path
 
 import pytest
 from livekit.agents import WorkerOptions
+from livekit.protocol.models import TrackSource
 
 from agilina_agent import main
 from agilina_agent.infrastructure.http_agilina_api import HttpAgilinaApi
 from agilina_agent.infrastructure.pending_results import PendingResults
 from agilina_agent.infrastructure.settings import Settings
-from agilina_agent.main import agilina_api, entrypoint, resend_pending
+from agilina_agent.main import agilina_api, entrypoint, resend_pending, worker_options
 from tests.shared.builders import TENANT, CeremonyResultBuilder
 
 # Nothing listens on the discard port: every connection is refused at once.
@@ -61,3 +62,16 @@ def test_the_worker_registers_for_automatic_dispatch(
     # LiveKit dispatches every new room only to workers registered without a name.
     assert options.agent_name == ""
     assert options.entrypoint_fnc is entrypoint
+
+
+def test_the_agent_can_listen_speak_and_publish_its_state_but_not_data(tmp_path: Path) -> None:
+    permissions = worker_options(_settings(tmp_path)).permissions
+
+    assert permissions.can_subscribe
+    assert permissions.can_publish
+    # Only its voice: no camera or screen share.
+    assert permissions.can_publish_sources == [TrackSource.MICROPHONE]
+    assert permissions.can_update_metadata
+    assert not permissions.can_publish_data
+    # Agilina must show up in the participant list.
+    assert not permissions.hidden

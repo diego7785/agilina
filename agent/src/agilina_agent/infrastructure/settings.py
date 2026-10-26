@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     default_language: Language = Language.ES
 
-    # LiveKit: the worker generates its own token with room permissions.
+    # LiveKit: only what the worker needs to register. The agent's room token is issued by
+    # LiveKit when it dispatches the job, with the permissions the worker declares.
     livekit_url: str = ""
     livekit_api_key: str = ""
     livekit_api_secret: str = ""
