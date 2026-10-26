@@ -60,23 +60,26 @@ token, para unirlo con quien está en la sala), `full_name` y `email` (el contra
 Cualquier error deja la sala igual de usable: la lista muestra solo a quienes están en la sala
 (como «Participante», sin correo) y el fallo ya lo registró `httpErrorLoggingInterceptor`.
 
-## Pendiente de verificar con LiveKit
+## Probar la sala contra LiveKit
 
-AGI-59 ya está integrada y la web usa su contrato real. Falta probarlo contra un servidor de LiveKit
-de verdad; cuando esté hecho, esta sección se puede borrar.
+Cada desarrollador usa su propio proyecto de LiveKit Cloud: `AGILINA_LIVEKIT_URL`,
+`AGILINA_LIVEKIT_API_KEY` y `AGILINA_LIVEKIT_API_SECRET` en su `.env` y `make up`. Las claves solo
+las lee la API (abre la sala y firma el token); la web no las necesita. Un entorno creado antes de
+AGI-59 no tiene la tabla `ceremony` (la migración inicial se reescribió): se reconstruye con
+`make clean` y `make up`.
 
-### 1. Configurar LiveKit
+Verificado contra LiveKit Cloud el 2026-10-25:
 
-Llenar `AGILINA_LIVEKIT_URL`, `AGILINA_LIVEKIT_API_KEY` y `AGILINA_LIVEKIT_API_SECRET` en el `.env`
-(LiveKit Cloud) y `make up`. Las claves solo las lee la API; la web no las necesita.
+- `make test-e2e`: las tres pruebas de la sala de AGI-60
+  ([room.spec.ts](../tests/e2e/specs/room.spec.ts)) pasan en Chromium contra la API real (entrar
+  con el micrófono, negarlo y quedar como oyente, salir). Las cuatro de AGI-61 (la fila propia,
+  las acciones, salir y el celular) todavía no se corrieron contra LiveKit.
+- **Firefox no corre en Playwright:** el que trae Playwright no establece el audio (ICE) con
+  LiveKit, ni local ni Cloud, tampoco por TURN. Firefox de escritorio va en la verificación manual.
 
-### 2. Verificar
+Pendiente: las verificaciones manuales de AGI-135 y AGI-61; cuando estén hechas, esta lista se
+puede borrar.
 
-- `make verify` y `make test-e2e`. Las pruebas de la sala
-  ([room.spec.ts](../tests/e2e/specs/room.spec.ts)) dejan de saltarse en Chromium.
-- **Firefox:** el Firefox de Playwright no estableció el audio con un LiveKit local. Con LiveKit
-  Cloud (que tiene TURN) puede que sí. Si ahora pasa, se actualiza el comentario de `room.spec.ts` y
-  la sección de punta a punta de [testing.md](testing.md); si no, queda documentado así.
 - **Verificación manual (AGI-135)**, con dos personas del equipo convocadas a la daily, una en Chrome
   y otra en Firefox de escritorio, con audífonos:
   1. Al pulsar **Unirse a la sala** el navegador pide el micrófono; al darlo aparecen **Conectado** y

@@ -3,8 +3,8 @@ import { type Browser, type BrowserType, expect, type Page, test } from '@playwr
 import { WEB } from '../playwright.config';
 
 /**
- * AGI-60 as a participant lives it, in Chromium and in Firefox (one project each): from the
- * dashboard she enters the room of her team's daily, with the microphone on; if the browser
+ * AGI-60 as a participant lives it, in Chromium: from the dashboard she enters the room of her
+ * team's daily, with the microphone on; if the browser
  * refuses the microphone she is told how to allow it and stays as a listener; leaving the page
  * leaves the room. A network that drops is not told here: Playwright cannot cut a connection
  * already open to `localhost`, so it is covered by the facade's tests and by hand.
@@ -12,22 +12,22 @@ import { WEB } from '../playwright.config';
  * She is the person of the sign-in story, and the dashboard story left her team with a daily a
  * few minutes away, so the room is open (from ten minutes before the daily to fifteen after).
  * The real room needs a LiveKit server whose keys the API has (it issues the token): without it the
- * room answers with a failure and these tests are skipped, saying why. The Firefox that
- * Playwright ships has not been able to set up the audio (WebRTC) with a local LiveKit server, so
- * there it ends the same way.
+ * room answers with a failure and these tests are skipped, saying why.
  *
  * AGI-61 as one person can check it: her own row in Participantes, the actions shown but not yet
  * available, no live transcript, «Salir de la sala» back to the dashboard and the room on a
  * phone. Who else comes and goes, who is speaking (in under a second) and Agilina in the room
  * need several people and the agent: they are checked by hand with three people, one on a phone
  * (AGI-135 and AGI-61, in docs/sala-y-emision-del-token.md).
+ *
+ * Firefox, and whether two people hear each other, are checked by hand (AGI-135): the Firefox
+ * that Playwright ships does not set up WebRTC with LiveKit (its ICE fails, TURN included).
  */
 const RUN = process.env['E2E_RUN'] ?? '';
 const TENANT = 'acme';
 const EMAIL = `e2e-${RUN}@example.test`;
 const PASSWORD = 'una-clave-bien-larga-1';
-const WITHOUT_ROOM =
-  'The room could not be reached: it needs LiveKit, and a browser that sets up WebRTC';
+const WITHOUT_ROOM = 'The room could not be reached: it needs the LiveKit keys in .env';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -63,25 +63,18 @@ async function enterRoom(page: Page): Promise<void> {
   test.skip(await page.getByTestId('room-failure').isVisible(), WITHOUT_ROOM);
 }
 
-/** A browser of the same kind whose microphone the person refuses. */
-function refusingBrowser(browserType: BrowserType): Promise<Browser> {
-  return browserType.name() === 'firefox'
-    ? browserType.launch({
-        firefoxUserPrefs: {
-          'media.navigator.streams.fake': true,
-          'permissions.default.microphone': 2,
-        },
-      })
-    : browserType.launch({
-        channel: 'chromium',
-        // Without the microphone Chromium hides its local addresses behind mDNS names, which a
-        // LiveKit server on this machine cannot reach; a hosted one is reached through TURN.
-        args: [
-          '--use-fake-device-for-media-stream',
-          '--deny-permission-prompts',
-          '--disable-features=WebRtcHideLocalIpsWithMdns',
-        ],
-      });
+/** A Chromium whose microphone the person refuses. */
+function refusingBrowser(chromium: BrowserType): Promise<Browser> {
+  return chromium.launch({
+    channel: 'chromium',
+    // Without the microphone Chromium hides its local addresses behind mDNS names, which a
+    // LiveKit server on this machine cannot reach (LiveKit Cloud is reached through TURN anyway).
+    args: [
+      '--use-fake-device-for-media-stream',
+      '--deny-permission-prompts',
+      '--disable-features=WebRtcHideLocalIpsWithMdns',
+    ],
+  });
 }
 
 test('she enters the room from the dashboard and her microphone turns on', async ({ page }) => {
@@ -94,9 +87,8 @@ test('she enters the room from the dashboard and her microphone turns on', async
 
 test('if she refuses the microphone she is told how to allow it and stays as a listener', async ({
   playwright,
-  browserName,
 }) => {
-  const browser = await refusingBrowser(playwright[browserName]);
+  const browser = await refusingBrowser(playwright.chromium);
   try {
     const context = await browser.newContext({ baseURL: WEB, locale: 'es-CO' });
     // The test runner hands the project's permissions to every context: this one has none.
