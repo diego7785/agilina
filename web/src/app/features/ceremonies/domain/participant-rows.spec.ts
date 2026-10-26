@@ -16,6 +16,7 @@ describe('participantRows', () => {
         name: 'Luis Mora',
         email: 'luis@example.test',
         connected: false,
+        muted: false,
         speaking: false,
         self: false,
       },
@@ -24,6 +25,7 @@ describe('participantRows', () => {
         name: 'Eva Prueba',
         email: 'eva@example.test',
         connected: true,
+        muted: false,
         speaking: false,
         self: true,
       },
@@ -32,6 +34,7 @@ describe('participantRows', () => {
         name: 'Ana Gil',
         email: 'ana@example.test',
         connected: false,
+        muted: false,
         speaking: false,
         self: false,
       },
@@ -71,8 +74,24 @@ describe('participantRows', () => {
     );
 
     expect(rows.slice(1)).toEqual([
-      { identity: 'guest-1', name: '', email: null, connected: true, speaking: false, self: false },
-      { identity: 'guest-2', name: '', email: null, connected: true, speaking: false, self: false },
+      {
+        identity: 'guest-1',
+        name: '',
+        email: null,
+        connected: true,
+        muted: false,
+        speaking: false,
+        self: false,
+      },
+      {
+        identity: 'guest-2',
+        name: '',
+        email: null,
+        connected: true,
+        muted: false,
+        speaking: false,
+        self: false,
+      },
     ]);
   });
 
@@ -84,15 +103,38 @@ describe('participantRows', () => {
     );
 
     expect(rows).toEqual([
-      { identity: 'user-eva', name: '', email: null, connected: true, speaking: false, self: true },
+      {
+        identity: 'user-eva',
+        name: '',
+        email: null,
+        connected: true,
+        muted: false,
+        speaking: false,
+        self: true,
+      },
       {
         identity: 'user-ana',
         name: '',
         email: null,
         connected: true,
+        muted: false,
         speaking: false,
         self: false,
       },
+    ]);
+  });
+
+  it('marks as muted whoever is in the room with the microphone off, and nobody who is out', () => {
+    const rows = participantRows(
+      [eva, ana, luis],
+      [aPresence('user-eva', { local: true, muted: true }), aPresence('user-ana')],
+      [],
+    );
+
+    expect(rows.map((row) => [row.identity, row.connected, row.muted])).toEqual([
+      ['user-eva', true, true],
+      ['user-ana', true, false],
+      ['user-luis', false, false],
     ]);
   });
 

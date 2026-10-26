@@ -166,6 +166,43 @@ describe('RoomFacade', () => {
       expect(room.microphoneRequests).toBe(1);
       expect(facade.microphone()).toBe('on');
     });
+
+    it('silences the microphone and turns it on again (AGI-61)', async () => {
+      facade.join('atlas');
+      await settle();
+      expect(facade.muted()).toBeFalse();
+
+      await facade.toggleMute();
+      expect(facade.muted()).toBeTrue();
+      expect(facade.microphone()).toBe('on');
+
+      await facade.toggleMute();
+      expect(facade.muted()).toBeFalse();
+      expect(room.calls.filter((call) => call.endsWith('mute'))).toEqual(['mute', 'unmute']);
+    });
+
+    it('leaves the participant as a listener when the microphone cannot be turned on again', async () => {
+      facade.join('atlas');
+      await settle();
+      await facade.toggleMute();
+
+      room.muteFailure = new Error('the device is gone');
+      await facade.toggleMute();
+
+      expect(facade.muted()).toBeFalse();
+      expect(facade.microphone()).toBe('unavailable');
+    });
+
+    it('enters again with the microphone on, not silenced', async () => {
+      facade.join('atlas');
+      await settle();
+      await facade.toggleMute();
+
+      facade.retry();
+      await settle();
+
+      expect(facade.muted()).toBeFalse();
+    });
   });
 
   describe('the connection (criterion 5)', () => {
@@ -352,6 +389,7 @@ describe('RoomFacade', () => {
           name: '',
           email: null,
           connected: true,
+          muted: false,
           speaking: false,
           self: true,
         },

@@ -316,6 +316,14 @@ Un solo estilo para todos los formularios (el de `/:tenant/activate`, el de `/:t
   el indicador va en la tarjeta Estado de Agilina. Una región `aria-live` siempre presente
   (`room-speaking-announcer`) anuncia quién habla, y «Turno de» también es `aria-live`: no se
   depende solo del color. Mientras la sala reconecta nadie aparece hablando.
+- **Silenciar micrófono** (AGI-61), arriba en Acciones mientras el micrófono está activo: silencia
+  la pista publicada (`RoomPort.muteMicrophone`, `setMicrophoneEnabled` del SDK) sin dejar de
+  publicarla, cambia a **Activar micrófono** y la línea de estado dice «Micrófono silenciado». En
+  Participantes, quien está conectado con el micrófono apagado (silenciado u oyente) lleva
+  «Silenciado» junto a «Conectado»: la presencia trae `muted` (`isMicrophoneEnabled` del SDK) y se
+  vuelve a enviar cuando alguien silencia, activa, publica o quita su micrófono. Si no
+  se puede reactivar, la persona queda como oyente con **Reintentar micrófono**; al volver a entrar,
+  el micrófono empieza activo.
 - **Salir de la sala** es un enlace al dashboard: dejar la página sale de la sala y suelta el
   micrófono (`RoomFacade`, en su `onDestroy`), y los demás ven la fila pasar a Desconectado.
 - La prueba del adaptador usa un `Room` falso que entrega `LIVEKIT_ROOM_FACTORY`: ninguna prueba

@@ -11,6 +11,7 @@ const ANA: ParticipantRow = {
   name: 'Ana Gil',
   email: 'ana@example.test',
   connected: true,
+  muted: false,
   speaking: false,
   self: false,
 };
@@ -63,6 +64,16 @@ describe('ParticipantTile', () => {
     expect(tile.querySelector('[data-testid="participant-presence"] svg')).not.toBeNull();
   });
 
+  it('says a person is connected and, at the same time, muted', async () => {
+    const connected = await render(ANA);
+    expect(connected.querySelector('[data-testid="participant-muted"]')).toBeNull();
+
+    const muted = await render({ ...ANA, muted: true });
+
+    expect(text(muted, 'participant-presence')).toBe('Conectado');
+    expect(text(muted, 'participant-muted')).toBe('Silenciado');
+  });
+
   it('calls «Participante» someone the room does not know by name, with its initial', async () => {
     const tile = await render({ ...ANA, name: '', email: null });
 
@@ -79,7 +90,7 @@ describe('ParticipantTile', () => {
   });
 
   it('marks who is speaking with a ring, an icon and «Hablando», not only with colour', async () => {
-    const tile = await render({ ...ANA, speaking: true });
+    const tile = await render({ ...ANA, muted: false, speaking: true });
 
     const indicator = tile.querySelector('[data-testid="participant-speaking"]');
     expect(text(tile, 'participant-speaking')).toBe('Hablando');

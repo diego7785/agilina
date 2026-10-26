@@ -47,6 +47,12 @@ export abstract class RoomPort {
    */
   abstract enableMicrophone(): Promise<MicrophoneState>;
 
+  /**
+   * Silences the published microphone or turns it on again, without unpublishing it: the others
+   * stop or start hearing the participant. Fails if the microphone cannot be turned on again.
+   */
+  abstract muteMicrophone(muted: boolean): Promise<void>;
+
   /** Plays the others' audio again after the browser blocked it; call it on a user's gesture. */
   abstract resumeAudio(): Promise<void>;
 

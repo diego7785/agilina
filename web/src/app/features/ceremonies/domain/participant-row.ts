@@ -9,6 +9,8 @@ export interface ParticipantRow {
   readonly name: string;
   readonly email: string | null;
   readonly connected: boolean;
+  /** In the room with the microphone off (silenced, or a listener); false when not connected. */
+  readonly muted: boolean;
   readonly speaking: boolean;
   readonly self: boolean;
 }

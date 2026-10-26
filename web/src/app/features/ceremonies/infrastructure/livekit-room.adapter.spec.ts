@@ -24,15 +24,20 @@ class FakeRoom {
   canPlaybackAudio = true;
   audioStarts = 0;
   disconnects = 0;
-  readonly remoteParticipants = new Map<string, { identity: string; isAgent: boolean }>();
+  readonly remoteParticipants = new Map<
+    string,
+    { identity: string; isAgent: boolean; isMicrophoneEnabled: boolean }
+  >();
   readonly localParticipant = {
     identity: 'eva',
     isAgent: false,
+    isMicrophoneEnabled: false,
     setMicrophoneEnabled: (enabled: boolean): Promise<undefined> => {
       if (this.microphoneFailure !== null) {
         return Promise.reject(this.microphoneFailure);
       }
       this.microphoneEnabled = enabled;
+      this.localParticipant.isMicrophoneEnabled = enabled;
       return Promise.resolve(undefined);
     },
     publishTrack: (track: unknown, options: unknown): Promise<undefined> => {
@@ -51,7 +56,7 @@ class FakeRoom {
 
   /** Someone enters the room, as the SDK tells it: in the map first, then the event. */
   arrive(identity: string, isAgent = false): void {
-    const participant = { identity, isAgent };
+    const participant = { identity, isAgent, isMicrophoneEnabled: true };
     this.remoteParticipants.set(identity, participant);
     this.emit(RoomEvent.ParticipantConnected, participant);
   }
@@ -114,7 +119,7 @@ describe('LiveKitRoomAdapter', () => {
   /** What the next room created fails with when it connects. */
   let nextConnectFailure: Error | null;
   /** Who is already in the next room created when the participant enters it. */
-  let nextRemotes: { identity: string; isAgent: boolean }[];
+  let nextRemotes: { identity: string; isAgent: boolean; isMicrophoneEnabled: boolean }[];
   const microphoneProvider = {
     provide: LIVEKIT_MICROPHONE,
     useValue: () => {
@@ -191,8 +196,8 @@ describe('LiveKitRoomAdapter', () => {
 
     it('tells who is in the room once in, the participant first and Agilina as an agent', async () => {
       nextRemotes = [
-        { identity: 'ana', isAgent: false },
-        { identity: 'agilina', isAgent: true },
+        { identity: 'ana', isAgent: false, isMicrophoneEnabled: true },
+        { identity: 'agilina', isAgent: true, isMicrophoneEnabled: true },
       ];
 
       await adapter.connect(anAccess());
@@ -202,9 +207,9 @@ describe('LiveKitRoomAdapter', () => {
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true },
-            { identity: 'ana', agent: false, local: false },
-            { identity: 'agilina', agent: true, local: false },
+            { identity: 'eva', agent: false, local: true, muted: true },
+            { identity: 'ana', agent: false, local: false, muted: false },
+            { identity: 'agilina', agent: true, local: false, muted: false },
           ],
         },
       ]);
@@ -373,6 +378,25 @@ describe('LiveKitRoomAdapter', () => {
       expect(logger.entries.map((e) => e.message)).toContain('Room reconnecting');
     });
 
+    it('tells everyone in the room again when someone silences or turns on their microphone', async () => {
+      room().arrive('ana');
+      await adapter.muteMicrophone(false);
+      changes = [];
+
+      room().remoteParticipants.get('ana')!.isMicrophoneEnabled = false;
+      room().emit(RoomEvent.TrackMuted);
+
+      expect(changes).toEqual([
+        {
+          kind: 'presence',
+          present: [
+            { identity: 'eva', agent: false, local: true, muted: false },
+            { identity: 'ana', agent: false, local: false, muted: true },
+          ],
+        },
+      ]);
+    });
+
     it('tells everyone in the room each time someone arrives', () => {
       room().arrive('ana');
       room().arrive('agilina', true);
@@ -381,16 +405,16 @@ describe('LiveKitRoomAdapter', () => {
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true },
-            { identity: 'ana', agent: false, local: false },
+            { identity: 'eva', agent: false, local: true, muted: true },
+            { identity: 'ana', agent: false, local: false, muted: false },
           ],
         },
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true },
-            { identity: 'ana', agent: false, local: false },
-            { identity: 'agilina', agent: true, local: false },
+            { identity: 'eva', agent: false, local: true, muted: true },
+            { identity: 'ana', agent: false, local: false, muted: false },
+            { identity: 'agilina', agent: true, local: false, muted: false },
           ],
         },
       ]);
@@ -407,8 +431,8 @@ describe('LiveKitRoomAdapter', () => {
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true },
-            { identity: 'luis', agent: false, local: false },
+            { identity: 'eva', agent: false, local: true, muted: true },
+            { identity: 'luis', agent: false, local: false, muted: false },
           ],
         },
       ]);
@@ -427,8 +451,8 @@ describe('LiveKitRoomAdapter', () => {
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true },
-            { identity: 'ana', agent: false, local: false },
+            { identity: 'eva', agent: false, local: true, muted: true },
+            { identity: 'ana', agent: false, local: false, muted: false },
           ],
         },
       ]);
@@ -507,6 +531,14 @@ describe('LiveKitRoomAdapter', () => {
 
       expect(changes).toEqual([{ kind: 'audio_blocked', blocked: true }]);
       expect(room().audioStarts).toBe(1);
+    });
+
+    it('silences the published microphone and turns it on again (AGI-61)', async () => {
+      await adapter.muteMicrophone(false);
+      expect(room().microphoneEnabled).toBeTrue();
+
+      await adapter.muteMicrophone(true);
+      expect(room().microphoneEnabled).toBeFalse();
     });
   });
 

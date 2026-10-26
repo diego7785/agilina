@@ -23,6 +23,7 @@ export function participantRows(
       name: invitee.fullName,
       email: invitee.email,
       connected: presence !== undefined,
+      muted: presence?.muted ?? false,
       speaking: presence !== undefined && speaking.includes(invitee.identity),
       self: presence?.local ?? false,
     };
@@ -32,6 +33,7 @@ export function participantRows(
     name: '',
     email: null,
     connected: true,
+    muted: presence.muted,
     speaking: speaking.includes(presence.identity),
     self: presence.local,
   }));

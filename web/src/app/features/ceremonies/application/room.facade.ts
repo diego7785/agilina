@@ -49,6 +49,7 @@ export class RoomFacade {
   private readonly currentMicrophone = signal<MicrophoneState>('pending');
   private readonly currentFailure = signal<RoomFailureKind | null>(null);
   private readonly currentAudioBlocked = signal(false);
+  private readonly currentMuted = signal(false);
   private readonly invitees = signal<readonly DailyParticipant[]>([]);
   private readonly present = signal<readonly RoomPresence[]>([]);
   private readonly speaking = signal<readonly string[]>([]);
@@ -58,6 +59,8 @@ export class RoomFacade {
   /** Why the participant is out of the room, while the status is `failed`. */
   readonly failure = this.currentFailure.asReadonly();
   readonly audioBlocked = this.currentAudioBlocked.asReadonly();
+  /** Whether the participant silenced their microphone, which stays published (`on`). */
+  readonly muted = this.currentMuted.asReadonly();
   /** The invited in turn order, connected or not, then whoever else is in the room. */
   readonly participants = computed(() =>
     participantRows(this.invitees(), this.present(), this.speaking()),
@@ -95,9 +98,27 @@ export class RoomFacade {
   /** Asks for the microphone again, once the person allowed it or plugged one in. */
   async retryMicrophone(): Promise<void> {
     this.currentMicrophone.set('pending');
+    this.currentMuted.set(false);
     const state = await this.room.enableMicrophone();
     if (!this.destroyed) {
       this.currentMicrophone.set(state);
+    }
+  }
+
+  /**
+   * Silences the microphone or turns it on again. If it cannot be turned on again (the device was
+   * unplugged, say), the person stays as a listener with «Reintentar micrófono».
+   */
+  async toggleMute(): Promise<void> {
+    const muted = !this.currentMuted();
+    try {
+      await this.room.muteMicrophone(muted);
+      this.currentMuted.set(muted);
+    } catch {
+      if (!this.destroyed) {
+        this.currentMuted.set(false);
+        this.currentMicrophone.set('unavailable');
+      }
     }
   }
 
@@ -118,6 +139,7 @@ export class RoomFacade {
     this.currentStatus.set('connecting');
     this.currentFailure.set(null);
     this.currentMicrophone.set('pending');
+    this.currentMuted.set(false);
     this.currentAudioBlocked.set(false);
     this.present.set([]);
     this.speaking.set([]);

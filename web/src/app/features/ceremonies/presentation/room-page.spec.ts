@@ -345,6 +345,33 @@ describe('RoomPage', () => {
       expect(room.calls).toEqual(calls);
     });
 
+    it('silences the microphone and turns it on again from the actions', async () => {
+      const page = await open();
+      expect(text(page, 'room-mute')).toBe('Silenciar micrófono');
+      expect(text(page, 'microphone-on')).toBe('Micrófono activo');
+
+      page.querySelector<HTMLButtonElement>('[data-testid="room-mute"]')!.click();
+      await settle();
+
+      expect(text(page, 'room-mute')).toBe('Activar micrófono');
+      expect(text(page, 'microphone-muted')).toBe('Micrófono silenciado');
+      expect(page.querySelector('[data-testid="microphone-on"]')).toBeNull();
+
+      page.querySelector<HTMLButtonElement>('[data-testid="room-mute"]')!.click();
+      await settle();
+
+      expect(text(page, 'room-mute')).toBe('Silenciar micrófono');
+      expect(room.calls.filter((call) => call.endsWith('mute'))).toEqual(['mute', 'unmute']);
+    });
+
+    it('offers no way to silence a microphone the person does not have', async () => {
+      room.microphoneAnswer = 'denied';
+
+      const page = await open();
+
+      expect(page.querySelector('[data-testid="room-mute"]')).toBeNull();
+    });
+
     it('leaves the room and goes back to the dashboard', async () => {
       const page = await open();
       const before = room.disconnects;

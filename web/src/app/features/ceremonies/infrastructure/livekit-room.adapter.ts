@@ -103,6 +103,11 @@ export class LiveKitRoomAdapter implements RoomPort {
     }
   }
 
+  async muteMicrophone(muted: boolean): Promise<void> {
+    // The SDK mutes the published microphone track, so the others see it muted, not gone.
+    await this.room?.localParticipant.setMicrophoneEnabled(!muted);
+  }
+
   async resumeAudio(): Promise<void> {
     await this.room?.startAudio();
   }
@@ -134,6 +139,25 @@ export class LiveKitRoomAdapter implements RoomPort {
         this.emitFor(room, presenceOf(room));
       })
       .on(RoomEvent.ParticipantConnected, () => {
+        this.emitFor(room, presenceOf(room));
+      })
+      // Someone's microphone was silenced, turned on, published or taken away.
+      .on(RoomEvent.TrackMuted, () => {
+        this.emitFor(room, presenceOf(room));
+      })
+      .on(RoomEvent.TrackUnmuted, () => {
+        this.emitFor(room, presenceOf(room));
+      })
+      .on(RoomEvent.TrackPublished, () => {
+        this.emitFor(room, presenceOf(room));
+      })
+      .on(RoomEvent.TrackUnpublished, () => {
+        this.emitFor(room, presenceOf(room));
+      })
+      .on(RoomEvent.LocalTrackPublished, () => {
+        this.emitFor(room, presenceOf(room));
+      })
+      .on(RoomEvent.LocalTrackUnpublished, () => {
         this.emitFor(room, presenceOf(room));
       })
       .on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
@@ -225,11 +249,17 @@ function presenceOf(room: Room, leaving?: string): RoomChange {
   return {
     kind: 'presence',
     present: [
-      { identity: local.identity, agent: local.isAgent, local: true },
+      {
+        identity: local.identity,
+        agent: local.isAgent,
+        local: true,
+        muted: !local.isMicrophoneEnabled,
+      },
       ...remote.map((participant) => ({
         identity: participant.identity,
         agent: participant.isAgent,
         local: false,
+        muted: !participant.isMicrophoneEnabled,
       })),
     ],
   };

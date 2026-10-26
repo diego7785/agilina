@@ -34,6 +34,7 @@ export class RoomPage implements OnInit {
   protected readonly microphone = this.facade.microphone;
   protected readonly failure = this.facade.failure;
   protected readonly audioBlocked = this.facade.audioBlocked;
+  protected readonly muted = this.facade.muted;
   protected readonly participants = this.facade.participants;
   protected readonly agilinaPresent = this.facade.agilinaPresent;
   protected readonly agilinaSpeaking = this.facade.agilinaSpeaking;
@@ -68,6 +69,10 @@ export class RoomPage implements OnInit {
 
   protected retryMicrophone(): void {
     void this.facade.retryMicrophone();
+  }
+
+  protected toggleMute(): void {
+    void this.facade.toggleMute();
   }
 
   protected resumeAudio(): void {

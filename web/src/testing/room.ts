@@ -40,9 +40,13 @@ export function aDailyParticipant(identity: string, fullName: string): DailyPart
 /** Someone in the room: a person seen by somebody else, unless the test says otherwise. */
 export function aPresence(
   identity: string,
-  { agent = false, local = false }: { agent?: boolean; local?: boolean } = {},
+  {
+    agent = false,
+    local = false,
+    muted = false,
+  }: { agent?: boolean; local?: boolean; muted?: boolean } = {},
 ): RoomPresence {
-  return { identity, agent, local };
+  return { identity, agent, local, muted };
 }
 
 /** API double: it hands over `participants` each time, or the failure the test sets. */
@@ -71,6 +75,8 @@ export class FakeRoomPort extends RoomPort {
   microphoneAnswer: MicrophoneState = 'on';
   microphonePrompts = 0;
   microphoneRequests = 0;
+  /** What silencing or turning on the microphone fails with, if anything. */
+  muteFailure: Error | null = null;
   readonly calls: string[] = [];
   audioResumed = 0;
   disconnects = 0;
@@ -92,6 +98,11 @@ export class FakeRoomPort extends RoomPort {
     this.calls.push('enableMicrophone');
     this.microphoneRequests++;
     return Promise.resolve(this.microphoneAnswer);
+  }
+
+  muteMicrophone(muted: boolean): Promise<void> {
+    this.calls.push(muted ? 'mute' : 'unmute');
+    return this.muteFailure === null ? Promise.resolve() : Promise.reject(this.muteFailure);
   }
 
   resumeAudio(): Promise<void> {
