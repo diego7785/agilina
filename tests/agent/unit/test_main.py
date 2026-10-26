@@ -1,14 +1,17 @@
-"""The composition root: the adapter is built without connecting, and the startup resend
-reads the configured folder and leaves there what it could not deliver."""
+"""The composition root: the adapter is built without connecting, the startup resend
+reads the configured folder and leaves there what it could not deliver, and the worker
+registers without a name so LiveKit dispatches every room to it."""
 
 from pathlib import Path
 
 import pytest
+from livekit.agents import WorkerOptions
 
+from agilina_agent import main
 from agilina_agent.infrastructure.http_agilina_api import HttpAgilinaApi
 from agilina_agent.infrastructure.pending_results import PendingResults
 from agilina_agent.infrastructure.settings import Settings
-from agilina_agent.main import agilina_api, resend_pending
+from agilina_agent.main import agilina_api, entrypoint, resend_pending
 from tests.shared.builders import TENANT, CeremonyResultBuilder
 
 # Nothing listens on the discard port: every connection is refused at once.
@@ -43,3 +46,18 @@ async def test_what_the_startup_resend_cannot_deliver_stays_in_the_configured_fo
 
     assert kept.pending() == [(TENANT, result)]
     assert f"Pending result of ceremony {result.ceremony_id} not delivered" in caplog.text
+
+
+def test_the_worker_registers_for_automatic_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registered: list[WorkerOptions] = []
+    monkeypatch.setattr(main, "get_settings", lambda: _settings(tmp_path))
+    monkeypatch.setattr(main.cli, "run_app", registered.append)
+
+    main.run()
+
+    [options] = registered
+    # LiveKit dispatches every new room only to workers registered without a name.
+    assert options.agent_name == ""
+    assert options.entrypoint_fnc is entrypoint

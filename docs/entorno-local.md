@@ -20,7 +20,9 @@ ya trae). No se instala Python, uv, Node ni nada más.
 El código fuente se monta dentro de los contenedores de desarrollo: al guardar un
 archivo, la API y la web se recargan solas, sin reconstruir nada. Reconstruir
 solo hace falta cuando cambian las dependencias (`pyproject.toml`,
-`package.json`); `make up` ya lo hace.
+`package.json`); `make up` ya lo hace. El worker del agente corre en modo `start`
+y no se recarga solo: después de cambiar `agent/src`, reinícialo con
+`docker compose -f infra/docker-compose.yml --env-file .env restart agent`.
 
 Mailpit atrapa todo correo que envíe la aplicación (por ejemplo el enlace de
 activación de una invitación): nada sale de tu máquina y lo ves en
