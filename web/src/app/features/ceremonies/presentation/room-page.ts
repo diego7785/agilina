@@ -7,7 +7,6 @@ import { Button } from '@shared/ui/button';
 
 import { ParticipantTile } from './participant-tile';
 import { RoomFacade } from '../application/room.facade';
-import { type ParticipantRow } from '../domain/participant-row';
 import { isRetriable } from '../domain/room-failure';
 
 /**
@@ -33,8 +32,7 @@ export class RoomPage implements OnInit {
   protected readonly microphone = this.facade.microphone;
   protected readonly failure = this.facade.failure;
   protected readonly audioBlocked = this.facade.audioBlocked;
-  /** Empty until the room reports who is in it (AGI-137). */
-  protected readonly participants: readonly ParticipantRow[] = [];
+  protected readonly participants = this.facade.participants;
   protected readonly inRoom = computed(
     () => this.status() === 'connected' || this.status() === 'reconnecting',
   );

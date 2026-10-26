@@ -5,6 +5,7 @@
 export interface ParticipantRow {
   /** Their identity in the LiveKit room, which tells the rows apart. */
   readonly identity: string;
+  /** Empty when the room does not know them: in the room, but not invited to the daily. */
   readonly name: string;
   readonly email: string | null;
   readonly connected: boolean;

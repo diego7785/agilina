@@ -5,6 +5,7 @@ import {
   DisconnectReason,
   type LocalAudioTrack,
   MediaDeviceFailure,
+  type RemoteParticipant,
   type RemoteTrack,
   type Room,
   RoomEvent,
@@ -58,7 +59,8 @@ export class LiveKitRoomAdapter implements RoomPort {
       throw new RoomFailure(connectionFailureOf(error));
     }
     this.logger.info('Room joined');
-    this.changeStream.next({ kind: 'audio_blocked', blocked: !room.canPlaybackAudio });
+    this.emitFor(room, { kind: 'audio_blocked', blocked: !room.canPlaybackAudio });
+    this.emitFor(room, presenceOf(room));
   }
 
   async requestMicrophone(): Promise<MicrophoneState> {
@@ -128,6 +130,13 @@ export class LiveKitRoomAdapter implements RoomPort {
       .on(RoomEvent.Reconnected, () => {
         this.logger.info('Room reconnected');
         this.emitFor(room, { kind: 'reconnected' });
+        this.emitFor(room, presenceOf(room));
+      })
+      .on(RoomEvent.ParticipantConnected, () => {
+        this.emitFor(room, presenceOf(room));
+      })
+      .on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
+        this.emitFor(room, presenceOf(room, participant.identity));
       })
       .on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
         if (this.room !== room || reason === DisconnectReason.CLIENT_INITIATED) {
@@ -195,6 +204,28 @@ export class LiveKitRoomAdapter implements RoomPort {
     }
     return this.audio;
   }
+}
+
+/**
+ * Everyone in the room now, the participant first. The one who `leaving` names is left out, in
+ * case the SDK still holds them while it tells they left.
+ */
+function presenceOf(room: Room, leaving?: string): RoomChange {
+  const local = room.localParticipant;
+  const remote = [...room.remoteParticipants.values()].filter(
+    (participant) => participant.identity !== leaving,
+  );
+  return {
+    kind: 'presence',
+    present: [
+      { identity: local.identity, agent: local.isAgent, local: true },
+      ...remote.map((participant) => ({
+        identity: participant.identity,
+        agent: participant.isAgent,
+        local: false,
+      })),
+    ],
+  };
 }
 
 /** Why LiveKit did not let the participant in. */

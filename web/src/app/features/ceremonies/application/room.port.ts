@@ -2,17 +2,20 @@ import { type Observable } from 'rxjs';
 
 import { type MicrophoneState } from '../domain/microphone-state';
 import { type RoomAccess } from '../domain/room-access';
+import { type RoomPresence } from '../domain/room-presence';
 
 /**
  * Something that happened to the connection while the participant was in the room: the network
  * dropped and it is being recovered, it came back, it could not be recovered (or the room closed
- * it), or the browser blocked or allowed again the playback of the others' audio.
+ * it), the browser blocked or allowed again the playback of the others' audio, or someone entered
+ * or left: `present` is everyone in the room now, the participant included.
  */
 export type RoomChange =
   | { readonly kind: 'reconnecting' }
   | { readonly kind: 'reconnected' }
   | { readonly kind: 'lost' }
-  | { readonly kind: 'audio_blocked'; readonly blocked: boolean };
+  | { readonly kind: 'audio_blocked'; readonly blocked: boolean }
+  | { readonly kind: 'presence'; readonly present: readonly RoomPresence[] };
 
 /**
  * Port towards the audio room, in the words of the product: no type of the SDK crosses it. The

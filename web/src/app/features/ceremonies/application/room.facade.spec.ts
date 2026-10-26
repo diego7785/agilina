@@ -1,24 +1,36 @@
 import { ApplicationRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { of, Subject } from 'rxjs';
 
-import { FakeRoomAccessPort, FakeRoomPort } from '@testing/room';
+import {
+  aDailyParticipant,
+  aPresence,
+  FakeDailyParticipantsPort,
+  FakeRoomAccessPort,
+  FakeRoomPort,
+} from '@testing/room';
 
+import { DailyParticipantsPort } from './daily-participants.port';
 import { RoomAccessPort } from './room-access.port';
 import { RoomFacade } from './room.facade';
 import { RoomPort } from './room.port';
+import { type DailyParticipant } from '../domain/daily-participant';
 import { RoomFailure } from '../domain/room-failure';
 
 describe('RoomFacade', () => {
   let access: FakeRoomAccessPort;
   let room: FakeRoomPort;
+  let invited: FakeDailyParticipantsPort;
   let facade: RoomFacade;
 
   beforeEach(() => {
     access = new FakeRoomAccessPort();
     room = new FakeRoomPort();
+    invited = new FakeDailyParticipantsPort();
     TestBed.configureTestingModule({
       providers: [
         RoomFacade,
+        { provide: DailyParticipantsPort, useValue: invited },
         { provide: RoomAccessPort, useValue: access },
         { provide: RoomPort, useValue: room },
       ],
@@ -252,6 +264,152 @@ describe('RoomFacade', () => {
       expect(room.connected.map((a) => a.token)).toEqual(['token-1', 'token-2']);
       expect(facade.status()).toBe('connected');
       expect(facade.microphone()).toBe('on');
+    });
+  });
+
+  describe('the participants (AGI-61)', () => {
+    const eva = aDailyParticipant('user-eva', 'Eva Prueba');
+    const ana = aDailyParticipant('user-ana', 'Ana Gil');
+
+    /** Identity, connected and self of each row, in order. */
+    function rows(): [string, boolean, boolean][] {
+      return facade.participants().map((row) => [row.identity, row.connected, row.self]);
+    }
+
+    beforeEach(() => {
+      invited.participants = [eva, ana];
+    });
+
+    it('lists nobody before entering', () => {
+      expect(facade.participants()).toEqual([]);
+    });
+
+    it('asks for the invited of the team once in, and lists them all', async () => {
+      facade.join('atlas');
+      await settle();
+
+      expect(invited.requested).toEqual(['atlas']);
+      expect(rows()).toEqual([
+        ['user-eva', false, false],
+        ['user-ana', false, false],
+      ]);
+      expect(facade.participants()[0]!.name).toBe('Eva Prueba');
+    });
+
+    it('follows who arrives and who leaves', async () => {
+      facade.join('atlas');
+      await settle();
+
+      room.emit({ kind: 'presence', present: [aPresence('user-eva', { local: true })] });
+      expect(rows()).toEqual([
+        ['user-eva', true, true],
+        ['user-ana', false, false],
+      ]);
+
+      room.emit({
+        kind: 'presence',
+        present: [
+          aPresence('user-eva', { local: true }),
+          aPresence('user-ana'),
+          aPresence('agilina', { agent: true }),
+        ],
+      });
+      expect(rows()).toEqual([
+        ['user-eva', true, true],
+        ['user-ana', true, false],
+      ]);
+
+      room.emit({ kind: 'presence', present: [aPresence('user-eva', { local: true })] });
+      expect(rows()).toEqual([
+        ['user-eva', true, true],
+        ['user-ana', false, false],
+      ]);
+    });
+
+    it('does not ask for the invited when it could not enter', async () => {
+      access.failure = new RoomFailure('no_access');
+
+      facade.join('atlas');
+      await settle();
+
+      expect(invited.requested).toEqual([]);
+    });
+
+    it('lists only who is in the room when the invited cannot be read', async () => {
+      invited.failure = new Error('403');
+      facade.join('atlas');
+      await settle();
+
+      room.emit({
+        kind: 'presence',
+        present: [aPresence('user-eva', { local: true }), aPresence('agilina', { agent: true })],
+      });
+
+      expect(facade.status()).toBe('connected');
+      expect(facade.participants()).toEqual([
+        { identity: 'user-eva', name: '', email: null, connected: true, self: true },
+      ]);
+    });
+
+    it('shows everyone disconnected once the connection is lost', async () => {
+      facade.join('atlas');
+      await settle();
+      room.emit({ kind: 'presence', present: [aPresence('user-eva', { local: true })] });
+
+      room.emit({ kind: 'lost' });
+
+      expect(rows()).toEqual([
+        ['user-eva', false, false],
+        ['user-ana', false, false],
+      ]);
+    });
+
+    it('shows everyone disconnected when it gives up reconnecting', async () => {
+      facade.join('atlas');
+      await settle();
+      room.emit({ kind: 'presence', present: [aPresence('user-eva', { local: true })] });
+      jasmine.clock().install();
+      try {
+        room.emit({ kind: 'reconnecting' });
+        jasmine.clock().tick(30_000);
+      } finally {
+        jasmine.clock().uninstall();
+      }
+
+      expect(facade.status()).toBe('failed');
+      expect(rows().every(([, connected]) => !connected)).toBeTrue();
+    });
+
+    it('forgets who was in the room and asks for the invited again when retried', async () => {
+      facade.join('atlas');
+      await settle();
+      room.emit({ kind: 'presence', present: [aPresence('user-eva', { local: true })] });
+      room.emit({ kind: 'lost' });
+      invited.participants = [ana];
+
+      facade.retry();
+      expect(rows().every(([, connected]) => !connected)).toBeTrue();
+      await settle();
+
+      expect(invited.requested).toEqual(['atlas', 'atlas']);
+      expect(rows()).toEqual([['user-ana', false, false]]);
+    });
+
+    it('ignores the invited of an attempt that is no longer the current one', async () => {
+      const late = new Subject<readonly DailyParticipant[]>();
+      const answers = [late, of([ana])];
+      invited.participantsOf = () => answers.shift()!;
+      facade.join('atlas');
+      await settle();
+      room.emit({ kind: 'lost' });
+
+      facade.retry();
+      await settle();
+      late.next([eva]);
+      late.complete();
+      await settle();
+
+      expect(rows()).toEqual([['user-ana', false, false]]);
     });
   });
 

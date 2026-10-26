@@ -3,10 +3,17 @@ import { provideRouter, Router, withComponentInputBinding } from '@angular/route
 import { RouterTestingHarness } from '@angular/router/testing';
 
 import { provideTestI18n } from '@testing/i18n';
-import { FakeRoomAccessPort, FakeRoomPort } from '@testing/room';
+import {
+  aDailyParticipant,
+  aPresence,
+  FakeDailyParticipantsPort,
+  FakeRoomAccessPort,
+  FakeRoomPort,
+} from '@testing/room';
 import { provideTestTenant } from '@testing/tenant';
 
 import { RoomPage } from './room-page';
+import { DailyParticipantsPort } from '../application/daily-participants.port';
 import { RoomAccessPort } from '../application/room-access.port';
 import { RoomPort } from '../application/room.port';
 import { RoomFailure } from '../domain/room-failure';
@@ -14,11 +21,13 @@ import { RoomFailure } from '../domain/room-failure';
 describe('RoomPage', () => {
   let access: FakeRoomAccessPort;
   let room: FakeRoomPort;
+  let invited: FakeDailyParticipantsPort;
   let harness: RouterTestingHarness;
 
   beforeEach(async () => {
     access = new FakeRoomAccessPort();
     room = new FakeRoomPort();
+    invited = new FakeDailyParticipantsPort();
     TestBed.configureTestingModule({
       providers: [
         provideTestI18n(),
@@ -30,6 +39,7 @@ describe('RoomPage', () => {
           ],
           withComponentInputBinding(),
         ),
+        { provide: DailyParticipantsPort, useValue: invited },
         { provide: RoomAccessPort, useValue: access },
         { provide: RoomPort, useValue: room },
       ],
@@ -308,6 +318,92 @@ describe('RoomPage', () => {
 
       expect(page.querySelector('[data-testid*="transcript"]')).toBeNull();
       expect(page.textContent).not.toMatch(/transcrip|subt[ií]tulo/i);
+    });
+  });
+
+  // ------------------------------------- criterion 1: the participants (AGI-137) --
+  describe('the participants', () => {
+    beforeEach(() => {
+      invited.participants = [
+        aDailyParticipant('user-eva', 'Eva Prueba'),
+        aDailyParticipant('user-ana', 'Ana Gil'),
+      ];
+    });
+
+    /** Name, «· tú», email and presence of each row of the list, in order. */
+    function rows(page: HTMLElement): string[] {
+      const fields = [
+        'participant-name',
+        'participant-self',
+        'participant-email',
+        'participant-presence',
+      ];
+      return [...page.querySelectorAll<HTMLElement>('[data-testid="room-participants"] li')].map(
+        (row) =>
+          fields
+            .map((field) => text(row, field))
+            .filter((value) => value !== undefined)
+            .join(' '),
+      );
+    }
+
+    it('lists the invited with their name and email, and who of them is in the room', async () => {
+      const page = await open();
+
+      room.emit({ kind: 'presence', present: [aPresence('user-eva', { local: true })] });
+      await settle();
+
+      expect(rows(page)).toEqual([
+        'Eva Prueba · tú eva@example.test Conectado',
+        'Ana Gil ana@example.test Desconectado',
+      ]);
+    });
+
+    it('shows who arrives and who leaves without reloading, and never Agilina', async () => {
+      const page = await open();
+      room.emit({ kind: 'presence', present: [aPresence('user-eva', { local: true })] });
+      await settle();
+
+      room.emit({
+        kind: 'presence',
+        present: [
+          aPresence('user-eva', { local: true }),
+          aPresence('user-ana'),
+          aPresence('agilina', { agent: true }),
+        ],
+      });
+      await settle();
+      expect(rows(page)).toEqual([
+        'Eva Prueba · tú eva@example.test Conectado',
+        'Ana Gil ana@example.test Conectado',
+      ]);
+
+      room.emit({ kind: 'presence', present: [aPresence('user-eva', { local: true })] });
+      await settle();
+      expect(rows(page)[1]).toBe('Ana Gil ana@example.test Desconectado');
+    });
+
+    it('shows someone in the room who was not invited as «Participante»', async () => {
+      const page = await open();
+
+      room.emit({
+        kind: 'presence',
+        present: [aPresence('user-eva', { local: true }), aPresence('guest-1')],
+      });
+      await settle();
+
+      expect(rows(page)[2]).toBe('Participante Conectado');
+    });
+
+    it('lists only who is in the room when the invited cannot be read', async () => {
+      invited.failure = new Error('403');
+      const page = await open();
+
+      room.emit({ kind: 'presence', present: [aPresence('user-eva', { local: true })] });
+      await settle();
+
+      expect(rows(page)).toEqual(['Participante · tú Conectado']);
+      expect(text(page, 'room-status')).toBe('Conectado');
     });
   });
 

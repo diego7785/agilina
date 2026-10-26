@@ -62,6 +62,14 @@ describe('ParticipantTile', () => {
     expect(tile.querySelector('[data-testid="participant-presence"] svg')).not.toBeNull();
   });
 
+  it('calls «Participante» someone the room does not know by name, with its initial', async () => {
+    const tile = await render({ ...ANA, name: '', email: null });
+
+    expect(text(tile, 'participant-name')).toBe('Participante');
+    expect(tile.querySelector('[aria-hidden="true"]')?.textContent.trim()).toBe('P');
+    expect(tile.querySelector('[data-testid="participant-email"]')).toBeNull();
+  });
+
   it('leaves the email out when there is none', async () => {
     const tile = await render({ ...ANA, email: null });
 

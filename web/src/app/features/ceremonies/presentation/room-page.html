@@ -227,7 +227,7 @@
           {{ t('participants.title') }}
         </h2>
         <ul class="mt-4 grid gap-2">
-          @for (row of participants; track row.identity) {
+          @for (row of participants(); track row.identity) {
             <li><agl-participant-tile [row]="row" /></li>
           }
         </ul>

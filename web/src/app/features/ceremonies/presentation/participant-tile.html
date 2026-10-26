@@ -14,7 +14,7 @@
       class="flex flex-wrap gap-x-1 text-sm font-semibold break-words"
       [class.text-muted]="!row().connected"
     >
-      <span data-testid="participant-name">{{ row().name }}</span>
+      <span data-testid="participant-name">{{ name() }}</span>
       @if (row().self) {
         <span data-testid="participant-self">{{ t('self') }}</span>
       }

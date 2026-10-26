@@ -449,7 +449,8 @@
         "title": "Participants",
         "connected": "Connected",
         "disconnected": "Disconnected",
-        "self": "· you"
+        "self": "· you",
+        "unknown": "Participant"
       },
       "actions": {
         "title": "Actions"

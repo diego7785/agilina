@@ -302,6 +302,14 @@ Un solo estilo para todos los formularios (el de `/:tenant/activate`, el de `/:t
 - **Audio de los demás:** cada pista de audio se reproduce con un `<audio>` en un contenedor oculto
   que crea el adaptador. Si el navegador bloquea la reproducción automática, la pantalla ofrece
   **Activar audio** (`room.startAudio()`, en un gesto de la persona).
+- **Participantes** (AGI-61): `RoomPort` avisa quién está en la sala con el cambio `presence`
+  (la foto completa al entrar, cuando alguien entra o sale y al reconectar; Agilina se reconoce
+  por `participant.isAgent`). `DailyParticipantsPort` (`HttpDailyParticipantsApi` sobre
+  `GET /v1/teams/{team_id}/dailies/current/participants`) da el nombre y el correo de los
+  convocados, que se piden en cada conexión. `participantRows` (dominio) los une: primero los
+  convocados en orden de turno, Conectado o Desconectado, y después quien esté en la sala sin estar
+  convocado, como «Participante». Agilina nunca es una fila. Si la API no responde, la lista
+  muestra solo a quienes están en la sala.
 - La prueba del adaptador usa un `Room` falso que entrega `LIVEKIT_ROOM_FACTORY`: ninguna prueba
   unitaria abre una conexión.
 
