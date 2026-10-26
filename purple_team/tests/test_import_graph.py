@@ -57,12 +57,11 @@ LEVELS: dict[str, int] = {
     "evaluation.spec": 3,
     "providers.factory": 4,
     "defense.input_guard": 4,
-    "defense.output_guard": 4,
     "defense.llm_guard": 4,
-    "defense.prompt_guard": 4,
     "cases": 4,
     "defense.layered": 5,
     "pipeline": 5,
+    "calibration": 5,
     "evaluation.evaluator": 6,
     "records": 7,
     "recording": 8,
@@ -81,6 +80,9 @@ LEVELS: dict[str, int] = {
 # defense.llm_guard and aggregation, all pointing to lower levels.
 # Prompt Guard stage (handoff/14 section 2.9): defense.prompt_guard, same edges as llm_guard.
 # Cycle 4 (handoff/18 section 9.2): tools.system_outputs; pipeline -> tools.system_outputs.
+# Cycle 5 (handoff/24 section 5.1): defense.output_guard and defense.prompt_guard deleted;
+# defense.models no longer imports policy; pipeline -> policy (system policy, always on);
+# new calibration module (level 5).
 ALLOWED: dict[str, frozenset[str]] = {
     **{module: frozenset() for module in LEVEL_ZERO},
     "config": frozenset({"errors", "paths"}),
@@ -102,15 +104,13 @@ ALLOWED: dict[str, frozenset[str]] = {
     ),
     "tools.simulated": frozenset({"tools.base", "core.models"}),
     "tools.system_outputs": frozenset({"tools.base", "core.models", "team_context"}),
-    "defense.models": frozenset({"config", "core.models", "policy"}),
+    "defense.models": frozenset({"config"}),
     "evaluation.spec": frozenset({"core.models", "core.text", "errors"}),
     "providers.factory": frozenset(
         {"config", "providers.base", "providers.mock", "providers.ollama", "providers.cloud"}
     ),
     "defense.input_guard": frozenset({"defense.models"}),
-    "defense.output_guard": frozenset({"core.models", "defense.models", "policy"}),
     "defense.llm_guard": frozenset({"config", "defense.models", "errors"}),
-    "defense.prompt_guard": frozenset({"config", "defense.models", "errors"}),
     "cases": frozenset(
         {
             "errors",
@@ -124,25 +124,19 @@ ALLOWED: dict[str, frozenset[str]] = {
             "policy",
         }
     ),
-    "defense.layered": frozenset(
-        {
-            "config",
-            "core.models",
-            "defense.models",
-            "defense.input_guard",
-            "defense.output_guard",
-        }
-    ),
+    "defense.layered": frozenset({"config", "defense.models", "defense.input_guard"}),
     "pipeline": frozenset(
         {
             *CORE_MODULES,
             "providers.base",
             "defense.models",
+            "policy",
             "tools.base",
             "tools.simulated",
             "tools.system_outputs",
         }
     ),
+    "calibration": frozenset({"cases", "config", "core.text", "defense.models", "errors"}),
     "evaluation.evaluator": frozenset(
         {
             *CORE_MODULES,

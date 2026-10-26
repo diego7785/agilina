@@ -20,10 +20,11 @@ from purple_team.records import SUMMARY_COLUMNS, CaseRecord, CaseStatus, Repetit
 from purple_team.tests.support import (
     REAL_CASES_DIR,
     REAL_SYSTEM_PROMPT,
+    KeywordScanner,
     make_temp_dir,
-    own_defense,
     read_json,
     real_team_context,
+    scanner_defense,
     simulated_pipeline,
 )
 
@@ -34,7 +35,8 @@ PROMPT = load_system_prompt(REAL_SYSTEM_PROMPT)
 
 def trace_for(case: Case) -> PipelineTrace:
     closer = CeremonyCloser(MockProvider(mock_scripts_for([case])), 0.0, real_team_context())
-    defense = own_defense()
+    # A scanner double that misses the c04 payload: the system policy blocks the item instead.
+    defense = scanner_defense(scanner=KeywordScanner(("asistente",)))
     pipeline = simulated_pipeline(closer, defense)
     return pipeline.process(case.transcript, PROMPT, RequestTrace(RUN_ID, case.case_id))
 
@@ -101,7 +103,7 @@ class RunRecorderTest(unittest.TestCase):
         expected_outputs = {
             "model_output.raw.txt",
             "model_output.parsed.json",
-            "output_guard.json",
+            "system_policy.json",
             "final_output.json",
             "tool_calls.json",
             "system_outputs.json",
@@ -114,14 +116,15 @@ class RunRecorderTest(unittest.TestCase):
                 data = read_json(path)
                 self.assertEqual(data["run_id"], RUN_ID)
                 self.assertEqual(data["case_id"], CASE.case_id)
-        guard = read_json(outputs / "output_guard.json")
-        self.assertEqual(guard["mode"], "own")
-        blocked = guard["blocked"]
+        policy = read_json(outputs / "system_policy.json")
+        self.assertEqual(list(policy), ["run_id", "case_id", "applied", "blocked"])
+        self.assertIs(policy["applied"], True)
+        blocked = policy["blocked"]
         self.assertIsInstance(blocked, list)
         if isinstance(blocked, list):
             self.assertEqual(blocked[0]["reason"], "slack_user_not_allowed")
         input_guard = read_json(inputs / "input_guard.json")
-        self.assertEqual(input_guard["detectors"], ["regex"])
+        self.assertEqual(input_guard["detectors"], ["llm_guard"])
         request = read_json(inputs / "model_request.json")
         self.assertEqual(request["system_prompt_sha256"], PROMPT.sha256)
 
@@ -173,7 +176,7 @@ class RunRecorderTest(unittest.TestCase):
             finished_at="2026-10-11T15:30:00Z",
             provider="mock",
             model="mock-scripted-v1",
-            defense=DefenseMode.OWN,
+            defense=DefenseMode.LLM_GUARD_DEFAULT,
             operation_mode=OPERATION_MODE,
             repetition=Repetition(group_id="grupo", index=2, count=3),
             config={},
@@ -188,19 +191,21 @@ class RunRecorderTest(unittest.TestCase):
         self.assertEqual(lines[0], ",".join(SUMMARY_COLUMNS))
         self.assertEqual(len(lines), 2)
         self.assertIn(",AML.T0051.001;AML.T0086,", lines[1])
-        self.assertEqual(log["schema_version"], 3)
+        self.assertEqual(log["schema_version"], 4)
         self.assertEqual(log["repetition"], {"group_id": "grupo", "index": 2, "count": 3})
         self.assertEqual(
             log["cases"][0]["atlas_techniques"][1],
             {"id": "AML.T0086", "name": "Exfiltration via AI Agent Tool Invocation"},
         )
-        self.assertIn("@partner-review", json.dumps(log["cases"][0]["output_guard"]))
+        self.assertIn("@partner-review", json.dumps(log["cases"][0]["system_policy"]))
         case_log = log["cases"][0]
         self.assertEqual(list(case_log)[-3:], ["tool_calls", "system_outputs", "evaluation"])
         self.assertEqual(len(case_log["system_outputs"]), 5)
         self.assertEqual({call["origin"] for call in case_log["tool_calls"]}, {"model"})
         row = next(csv.DictReader(lines))
         self.assertEqual((row["tool_calls"], row["system_outputs"]), ("3", "5"))
+        blocks = (row["blocked_actions"], row["system_policy_blocks"])
+        self.assertEqual(blocks, ("1", "slack_user_not_allowed"))
 
     def test_paths_outside_the_base_are_absolute(self) -> None:
         self.assertTrue(Path(self.recorder.display(CASE.transcript_path)).is_absolute())

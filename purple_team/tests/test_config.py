@@ -3,6 +3,7 @@
 import unittest
 
 from purple_team.config import (
+    BASELINE_SCANNER,
     DEFAULT_CONFIG_FILE,
     MOCK_TEMPERATURE,
     CloudThinkingLevel,
@@ -11,8 +12,9 @@ from purple_team.config import (
     LlmGuardMatchType,
     OllamaFormat,
     ProviderName,
+    ScannerModel,
+    ScannerSettings,
     load_config,
-    parse_defense_mode,
     parse_defense_modes,
 )
 from purple_team.errors import ConfigError
@@ -34,9 +36,9 @@ class DefaultConfigTest(unittest.TestCase):
         self.assertEqual(config.cases_dir, PURPLE_TEAM_DIR / "cases")
         self.assertEqual(config.team_context_file, REAL_TEAM_CONTEXT)
         self.assertEqual(config.max_content_chars, 1500)
-        self.assertEqual(config.llm_guard.threshold, 0.92)
-        self.assertIs(config.llm_guard.match_type, LlmGuardMatchType.FULL)
-        self.assertEqual(config.prompt_guard.threshold, 0.5)
+        self.assertEqual(config.calibration_dir, PURPLE_TEAM_DIR / "calibration")
+        self.assertIs(config.llm_guard_tuned.model, ScannerModel.PROTECTAI_V2)
+        self.assertIs(config.prompt_guard_2.model, ScannerModel.PROMPT_GUARD_2)
 
     def test_defaults_in_code_match_the_versioned_file(self) -> None:
         config = load_config(cli_overrides={}, environ={})
@@ -49,8 +51,12 @@ class DefaultConfigTest(unittest.TestCase):
         self.assertEqual(from_code.ollama, config.ollama)
         self.assertEqual(from_code.cloud, config.cloud)
         self.assertEqual(from_code.max_content_chars, config.max_content_chars)
-        self.assertEqual(from_code.llm_guard, config.llm_guard)
-        self.assertEqual(from_code.prompt_guard, config.prompt_guard)
+        self.assertEqual(from_code.llm_guard_tuned, config.llm_guard_tuned)
+        self.assertEqual(from_code.prompt_guard_2, config.prompt_guard_2)
+        self.assertEqual(
+            from_code.display(from_code.calibration_dir),
+            config.display(config.calibration_dir),
+        )
         shown_from_code = from_code.display(from_code.team_context_file)
         self.assertEqual(shown_from_code, config.display(config.team_context_file))
         self.assertEqual(from_code.provider, config.provider)
@@ -62,12 +68,12 @@ class PrecedenceTest(unittest.TestCase):
         self.tmp_dir = make_temp_dir(self)
         self.config_file = write_temp_config(
             self.tmp_dir,
-            harness_lines=['defense = "on"'],
+            harness_lines=['defense = "llm-guard-tuned"'],
         )
 
     def test_file_overrides_defaults(self) -> None:
         config = load_config(cli_overrides={"config": str(self.config_file)}, environ={})
-        self.assertIs(config.defense, DefenseMode.OWN)
+        self.assertIs(config.defense, DefenseMode.LLM_GUARD_TUNED)
         self.assertEqual(config.sources["defense"], ConfigSource.FILE)
         self.assertEqual(config.sources["config_file"], ConfigSource.CLI)
 
@@ -98,7 +104,7 @@ class PrecedenceTest(unittest.TestCase):
     def test_empty_environment_values_are_ignored(self) -> None:
         environ = {"PTH_CONFIG": str(self.config_file), "PTH_DEFENSE": ""}
         config = load_config(cli_overrides={}, environ=environ)
-        self.assertIs(config.defense, DefenseMode.OWN)
+        self.assertIs(config.defense, DefenseMode.LLM_GUARD_TUNED)
 
     def test_team_context_file_from_file_and_environment(self) -> None:
         config = load_config(cli_overrides={"config": str(self.config_file)}, environ={})
@@ -110,40 +116,59 @@ class PrecedenceTest(unittest.TestCase):
 
 
 class DefenseModeTest(unittest.TestCase):
-    def test_on_is_an_alias_of_own(self) -> None:
-        self.assertIs(parse_defense_mode("on", "cli"), DefenseMode.OWN)
-        config = load_config(cli_overrides={}, environ={"PTH_DEFENSE": "on"})
-        self.assertIs(config.defense, DefenseMode.OWN)
-        self.assertEqual(config.to_record()["defense"], "own")
-
     def test_every_mode_is_accepted(self) -> None:
+        self.assertEqual(
+            [mode.value for mode in DefenseMode],
+            ["off", "llm-guard-default", "llm-guard-tuned", "prompt-guard-2"],
+        )
         for mode in DefenseMode:
             with self.subTest(mode=mode):
                 config = load_config(cli_overrides={"defense": mode.value}, environ={})
                 self.assertIs(config.defense, mode)
 
-    def test_lists_of_modes_keep_the_order_and_resolve_aliases(self) -> None:
-        modes = parse_defense_modes("off, on,llm-guard,own-llm-guard,prompt-guard,own-prompt-guard")
+    def test_lists_of_modes_keep_the_order(self) -> None:
+        modes = parse_defense_modes("prompt-guard-2, off,llm-guard-tuned,llm-guard-default")
         expected = (
+            DefenseMode.PROMPT_GUARD_2,
             DefenseMode.OFF,
-            DefenseMode.OWN,
-            DefenseMode.LLM_GUARD,
-            DefenseMode.OWN_LLM_GUARD,
-            DefenseMode.PROMPT_GUARD,
-            DefenseMode.OWN_PROMPT_GUARD,
+            DefenseMode.LLM_GUARD_TUNED,
+            DefenseMode.LLM_GUARD_DEFAULT,
         )
         self.assertEqual(modes, expected)
 
-    def test_prompt_guard_modes_from_the_environment_and_the_command_line(self) -> None:
-        from_env = load_config(cli_overrides={}, environ={"PTH_DEFENSE": "prompt-guard"})
-        self.assertIs(from_env.defense, DefenseMode.PROMPT_GUARD)
+    def test_scanner_modes_from_the_environment_and_the_command_line(self) -> None:
+        from_env = load_config(cli_overrides={}, environ={"PTH_DEFENSE": "prompt-guard-2"})
+        self.assertIs(from_env.defense, DefenseMode.PROMPT_GUARD_2)
         self.assertEqual(from_env.sources["defense"], ConfigSource.ENV)
-        from_cli = load_config(cli_overrides={"defense": "own-prompt-guard"}, environ={})
-        self.assertIs(from_cli.defense, DefenseMode.OWN_PROMPT_GUARD)
-        self.assertEqual(from_cli.to_record()["defense"], "own-prompt-guard")
+        from_cli = load_config(cli_overrides={"defense": "llm-guard-default"}, environ={})
+        self.assertIs(from_cli.defense, DefenseMode.LLM_GUARD_DEFAULT)
+        self.assertEqual(from_cli.to_record()["defense"], "llm-guard-default")
+
+    def test_retired_modes_explain_the_migration(self) -> None:
+        hints = {
+            "on": "defensa propia por reglas se retiró",
+            "own": "defensa propia por reglas se retiró",
+            "own-llm-guard": "usa llm-guard-default o prompt-guard-2",
+            "own-prompt-guard": "usa llm-guard-default o prompt-guard-2",
+            "llm-guard": "ahora se llama llm-guard-default",
+            "prompt-guard": "ahora es prompt-guard-2",
+        }
+        options = "Opciones válidas: off, llm-guard-default, llm-guard-tuned, prompt-guard-2"
+        for name, hint in hints.items():
+            for origin, overrides, environ in (
+                ("cli", {"defense": name}, {}),
+                ("env", {}, {"PTH_DEFENSE": name}),
+            ):
+                with self.subTest(name=name, origin=origin):
+                    with self.assertRaises(ConfigError) as raised:
+                        load_config(cli_overrides=overrides, environ=environ)
+                    message = str(raised.exception)
+                    self.assertIn(f"(origen: {origin}): {name!r}", message)
+                    self.assertIn(hint.casefold(), message.casefold())
+                    self.assertIn(options, message)
 
     def test_invalid_lists_are_rejected(self) -> None:
-        for text in ("", "off,", "off,off", "own,on", "off,maybe"):
+        for text in ("", "off,", "off,off", "own,on", "off,maybe", "off,llm-guard"):
             with self.subTest(text=text):
                 with self.assertRaises(ConfigError):
                     parse_defense_modes(text)
@@ -152,7 +177,7 @@ class DefenseModeTest(unittest.TestCase):
         with self.assertRaises(ConfigError) as raised:
             load_config(cli_overrides={}, environ={"PTH_DEFENSE": "maybe"})
         message = str(raised.exception)
-        self.assertIn("off, own, llm-guard, own-llm-guard", message)
+        self.assertIn("off, llm-guard-default, llm-guard-tuned, prompt-guard-2", message)
         self.assertIn("env", message)
 
 
@@ -251,15 +276,30 @@ class InvalidConfigTest(unittest.TestCase):
         self.assertIn("harness.provder", str(raised.exception))
 
     def test_removed_policy_keys_explain_the_team_context(self) -> None:
-        for key in ("allowed_email_domains", "allowed_onedrive_root", "allowed_jira_projects"):
-            with self.subTest(key=key):
-                extra = f'[defense.policy]\n{key} = "x"'
+        keys = ("allowed_email_domains", "allowed_onedrive_root", "allowed_jira_projects")
+        for section in ("defense.policy", "system_policy"):
+            for key in keys:
+                with self.subTest(section=section, key=key):
+                    extra = f'[{section}]\n{key} = "x"'
+                    config_file = write_temp_config(make_temp_dir(self), extra=extra)
+                    with self.assertRaises(ConfigError) as raised:
+                        load_config(cli_overrides={"config": str(config_file)}, environ={})
+                    message = str(raised.exception)
+                    self.assertIn(f"{section}.{key} ya no existe", message)
+                    self.assertIn("team_context.json", message)
+
+    def test_removed_sections_explain_the_migration(self) -> None:
+        hints = {
+            "[defense.policy]\nmax_content_chars = 1500": "ahora es [system_policy]",
+            "[defense.llm_guard]\nthreshold = 0.92": "[defense.llm_guard_tuned]",
+            "[defense.prompt_guard]\nthreshold = 0.5": "ahora es [defense.prompt_guard_2]",
+        }
+        for extra, hint in hints.items():
+            with self.subTest(extra=extra):
                 config_file = write_temp_config(make_temp_dir(self), extra=extra)
                 with self.assertRaises(ConfigError) as raised:
                     load_config(cli_overrides={"config": str(config_file)}, environ={})
-                message = str(raised.exception)
-                self.assertIn(f"defense.policy.{key} ya no existe", message)
-                self.assertIn("team_context.json", message)
+                self.assertIn(hint, str(raised.exception))
 
     def test_unknown_table_is_rejected(self) -> None:
         config_file = write_temp_config(self.tmp_dir, extra="[providers.openai]\nmodel = 'x'")
@@ -279,19 +319,19 @@ class InvalidConfigTest(unittest.TestCase):
 
     def test_wrong_value_types_are_rejected(self) -> None:
         invalid_extras = [
-            "[defense.policy]\nmax_content_chars = 0",
-            "[defense.policy]\nmax_content_chars = true",
+            "[system_policy]\nmax_content_chars = 0",
+            "[system_policy]\nmax_content_chars = true",
             "[providers.ollama]\ntimeout_seconds = -1",
             "[providers.cloud]\ntemperature = -0.5",
             '[providers.cloud]\nthinking_level = "maximal"',
-            "[defense.llm_guard]\nthreshold = 1",
-            "[defense.llm_guard]\nthreshold = 0",
-            '[defense.llm_guard]\nmatch_type = "sentence"',
-            "[defense.prompt_guard]\nthreshold = 0",
-            "[defense.prompt_guard]\nthreshold = 1",
-            "[defense.prompt_guard]\nthreshold = 1.5",
-            '[defense.prompt_guard]\nthreshold = "x"',
-            "[defense.prompt_guard]\nthreshold = true",
+            "[defense.llm_guard_tuned]\nthreshold = 1",
+            "[defense.llm_guard_tuned]\nthreshold = 0",
+            '[defense.llm_guard_tuned]\nmatch_type = "sentence"',
+            "[defense.prompt_guard_2]\nthreshold = 0",
+            "[defense.prompt_guard_2]\nthreshold = 1",
+            "[defense.prompt_guard_2]\nthreshold = 1.5",
+            '[defense.prompt_guard_2]\nthreshold = "x"',
+            "[defense.prompt_guard_2]\nthreshold = true",
         ]
         for extra in invalid_extras:
             with self.subTest(extra=extra):
@@ -299,14 +339,26 @@ class InvalidConfigTest(unittest.TestCase):
                 with self.assertRaises(ConfigError):
                     load_config(cli_overrides={"config": str(config_file)}, environ={})
 
-    def test_prompt_guard_model_and_revision_are_not_configurable(self) -> None:
-        for key in ("model", "revision", "device"):
-            with self.subTest(key=key):
-                extra = f'[defense.prompt_guard]\n{key} = "x"'
+    def test_model_key_is_not_configurable(self) -> None:
+        for section in ("defense.llm_guard_tuned", "defense.prompt_guard_2"):
+            for key in ("model", "revision", "device"):
+                with self.subTest(section=section, key=key):
+                    extra = f'[{section}]\n{key} = "x"'
+                    config_file = write_temp_config(make_temp_dir(self), extra=extra)
+                    with self.assertRaises(ConfigError) as raised:
+                        load_config(cli_overrides={"config": str(config_file)}, environ={})
+                    message = str(raised.exception)
+                    self.assertIn(f"Clave desconocida en {config_file.resolve()}", message)
+                    self.assertIn(f"{section}.{key}", str(raised.exception))
+
+    def test_strip_speaker_must_be_boolean(self) -> None:
+        for value in ("1", '"quizas"', "0.5"):
+            with self.subTest(value=value):
+                extra = f"[defense.prompt_guard_2]\nstrip_speaker = {value}"
                 config_file = write_temp_config(make_temp_dir(self), extra=extra)
                 with self.assertRaises(ConfigError) as raised:
                     load_config(cli_overrides={"config": str(config_file)}, environ={})
-                self.assertIn(f"defense.prompt_guard.{key}", str(raised.exception))
+                self.assertIn("prompt_guard_2.strip_speaker", str(raised.exception))
 
     def test_unknown_cli_override_is_rejected(self) -> None:
         with self.assertRaises(ConfigError):
@@ -341,34 +393,83 @@ class CloudOptionsTest(unittest.TestCase):
                 with self.assertRaises(ConfigError):
                     load_config(cli_overrides={}, environ={"PTH_CLOUD_TEMPERATURE": value})
 
-    def test_cloud_and_llm_guard_options_are_recorded(self) -> None:
+    def test_cloud_and_scanner_options_are_recorded(self) -> None:
         record = load_config(cli_overrides={}, environ={}).to_record()
         cloud = record["cloud"]
-        llm_guard = record["llm_guard"]
         self.assertIsInstance(cloud, dict)
         if isinstance(cloud, dict):
             self.assertEqual(cloud["thinking_level"], "low")
             self.assertEqual(cloud["base_url"], "https://generativelanguage.googleapis.com/v1beta")
             self.assertEqual(cloud["temperature"], 1.0)
-        self.assertEqual(llm_guard, {"threshold": 0.92, "match_type": "full"})
-        self.assertEqual(record["prompt_guard"], {"threshold": 0.5})
-        self.assertEqual(record["policy"], {"max_content_chars": 1500})
+        baseline = {
+            "model": "protectai/deberta-v3-base-prompt-injection-v2",
+            "threshold": 0.92,
+            "match_type": "full",
+            "strip_speaker": True,
+        }
+        self.assertEqual(record["llm_guard_default"], baseline)
+        prompt_guard_2 = record["prompt_guard_2"]
+        self.assertIsInstance(prompt_guard_2, dict)
+        if isinstance(prompt_guard_2, dict):
+            self.assertEqual(prompt_guard_2["model"], "meta-llama/Llama-Prompt-Guard-2-86M")
+        self.assertNotIn("policy", record)
+        self.assertNotIn("llm_guard", record)
+        self.assertEqual(record["calibration_dir"], "calibration")
         self.assertEqual(record["team_context_file"], "team_context.json")
 
 
-class PromptGuardOptionsTest(unittest.TestCase):
-    def test_threshold_from_the_file_is_recorded_with_its_source(self) -> None:
-        extra = "[defense.prompt_guard]\nthreshold = 0.7"
+class ScannerOptionsTest(unittest.TestCase):
+    def test_scanner_settings_per_mode(self) -> None:
+        extra = "\n".join(
+            [
+                "[defense.llm_guard_tuned]",
+                "threshold = 0.5",
+                'match_type = "chunks"',
+                "strip_speaker = false",
+                "[defense.prompt_guard_2]",
+                "threshold = 0.2",
+                'match_type = "full"',
+                'strip_speaker = "true"',
+            ],
+        )
         config_file = write_temp_config(make_temp_dir(self), extra=extra)
         config = load_config(cli_overrides={"config": str(config_file)}, environ={})
-        self.assertEqual(config.prompt_guard.threshold, 0.7)
-        self.assertEqual(config.sources["prompt_guard.threshold"], ConfigSource.FILE)
+        self.assertIsNone(config.scanner_settings(DefenseMode.OFF))
+        self.assertEqual(config.scanner_settings(DefenseMode.LLM_GUARD_DEFAULT), BASELINE_SCANNER)
+        self.assertEqual(
+            config.scanner_settings(DefenseMode.LLM_GUARD_TUNED),
+            ScannerSettings(ScannerModel.PROTECTAI_V2, 0.5, LlmGuardMatchType.CHUNKS, False),
+        )
+        self.assertEqual(
+            config.scanner_settings(DefenseMode.PROMPT_GUARD_2),
+            ScannerSettings(ScannerModel.PROMPT_GUARD_2, 0.2, LlmGuardMatchType.FULL, True),
+        )
+
+    def test_baseline_is_the_scanner_of_e12_and_e18(self) -> None:
+        expected = ScannerSettings(
+            ScannerModel.PROTECTAI_V2,
+            0.92,
+            LlmGuardMatchType.FULL,
+            strip_speaker=True,
+        )
+        self.assertEqual(BASELINE_SCANNER, expected)
+
+    def test_scanner_sections_from_the_file_are_recorded_with_their_source(self) -> None:
+        extra = "[defense.prompt_guard_2]\nthreshold = 0.7"
+        config_file = write_temp_config(make_temp_dir(self), extra=extra)
+        config = load_config(cli_overrides={"config": str(config_file)}, environ={})
+        self.assertEqual(config.prompt_guard_2.threshold, 0.7)
+        self.assertEqual(config.sources["prompt_guard_2.threshold"], ConfigSource.FILE)
+        self.assertEqual(config.sources["prompt_guard_2.match_type"], ConfigSource.DEFAULT)
         record = config.to_record()
-        self.assertEqual(record["prompt_guard"], {"threshold": 0.7})
+        recorded = record["prompt_guard_2"]
+        self.assertIsInstance(recorded, dict)
+        if isinstance(recorded, dict):
+            self.assertEqual(recorded["threshold"], 0.7)
         sources = record["sources"]
         self.assertIsInstance(sources, dict)
         if isinstance(sources, dict):
-            self.assertEqual(sources["prompt_guard.threshold"], "file")
+            self.assertEqual(sources["prompt_guard_2.threshold"], "file")
 
 
 class RecordTest(unittest.TestCase):
@@ -390,7 +491,7 @@ class RecordTest(unittest.TestCase):
             self.assertEqual(cloud["api_key_env"], "PTH_CLOUD_API_KEY")
 
     def test_record_lists_the_source_of_each_value(self) -> None:
-        record = load_config(cli_overrides={"defense": "own"}, environ={}).to_record()
+        record = load_config(cli_overrides={"defense": "llm-guard-default"}, environ={}).to_record()
         sources = record["sources"]
         self.assertIsInstance(sources, dict)
         if isinstance(sources, dict):

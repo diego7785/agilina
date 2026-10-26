@@ -1,4 +1,4 @@
-"""Agent pipeline: input defense -> core -> output defense -> simulated tools -> system outputs.
+"""Agent pipeline: optional input scanner -> core -> system policy (always) -> tools -> outputs.
 
 The modeled operation mode is *autonomous*: every allowed action item is executed without
 human approval. Agilina's support mode (approval request) is out of scope. After the action
@@ -12,7 +12,8 @@ from typing import Final
 from purple_team.core.ceremony import CeremonyCloser, CeremonyClosing
 from purple_team.core.models import CeremonyOutput
 from purple_team.core.prompts import SystemPrompt
-from purple_team.defense.models import Defense, InputScreening, OutputScreening
+from purple_team.defense.models import Defense, InputScreening
+from purple_team.policy import PolicyScreening, SystemPolicy
 from purple_team.providers.base import RequestTrace
 from purple_team.tools.base import SystemOutputRecord, ToolCallRecord
 from purple_team.tools.simulated import ToolDispatcher
@@ -27,28 +28,30 @@ class PipelineTrace:
 
     input_screening: InputScreening
     closing: CeremonyClosing
-    output_screening: OutputScreening | None
+    policy_screening: PolicyScreening | None
     tool_calls: tuple[ToolCallRecord, ...]
     system_outputs: tuple[SystemOutputRecord, ...]
 
     @property
     def final_output(self) -> CeremonyOutput | None:
         """What was delivered and executed (``None`` when the model output was invalid)."""
-        return self.output_screening.output if self.output_screening is not None else None
+        return self.policy_screening.output if self.policy_screening is not None else None
 
 
 class AgentPipeline:
-    """Runs one transcript through the defense, the core and the tools."""
+    """Runs one transcript through the scanner, the core, the system policy and the tools."""
 
     def __init__(
         self,
         closer: CeremonyCloser,
         defense: Defense,
+        policy: SystemPolicy,
         tools: ToolDispatcher,
         system_outputs: SystemOutputs,
     ) -> None:
         self._closer = closer
         self._defense = defense
+        self._policy = policy
         self._tools = tools
         self._system_outputs = system_outputs
 
@@ -58,7 +61,7 @@ class AgentPipeline:
         system_prompt: SystemPrompt,
         trace: RequestTrace,
     ) -> PipelineTrace:
-        """Screen, close the ceremony, screen the output, execute the allowed items and deliver.
+        """Screen, close the ceremony, apply the policy, execute the allowed items and deliver.
 
         An invalid model output produces neither tool calls nor system outputs.
         """
@@ -68,12 +71,12 @@ class AgentPipeline:
             return PipelineTrace(
                 input_screening,
                 closing,
-                output_screening=None,
+                policy_screening=None,
                 tool_calls=(),
                 system_outputs=(),
             )
-        output_screening = self._defense.screen_output(closing.output)
-        final_output = output_screening.output
+        policy_screening = self._policy.screen(closing.output)
+        final_output = policy_screening.output
         tool_calls = self._tools.dispatch(final_output.action_items)
         system_outputs = self._system_outputs.deliver(final_output, trace.case_id)
-        return PipelineTrace(input_screening, closing, output_screening, tool_calls, system_outputs)
+        return PipelineTrace(input_screening, closing, policy_screening, tool_calls, system_outputs)

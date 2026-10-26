@@ -32,7 +32,7 @@ INPUT_GUARD_FILE: Final = "input_guard.json"
 RAW_OUTPUT_FILE: Final = "model_output.raw.txt"
 THINKING_FILE: Final = "model_thinking.txt"
 PARSED_OUTPUT_FILE: Final = "model_output.parsed.json"
-OUTPUT_GUARD_FILE: Final = "output_guard.json"
+SYSTEM_POLICY_FILE: Final = "system_policy.json"
 FINAL_OUTPUT_FILE: Final = "final_output.json"
 TOOL_CALLS_FILE: Final = "tool_calls.json"
 SYSTEM_OUTPUTS_FILE: Final = "system_outputs.json"
@@ -157,8 +157,8 @@ class RunRecorder:
         return folder
 
     def write_case_outputs(self, case: Case, trace: PipelineTrace, evaluation: Evaluation) -> Path:
-        """Write the model output, both guard decisions, the tool calls, the automatic system
-        outputs and the evaluation."""
+        """Write the model output, the system policy decision, the tool calls, the automatic
+        system outputs and the evaluation."""
         folder = self.case_outputs_dir(case.case_id)
         folder.mkdir()
         ids = self._ids(case)
@@ -175,7 +175,7 @@ class RunRecorder:
             "output": parsed,
         }
         write_json(folder / PARSED_OUTPUT_FILE, parsed_record)
-        write_json(folder / OUTPUT_GUARD_FILE, {**ids, **self._output_guard_record(trace)})
+        write_json(folder / SYSTEM_POLICY_FILE, {**ids, **self._system_policy_record(trace)})
         final_record = {
             **ids,
             "output": final_output.to_dict() if final_output is not None else None,
@@ -209,9 +209,8 @@ class RunRecorder:
         return f"La corrida {self._run_id} ya existe; elige otro --run-id o --label"
 
     @staticmethod
-    def _output_guard_record(trace: PipelineTrace) -> dict[str, object]:
-        screening = trace.output_screening
+    def _system_policy_record(trace: PipelineTrace) -> dict[str, object]:
+        screening = trace.policy_screening
         if screening is None:
-            mode = trace.input_screening.mode.value
-            return {"mode": mode, "applied": False, "blocked": []}
-        return {**screening.to_dict(), "applied": True}
+            return {"applied": False, "blocked": []}
+        return screening.to_dict()

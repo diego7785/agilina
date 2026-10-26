@@ -14,19 +14,20 @@ from typing import Final
 
 from purple_team.cli import main
 from purple_team.composition import build_tools
-from purple_team.config import DefenseMode
+from purple_team.config import BASELINE_SCANNER, DefenseMode, ScannerSettings
 from purple_team.core.ceremony import CeremonyCloser
 from purple_team.defense.input_guard import InputGuard
-from purple_team.defense.layered import LayeredDefense
+from purple_team.defense.layered import InputGuardDefense
+from purple_team.defense.llm_guard import LlmGuardDetector
 from purple_team.defense.models import Defense
-from purple_team.defense.output_guard import OutputGuard
 from purple_team.pipeline import AgentPipeline
-from purple_team.policy import DefensePolicy
+from purple_team.policy import SystemPolicy
 from purple_team.team_context import TeamContext, load_team_context
 from purple_team.tools.system_outputs import SystemOutputs
 
 PURPLE_TEAM_DIR = Path(__file__).resolve().parent.parent
 REAL_CASES_DIR = PURPLE_TEAM_DIR / "cases"
+REAL_CALIBRATION_DIR = PURPLE_TEAM_DIR / "calibration"
 REAL_SYSTEM_PROMPT = PURPLE_TEAM_DIR / "prompts" / "system_prompt.es.txt"
 REAL_TEAM_CONTEXT = PURPLE_TEAM_DIR / "team_context.json"
 FIXED_INSTANT = datetime(2026, 10, 11, 15, 30, tzinfo=UTC)
@@ -41,9 +42,6 @@ DEFAULT_MAX_CONTENT_CHARS: Final = 1500
 KEYWORD_SCANNER_WORDS: Final = ("asistente", "agilina", "<!--", "meeting bot")
 FLAGGED_SCORE: Final = 1.0
 CLEAN_SCORE: Final = -1.0
-# Scores of the Prompt Guard 2 double: P(malicious) of a flagged line and of any other line.
-PROMPT_GUARD_FLAGGED: Final = 0.99
-PROMPT_GUARD_CLEAN: Final = 0.01
 
 
 def real_team_context() -> TeamContext:
@@ -51,20 +49,15 @@ def real_team_context() -> TeamContext:
     return load_team_context(REAL_TEAM_CONTEXT)
 
 
-def default_policy(max_content_chars: int = DEFAULT_MAX_CONTENT_CHARS) -> DefensePolicy:
-    """Policy derived from the versioned team context."""
-    return DefensePolicy.from_team_context(real_team_context(), max_content_chars)
-
-
-def own_defense(policy: DefensePolicy | None = None) -> LayeredDefense:
-    """The ``own`` defense: regex input guard and the output policy."""
-    chosen = default_policy() if policy is None else policy
-    return LayeredDefense(DefenseMode.OWN, InputGuard(), OutputGuard(chosen))
+def default_policy(max_content_chars: int = DEFAULT_MAX_CONTENT_CHARS) -> SystemPolicy:
+    """System policy derived from the versioned team context."""
+    return SystemPolicy.from_team_context(real_team_context(), max_content_chars)
 
 
 def simulated_pipeline(closer: CeremonyCloser, defense: Defense) -> AgentPipeline:
-    """Pipeline with the simulated tools and the system outputs of the versioned context."""
-    return AgentPipeline(closer, defense, build_tools(), SystemOutputs(real_team_context()))
+    """Pipeline with the system policy, the simulated tools and the system outputs."""
+    context = real_team_context()
+    return AgentPipeline(closer, defense, default_policy(), build_tools(), SystemOutputs(context))
 
 
 class KeywordScanner:
@@ -86,37 +79,15 @@ class KeywordScanner:
         return prompt, True, CLEAN_SCORE
 
 
-class KeywordClassifier:
-    """Test double of the Llama Prompt Guard 2 classifier: fixed scores by keyword.
-
-    By default every word of ``KEYWORD_SCANNER_WORDS`` scores ``PROMPT_GUARD_FLAGGED``. A text
-    without any keyword scores ``PROMPT_GUARD_CLEAN`` and one with several keywords gets the
-    highest of their scores. It never loads a model; it records every text it was asked about.
-    """
-
-    def __init__(self, scores: Mapping[str, float] | None = None) -> None:
-        chosen = dict.fromkeys(KEYWORD_SCANNER_WORDS, PROMPT_GUARD_FLAGGED)
-        if scores is not None:
-            chosen = dict(scores)
-        self._scores = {word.casefold(): score for word, score in chosen.items()}
-        self.texts: list[str] = []
-
-    def malicious_score(self, text: str) -> float:
-        """Highest score of the keywords found in the text, else ``PROMPT_GUARD_CLEAN``."""
-        self.texts.append(text)
-        folded = text.casefold()
-        found = [score for word, score in self._scores.items() if word in folded]
-        return max(found, default=PROMPT_GUARD_CLEAN)
-
-    def describe(self) -> dict[str, object]:
-        """Same shape as the real classifier, with the label order of the model card."""
-        return {
-            "labels": {"0": "BENIGN", "1": "MALICIOUS"},
-            "malicious_index": 1,
-            "device": "test-double",
-            "transformers_version": None,
-            "torch_version": None,
-        }
+def scanner_defense(
+    mode: DefenseMode = DefenseMode.LLM_GUARD_DEFAULT,
+    scanner: KeywordScanner | None = None,
+    settings: ScannerSettings = BASELINE_SCANNER,
+) -> InputGuardDefense:
+    """A scanner mode with the ``KeywordScanner`` double instead of a real model."""
+    chosen = KeywordScanner() if scanner is None else scanner
+    detector = LlmGuardDetector(chosen, settings, None)
+    return InputGuardDefense(mode, InputGuard((detector,)))
 
 
 class FixedClock:
@@ -187,18 +158,20 @@ def write_temp_config(
     directory: Path,
     *,
     cases_dir: Path = REAL_CASES_DIR,
+    calibration_dir: Path = REAL_CALIBRATION_DIR,
     harness_lines: Sequence[str] = (),
     extra: str = "",
 ) -> Path:
     """Write a TOML config whose runs land inside ``directory`` and return its path.
 
     ``inputs_dir`` and ``outputs_dir`` are relative (they stay inside the temporary
-    directory) while the cases, the system prompt and the team context point to the real
-    files.
+    directory) while the cases, the calibration set, the system prompt and the team context
+    point to the real files.
     """
     lines = [
         "[harness]",
         f"cases_dir = {toml_string(str(cases_dir))}",
+        f"calibration_dir = {toml_string(str(calibration_dir))}",
         'inputs_dir = "inputs"',
         'outputs_dir = "outputs"',
         f"system_prompt_file = {toml_string(str(REAL_SYSTEM_PROMPT))}",

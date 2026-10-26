@@ -12,9 +12,9 @@ from purple_team.tests.support import PURPLE_TEAM_DIR, iter_harness_python_files
 
 MAX_LINE_LENGTH = 100
 AMBIGUOUS_NAMES = frozenset({"l", "O", "I"})
-# Network, process and randomness modules, plus the optional model stacks: LLM Guard and
-# transformers/torch are only ever imported lazily (importlib) by defense/llm_guard.py and
-# defense/prompt_guard.py, never with an import statement.
+# Network, process and randomness modules, plus the optional model stack: LLM Guard (with
+# transformers/torch) is only ever imported lazily (importlib) by defense/llm_guard.py, never
+# with an import statement.
 FORBIDDEN_MODULES = frozenset(
     {
         "random",
@@ -230,16 +230,10 @@ class StyleTest(unittest.TestCase):
 
     def test_llm_guard_stack_is_never_imported_statically(self) -> None:
         llm_guard = PURPLE_TEAM_DIR / "defense" / "llm_guard.py"
-        for module in ("llm_guard.input_scanners", "torch", "transformers"):
+        for module in ("llm_guard.input_scanners", "llm_guard.model", "torch", "transformers"):
             with self.subTest(module=module):
                 self.assertTrue(is_forbidden_module(llm_guard, module))
         self.assertFalse(is_forbidden_module(llm_guard, "importlib"))
-
-    def test_prompt_guard_stack_is_never_imported_statically(self) -> None:
-        prompt_guard = PURPLE_TEAM_DIR / "defense" / "prompt_guard.py"
-        for module in ("transformers", "torch", "huggingface_hub.errors"):
-            with self.subTest(module=module):
-                self.assertTrue(is_forbidden_module(prompt_guard, module))
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ from purple_team.core.text import sha256_hex
 from purple_team.evaluation.evaluator import Evaluation
 from purple_team.pipeline import PipelineTrace
 
-RECORD_SCHEMA_VERSION: Final = 3
+RECORD_SCHEMA_VERSION: Final = 4
 NOT_APPLICABLE: Final = "n/a"
 TRUE_CELL: Final = "true"
 FALSE_CELL: Final = "false"
@@ -36,6 +36,11 @@ SUMMARY_COLUMNS: Final = (
     "injection_effect",
     "output_valid",
     "blocked_actions",
+    "system_policy_blocks",
+    "redacted_legit_lines",
+    "legit_lines",
+    "expected_items_found",
+    "expected_items_total",
     "tool_calls",
     "system_outputs",
     "passed",
@@ -49,6 +54,11 @@ EVALUATION_COLUMNS: Final = (
     "injection_in_model_output",
     "injection_effect",
     "blocked_actions",
+    "system_policy_blocks",
+    "redacted_legit_lines",
+    "legit_lines",
+    "expected_items_found",
+    "expected_items_total",
     "failed_checks",
 )
 
@@ -89,6 +99,15 @@ class CaseRecord:
     error: str | None
 
     @property
+    def policy_block_reasons(self) -> tuple[str, ...] | None:
+        """Reasons of the system policy blocks, in order (``None`` if the case did not complete)."""
+        if self.evaluation is None:
+            return None
+        screening = self.trace.policy_screening if self.trace is not None else None
+        blocked = screening.blocked if screening is not None else ()
+        return tuple(block.reason.value for block in blocked)
+
+    @property
     def passed(self) -> bool:
         """A case passes only if it completed and every check passed."""
         return self.evaluation is not None and self.evaluation.passed
@@ -97,7 +116,7 @@ class CaseRecord:
         """JSON view (plan section 8.1)."""
         injection = self.case.injection
         trace = self.trace
-        output_screening = trace.output_screening if trace is not None else None
+        policy_screening = trace.policy_screening if trace is not None else None
         final_output = trace.final_output if trace is not None else None
         return {
             "case_id": self.case.case_id,
@@ -112,7 +131,7 @@ class CaseRecord:
             "paths": {"inputs": self.inputs_path, "outputs": self.outputs_path},
             "input": self._input_dict(),
             "model_output": self._model_output_dict(),
-            "output_guard": output_screening.to_dict() if output_screening is not None else None,
+            "system_policy": policy_screening.to_dict() if policy_screening is not None else None,
             "final_output": final_output.to_dict() if final_output is not None else None,
             "tool_calls": [call.to_dict() for call in trace.tool_calls] if trace else [],
             "system_outputs": [out.to_dict() for out in trace.system_outputs] if trace else [],
@@ -177,6 +196,12 @@ class CaseRecord:
             "injection_in_model_output": evaluation.injection_in_model_output,
             "injection_effect": evaluation.injection_effect,
             "blocked_actions": evaluation.blocked_actions,
+            # Same count as blocked_actions, named after the system policy, with its reasons.
+            "system_policy_blocks": CHECK_SEPARATOR.join(self.policy_block_reasons or ()),
+            "redacted_legit_lines": len(evaluation.redacted_legit_lines),
+            "legit_lines": evaluation.legit_lines,
+            "expected_items_found": evaluation.expected_items_found,
+            "expected_items_total": len(evaluation.expected_action_items),
             "failed_checks": CHECK_SEPARATOR.join(evaluation.failed_checks),
         }
 
@@ -196,6 +221,10 @@ class RunTotals:
     injection_effect: int
     input_detections: int
     blocked_actions: int
+    redacted_legit_lines: int
+    legit_lines: int
+    expected_action_items_found: int
+    expected_action_items_total: int
 
     @classmethod
     def from_cases(cls, records: Sequence[CaseRecord]) -> Self:
@@ -215,6 +244,10 @@ class RunTotals:
             injection_effect=sum(1 for e in evaluations if e.injection_effect),
             input_detections=sum(e.input_detections for e in evaluations),
             blocked_actions=sum(e.blocked_actions for e in evaluations),
+            redacted_legit_lines=sum(len(e.redacted_legit_lines) for e in evaluations),
+            legit_lines=sum(e.legit_lines for e in evaluations),
+            expected_action_items_found=sum(e.expected_items_found for e in evaluations),
+            expected_action_items_total=sum(len(e.expected_action_items) for e in evaluations),
         )
 
     def to_dict(self) -> dict[str, int]:
@@ -231,6 +264,10 @@ class RunTotals:
             "injection_effect": self.injection_effect,
             "input_detections": self.input_detections,
             "blocked_actions": self.blocked_actions,
+            "redacted_legit_lines": self.redacted_legit_lines,
+            "legit_lines": self.legit_lines,
+            "expected_action_items_found": self.expected_action_items_found,
+            "expected_action_items_total": self.expected_action_items_total,
         }
 
 

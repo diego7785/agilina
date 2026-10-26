@@ -1,13 +1,15 @@
-"""Single definition of "allowed destination", derived from the team context.
+"""System policy: the single definition of "allowed destination", from the team context.
 
-The output guard uses it to block action items and ``cases.validate_against_policy`` uses
-the very same predicate to check that every expected item is reachable, so both can never
-diverge.
+It is part of Agilina's design (the backend restricts every operation to the configured
+project, board, channel and members), so it applies in every defense mode, also ``off``:
+the pipeline drops the action items it does not allow before the tools run, and
+``cases.validate_against_policy`` uses the very same predicate to check that every expected
+item is reachable, so both can never diverge. It never inspects the summary.
 
 Cycle 4 (handoff/18 section 2.3): ``jira_comment`` only on issues of the team project,
 ``slack_message`` only to members or to the team channel and ``calendar_event`` only when
 every invitee is a member. Agilina holds Slack's ``chat:write.public`` scope (it can post in
-any public channel without being invited), so this guard is the only control over channels.
+any public channel without being invited), so this policy is the only control over channels.
 """
 
 import re
@@ -18,6 +20,7 @@ from typing import Final, Self
 from purple_team.core.models import (
     SLACK_CHANNEL_PREFIX,
     ActionItem,
+    CeremonyOutput,
     Destination,
     canonical_email,
     canonical_target,
@@ -25,11 +28,12 @@ from purple_team.core.models import (
 from purple_team.team_context import ISSUE_NUMBER_PATTERN, TeamContext
 
 POLICY_SOURCE: Final = "team_context"
+POLICY_NAME: Final = "política del sistema"
 ISSUE_KEY_SEPARATOR: Final = "-"
 
 
 class BlockReason(StrEnum):
-    """Why the output guard blocked an action item."""
+    """Why the system policy blocked an action item."""
 
     JIRA_ISSUE_NOT_ALLOWED = "jira_issue_not_allowed"
     SLACK_CHANNEL_NOT_ALLOWED = "slack_channel_not_allowed"
@@ -39,7 +43,32 @@ class BlockReason(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
-class DefensePolicy:
+class BlockedAction:
+    """Action item of the model output that was not executed."""
+
+    index: int
+    item: ActionItem
+    reason: BlockReason
+
+    def to_dict(self) -> dict[str, object]:
+        """JSON view."""
+        return {"index": self.index, "reason": self.reason.value, "item": self.item.to_dict()}
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyScreening:
+    """Output of the system policy: what gets executed and what was blocked."""
+
+    output: CeremonyOutput
+    blocked: tuple[BlockedAction, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        """JSON view of the policy decision."""
+        return {"applied": True, "blocked": [block.to_dict() for block in self.blocked]}
+
+
+@dataclass(frozen=True, slots=True)
+class SystemPolicy:
     """Allowed destinations (team project, members, team channel) and content size.
 
     Slack users and channels and the invitees are stored in their canonical form
@@ -124,6 +153,19 @@ class DefensePolicy:
             return BlockReason.CONTENT_TOO_LONG
         return None
 
+    def screen(self, output: CeremonyOutput) -> PolicyScreening:
+        """Keep the allowed action items, in order, and the summary unchanged."""
+        allowed: list[ActionItem] = []
+        blocked: list[BlockedAction] = []
+        for index, item in enumerate(output.action_items):
+            reason = self.block_reason(item)
+            if reason is None:
+                allowed.append(item)
+            else:
+                blocked.append(BlockedAction(index=index, item=item, reason=reason))
+        screened = CeremonyOutput(summary=output.summary, action_items=tuple(allowed))
+        return PolicyScreening(output=screened, blocked=tuple(blocked))
+
     def _destination_reason(self, item: ActionItem) -> BlockReason | None:
         if item.destination is Destination.CALENDAR_EVENT:
             reasons = (self.invitee_block_reason(invitee) for invitee in item.invitees)
@@ -133,12 +175,14 @@ class DefensePolicy:
         return self.target_block_reason(item.destination, item.target)
 
     def to_record(self) -> dict[str, object]:
-        """Effective policy for the run records.
+        """System policy for the run records (always on, in every mode).
 
         ``jira_issue_pattern`` shows the project key in uppercase, as written in the context;
         the comparison is made on the canonical (casefolded, no whitespace) key.
         """
         return {
+            "name": POLICY_NAME,
+            "always_on": True,
             "source": POLICY_SOURCE,
             "jira_project_key": self.jira_project_key,
             "jira_issue_pattern": self.jira_issue_pattern,

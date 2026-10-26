@@ -1,11 +1,13 @@
 """Aggregated summary of repeated runs: rates per case and per defense mode.
 
 Every rate excludes the runs that ended in error from its denominator (they are counted
-apart in ``errors``). ``injection_reached_model_rate`` compares input detectors only,
-``injection_effect_rate`` compares the whole defense (input + output guard).
+apart in ``errors``). ``injection_reached_model_rate`` compares the input scanners only,
+``injection_effect_rate`` the whole flow (scanner + model + system policy).
+``redacted_legit_lines`` and ``expected_items_*`` measure what the scanner costs.
 """
 
-from collections.abc import Sequence
+from collections import Counter
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final, Self
 
@@ -20,7 +22,7 @@ from purple_team.records import (
     format_cell,
 )
 
-AGGREGATE_SCHEMA_VERSION: Final = 1
+AGGREGATE_SCHEMA_VERSION: Final = 2
 AGGREGATES_DIR_NAME: Final = "aggregates"
 RATE_DECIMALS: Final = 3
 MEAN_DECIMALS: Final = 2
@@ -46,6 +48,11 @@ AGGREGATE_COLUMNS: Final = (
     "injection_in_model_output_rate",
     "input_detections_mean",
     "blocked_actions_mean",
+    "system_policy_blocks",
+    "redacted_legit_lines_mean",
+    "legit_lines",
+    "expected_items_found",
+    "expected_items_rate",
     "run_ids",
 )
 
@@ -85,6 +92,11 @@ class CaseModeAggregate:
     injection_in_model_output: int | None
     input_detections_total: int
     blocked_actions_total: int
+    policy_blocks: Mapping[str, int]
+    redacted_legit_total: int
+    legit_lines: int | None
+    expected_items_found: int
+    expected_items_total: int
     run_ids: tuple[str, ...]
 
     @classmethod
@@ -117,6 +129,19 @@ class CaseModeAggregate:
             injection_in_model_output=in_output if has_injection else None,
             input_detections_total=sum(result.input_detections for result in evaluations),
             blocked_actions_total=sum(result.blocked_actions for result in evaluations),
+            policy_blocks=dict(
+                sorted(
+                    Counter(
+                        reason
+                        for _run_id, record in records
+                        for reason in record.policy_block_reasons or ()
+                    ).items(),
+                ),
+            ),
+            redacted_legit_total=sum(len(result.redacted_legit_lines) for result in evaluations),
+            legit_lines=evaluations[0].legit_lines if evaluations else None,
+            expected_items_found=sum(result.expected_items_found for result in evaluations),
+            expected_items_total=sum(len(result.expected_action_items) for result in evaluations),
             run_ids=tuple(run_id for run_id, _record in records),
         )
 
@@ -150,6 +175,16 @@ class CaseModeAggregate:
         """Mean blocked actions per completed run."""
         return mean(self.blocked_actions_total, self.completed)
 
+    @property
+    def redacted_legit_lines_mean(self) -> float | None:
+        """Mean legitimate lines redacted by the scanner per completed run."""
+        return mean(self.redacted_legit_total, self.completed)
+
+    @property
+    def expected_items_rate(self) -> float | None:
+        """Expected action items kept over the expected items of the completed runs."""
+        return rate(self.expected_items_found, self.expected_items_total)
+
     def to_dict(self) -> dict[str, object]:
         """Typed JSON view: numbers as numbers and ``null`` instead of ``n/a``."""
         return {
@@ -170,6 +205,11 @@ class CaseModeAggregate:
             "injection_in_model_output_rate": self.injection_in_model_output_rate,
             "input_detections_mean": self.input_detections_mean,
             "blocked_actions_mean": self.blocked_actions_mean,
+            "system_policy_blocks": dict(self.policy_blocks),
+            "redacted_legit_lines_mean": self.redacted_legit_lines_mean,
+            "legit_lines": self.legit_lines,
+            "expected_items_found": self.expected_items_found,
+            "expected_items_rate": self.expected_items_rate,
             "run_ids": list(self.run_ids),
         }
 
@@ -202,6 +242,16 @@ class CaseModeAggregate:
             ),
             "input_detections_mean": _decimal_cell(self.input_detections_mean, MEAN_DECIMALS),
             "blocked_actions_mean": _decimal_cell(self.blocked_actions_mean, MEAN_DECIMALS),
+            "system_policy_blocks": RUN_ID_SEPARATOR.join(
+                f"{reason}:{count}" for reason, count in self.policy_blocks.items()
+            ),
+            "redacted_legit_lines_mean": _decimal_cell(
+                self.redacted_legit_lines_mean,
+                MEAN_DECIMALS,
+            ),
+            "legit_lines": format_cell(self.legit_lines),
+            "expected_items_found": format_cell(self.expected_items_found),
+            "expected_items_rate": _decimal_cell(self.expected_items_rate, RATE_DECIMALS),
             "run_ids": RUN_ID_SEPARATOR.join(self.run_ids),
         }
         return {column: cells[column] for column in AGGREGATE_COLUMNS}
@@ -228,6 +278,10 @@ class ModeAggregate:
     passed: int
     input_detections: int
     blocked_actions: int
+    redacted_legit_lines: int
+    legit_lines: int
+    expected_items_found: int
+    expected_items_total: int
 
     @classmethod
     def from_rows(cls, mode: DefenseMode, rows: Sequence[CaseModeAggregate], runs: int) -> Self:
@@ -246,6 +300,10 @@ class ModeAggregate:
             passed=sum(row.passed for row in rows),
             input_detections=sum(row.input_detections_total for row in rows),
             blocked_actions=sum(row.blocked_actions_total for row in rows),
+            redacted_legit_lines=sum(row.redacted_legit_total for row in rows),
+            legit_lines=sum((row.legit_lines or 0) * row.completed for row in rows),
+            expected_items_found=sum(row.expected_items_found for row in rows),
+            expected_items_total=sum(row.expected_items_total for row in rows),
         )
 
     @property
@@ -268,6 +326,16 @@ class ModeAggregate:
         """Passed over completed case runs."""
         return rate(self.passed, self.completed)
 
+    @property
+    def redacted_legit_rate(self) -> float | None:
+        """Redacted legitimate lines over the legitimate lines of the completed case runs."""
+        return rate(self.redacted_legit_lines, self.legit_lines)
+
+    @property
+    def expected_items_rate(self) -> float | None:
+        """Expected action items kept over those of the completed case runs."""
+        return rate(self.expected_items_found, self.expected_items_total)
+
     def to_dict(self) -> dict[str, object]:
         """JSON view."""
         return {
@@ -286,6 +354,12 @@ class ModeAggregate:
             "pass_rate": self.pass_rate,
             "input_detections": self.input_detections,
             "blocked_actions": self.blocked_actions,
+            "redacted_legit_lines": self.redacted_legit_lines,
+            "legit_lines": self.legit_lines,
+            "redacted_legit_rate": self.redacted_legit_rate,
+            "expected_items_found": self.expected_items_found,
+            "expected_items_total": self.expected_items_total,
+            "expected_items_rate": self.expected_items_rate,
         }
 
 
@@ -303,6 +377,9 @@ class Aggregate:
     run_ids: tuple[tuple[DefenseMode, tuple[str, ...]], ...]
     rows: tuple[CaseModeAggregate, ...]
     per_mode: tuple[ModeAggregate, ...]
+    requested_modes: tuple[DefenseMode, ...]
+    unavailable_modes: Mapping[DefenseMode, str]
+    system_policy: object
 
     def to_dict(self) -> dict[str, object]:
         """JSON view."""
@@ -313,6 +390,11 @@ class Aggregate:
             "provider": self.provider,
             "model": self.model,
             "modes": [mode.value for mode in self.modes],
+            "requested_modes": [mode.value for mode in self.requested_modes],
+            "unavailable_modes": {
+                mode.value: reason for mode, reason in self.unavailable_modes.items()
+            },
+            "system_policy": self.system_policy,
             "repeat": self.repeat,
             "case_ids": list(self.case_ids),
             "run_ids": {mode.value: list(run_ids) for mode, run_ids in self.run_ids},
@@ -325,8 +407,18 @@ class Aggregate:
         return [row.csv_row(self.group_id, self.provider, self.model) for row in self.rows]
 
 
-def aggregate_runs(group_id: str, runs: Sequence[RunRecord], repeat: int) -> Aggregate:
-    """Group the case records of every run by mode (in order of appearance) and by case."""
+def aggregate_runs(
+    group_id: str,
+    runs: Sequence[RunRecord],
+    repeat: int,
+    *,
+    unavailable: Mapping[DefenseMode, str],
+    requested_modes: Sequence[DefenseMode],
+) -> Aggregate:
+    """Group the case records of every run by mode (in order of appearance) and by case.
+
+    ``unavailable`` lists the requested modes that could not run, with the reason.
+    """
     if not runs:
         raise ValueError("No hay corridas que agregar")
     modes = tuple(dict.fromkeys(run.defense for run in runs))
@@ -355,6 +447,10 @@ def aggregate_runs(group_id: str, runs: Sequence[RunRecord], repeat: int) -> Agg
         run_ids=tuple(run_ids),
         rows=tuple(rows),
         per_mode=tuple(per_mode),
+        requested_modes=tuple(requested_modes),
+        unavailable_modes=dict(unavailable),
+        # Name, source and effective rules of the system policy (same in every run of a group).
+        system_policy=first.config.get("system_policy"),
     )
 
 

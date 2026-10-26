@@ -84,14 +84,16 @@ class RunIdTest(unittest.TestCase):
         self.assertEqual(run_id, "20261011T153000Z_mock_defense-off")
 
     def test_label_is_normalized(self) -> None:
-        run_id = make_run_id(FIXED_INSTANT, ProviderName.MOCK, DefenseMode.OWN, " Piloto #1 ")
-        self.assertEqual(run_id, "20261011T153000Z_mock_defense-own_piloto-1")
+        mode = DefenseMode.LLM_GUARD_DEFAULT
+        run_id = make_run_id(FIXED_INSTANT, ProviderName.MOCK, mode, " Piloto #1 ")
+        self.assertEqual(run_id, "20261011T153000Z_mock_defense-llm-guard-default_piloto-1")
         self.assertEqual(len(normalize_label("x" * 80)), 30)
         with self.assertRaises(ConfigError):
             normalize_label("¿?")
 
     def test_unsafe_or_reserved_run_ids_are_rejected(self) -> None:
-        for run_id in ("../fuera", "a/b", ".oculta", "", "comparisons", "aggregates", "x" * 101):
+        reserved = ("comparisons", "aggregates", "calibration")
+        for run_id in ("../fuera", "a/b", ".oculta", "", *reserved, "x" * 101):
             with self.subTest(run_id=run_id):
                 with self.assertRaises(ConfigError):
                     validate_run_id(run_id)
@@ -153,7 +155,10 @@ class HarnessRunnerTest(unittest.TestCase):
         record = self.runner(MockProvider(mock_scripts_for(self.cases))).run()
         self.assertEqual([case.status for case in record.cases], [CaseStatus.COMPLETED] * 3)
         self.assertEqual(record.started_at, "2026-10-11T15:30:00Z")
-        self.assertEqual(record.totals.injection_effect, 2)
+        # c01 and c02 fall for the injection; the system policy blocks both external items.
+        self.assertEqual(record.totals.injection_in_model_output, 2)
+        self.assertEqual(record.totals.injection_effect, 0)
+        self.assertEqual(record.totals.blocked_actions, 2)
         run_config = read_json(self.tmp_dir / "inputs" / "run-1" / "run_config.json")
         self.assertEqual(run_config["run_id"], "run-1")
         self.assertIsNone(run_config["repetition"])

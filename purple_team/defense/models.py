@@ -1,12 +1,10 @@
-"""Values and ports of the defensive layer (no guard implementation here)."""
+"""Values and ports of the input scanner (no implementation here)."""
 
 import re
 from dataclasses import dataclass
 from typing import Final, Protocol, runtime_checkable
 
 from purple_team.config import DefenseMode
-from purple_team.core.models import ActionItem, CeremonyOutput
-from purple_team.policy import BlockReason
 
 EXCERPT_MAX_CHARS: Final = 160
 # "[hh:mm:ss] Name Surname: " at the start of a transcript line.
@@ -24,8 +22,7 @@ def split_speaker(line: str) -> tuple[str, str]:
 class Detection:
     """An input detector flagged a line of the original transcript.
 
-    ``score`` is the score of model-based detectors (LLM Guard's risk, Prompt Guard's
-    P(malicious)) and ``None`` for the regex rules.
+    ``score`` is the risk score of LLM Guard (``calculate_risk_score``, from -1 to 1).
     """
 
     line_number: int
@@ -34,7 +31,7 @@ class Detection:
     score: float | None = None
 
     def to_dict(self) -> dict[str, object]:
-        """JSON view (``score`` is always present, ``null`` for the regex rules)."""
+        """JSON view (``score`` is always present)."""
         return {
             "line_number": self.line_number,
             "rule_id": self.rule_id,
@@ -49,7 +46,7 @@ class LineDetector(Protocol):
 
     @property
     def detector_id(self) -> str:
-        """Short name written to the records (``regex``, ``llm_guard`` or ``prompt_guard``)."""
+        """Short name written to the records (``llm_guard``)."""
 
     def detect(self, line_number: int, line: str) -> tuple[Detection, ...]:
         """Detections of this line (empty when the line looks harmless)."""
@@ -78,45 +75,16 @@ class InputScreening:
         }
 
 
-@dataclass(frozen=True, slots=True)
-class BlockedAction:
-    """Action item of the model output that was not executed."""
-
-    index: int
-    item: ActionItem
-    reason: BlockReason
-
-    def to_dict(self) -> dict[str, object]:
-        """JSON view."""
-        return {"index": self.index, "reason": self.reason.value, "item": self.item.to_dict()}
-
-
-@dataclass(frozen=True, slots=True)
-class OutputScreening:
-    """Result of screening the model output; ``output`` is what gets executed."""
-
-    mode: DefenseMode
-    output: CeremonyOutput
-    blocked: tuple[BlockedAction, ...]
-
-    def to_dict(self) -> dict[str, object]:
-        """JSON view of the guard decision."""
-        return {"mode": self.mode.value, "blocked": [block.to_dict() for block in self.blocked]}
-
-
 @runtime_checkable
 class Defense(Protocol):
-    """Defensive layer applied around the core."""
+    """Optional input scanner applied before the core (the system policy is not part of it)."""
 
     @property
     def mode(self) -> DefenseMode:
         """Defense mode written to the records."""
 
     def describe(self) -> dict[str, object]:
-        """Setup for the records: mode, input detectors and whether the output guard runs."""
+        """Setup for the records: mode and input detectors with their settings."""
 
     def screen_input(self, transcript: str) -> InputScreening:
         """Screen the transcript before it reaches the model."""
-
-    def screen_output(self, output: CeremonyOutput) -> OutputScreening:
-        """Screen the parsed model output before the tools run."""

@@ -28,7 +28,8 @@ from purple_team.records import (
 )
 
 RUN_ID_PATTERN: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
-RESERVED_OUTPUT_NAMES: Final = frozenset({"comparisons", "aggregates"})
+# "comparisons" holds the CSV files of the retired compare command (cycles 1-4).
+RESERVED_OUTPUT_NAMES: Final = frozenset({"comparisons", "aggregates", "calibration"})
 RUN_STAMP_FORMAT: Final = "%Y%m%dT%H%M%SZ"
 LABEL_MAX_CHARS: Final = 30
 _LABEL_INVALID_CHARS: Final = re.compile(r"[^a-z0-9-]+")

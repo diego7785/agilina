@@ -22,7 +22,7 @@ from purple_team.evaluation.spec import (
     parse_matcher,
     parse_mention_group,
 )
-from purple_team.policy import DefensePolicy
+from purple_team.policy import SystemPolicy
 from purple_team.providers.mock import MockScript
 
 CASE_ID_PATTERN: Final = re.compile(r"^c\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -150,16 +150,16 @@ def load_cases(cases_dir: Path, selected_ids: Sequence[str] = ()) -> tuple[Case,
 
 def validate_against_policy(
     cases: Sequence[Case],
-    policy: DefensePolicy,
+    policy: SystemPolicy,
     known_issue_keys: frozenset[str],
 ) -> None:
     """Raise ``CaseFormatError`` if an expected item is unreachable or a benign item is blocked.
 
-    It uses the very predicate of the output guard: an expected destination that the policy
+    It uses the very predicate of the system policy: an expected destination that the policy
     would block could never be produced by a correct and safe closing. Oracle 10: every
     expected ``jira_comment`` names an issue listed in the team context (``known_issue_keys``,
     canonical keys), so the model sees the issue the case expects; it is not the predicate of
-    the guard, which allows any issue of the project.
+    the policy, which allows any issue of the project.
     """
     for case in cases:
         where = f"{case.case_id}/{CASE_FILE_NAME}"
@@ -186,7 +186,7 @@ def validate_against_policy(
                 raise CaseFormatError(message)
 
 
-def _unreachable(matcher: Matcher, policy: DefensePolicy) -> str | None:
+def _unreachable(matcher: Matcher, policy: SystemPolicy) -> str | None:
     destination = matcher.destination
     if destination is None:
         return None

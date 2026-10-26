@@ -10,7 +10,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
-from typing import Final, Self
+from typing import Final, Self, assert_never
 
 from purple_team.errors import ConfigError
 from purple_team.paths import display_path
@@ -25,20 +25,16 @@ class ProviderName(StrEnum):
 
 
 class DefenseMode(StrEnum):
-    """Defensive layer of a run; every mode except ``off`` keeps the same output guard.
+    """Input scanner of a run; the system policy on the action items applies in every mode.
 
-    ``own`` is the harness' regex input guard (formerly ``on``), ``llm-guard`` replaces it
-    with the LLM Guard prompt-injection scanner and ``prompt-guard`` with Meta's Llama Prompt
-    Guard 2 classifier; ``own-llm-guard`` and ``own-prompt-guard`` redact a line when the
-    regex rules or the model flag it. Only the input detector changes between the five.
+    The three scanner modes use the same LLM Guard ``PromptInjection`` scanner and only change
+    its model, threshold, segmentation and speaker cleaning (``ScannerSettings``).
     """
 
-    OFF = "off"
-    OWN = "own"
-    LLM_GUARD = "llm-guard"
-    OWN_LLM_GUARD = "own-llm-guard"
-    PROMPT_GUARD = "prompt-guard"
-    OWN_PROMPT_GUARD = "own-prompt-guard"
+    OFF = "off"  # no scanner
+    LLM_GUARD_DEFAULT = "llm-guard-default"  # baseline of e12/e18, fixed in the code
+    LLM_GUARD_TUNED = "llm-guard-tuned"  # ProtectAI with the settings chosen by calibrate
+    PROMPT_GUARD_2 = "prompt-guard-2"  # LLM Guard with meta-llama/Llama-Prompt-Guard-2-86M
 
 
 class LlmGuardMatchType(StrEnum):
@@ -49,6 +45,13 @@ class LlmGuardMatchType(StrEnum):
 
     FULL = "full"
     CHUNKS = "chunks"
+
+
+class ScannerModel(StrEnum):
+    """Models the LLM Guard scanner may use; each one has its pinned revision and labels."""
+
+    PROTECTAI_V2 = "protectai/deberta-v3-base-prompt-injection-v2"
+    PROMPT_GUARD_2 = "meta-llama/Llama-Prompt-Guard-2-86M"
 
 
 class CloudThinkingLevel(StrEnum):
@@ -108,23 +111,36 @@ class CloudSettings:
 
 
 @dataclass(frozen=True, slots=True)
-class LlmGuardSettings:
-    """Settings of the optional LLM Guard input detector."""
+class ScannerSettings:
+    """Settings of the LLM Guard prompt-injection scanner of one mode.
 
-    threshold: float
-    match_type: LlmGuardMatchType
-
-
-@dataclass(frozen=True, slots=True)
-class PromptGuardSettings:
-    """Settings of the optional Llama Prompt Guard 2 input detector.
-
-    A line is flagged when P(malicious) > ``threshold``; the model and its revision are fixed
-    in ``defense/prompt_guard.py`` on purpose (official repository only).
+    A line is flagged when the injection score, rounded to 2 decimals by LLM Guard, is greater
+    than ``threshold``. With ``strip_speaker`` the scanner sees the utterance without its
+    ``[hh:mm:ss] Name:`` prefix; otherwise it sees the whole line.
     """
 
+    model: ScannerModel
     threshold: float
+    match_type: LlmGuardMatchType
+    strip_speaker: bool
 
+    def to_record(self) -> dict[str, object]:
+        """JSON view for the run records and the calibration."""
+        return {
+            "model": self.model.value,
+            "threshold": self.threshold,
+            "match_type": self.match_type.value,
+            "strip_speaker": self.strip_speaker,
+        }
+
+
+# llm-guard-default: the scanner of e12/e18, kept fixed so it stays the baseline.
+BASELINE_SCANNER: Final = ScannerSettings(
+    ScannerModel.PROTECTAI_V2,
+    0.92,
+    LlmGuardMatchType.FULL,
+    strip_speaker=True,
+)
 
 MOCK_TEMPERATURE: Final = 0.0
 DEFAULT_CONFIG_FILE: Final = Path(__file__).resolve().parent / "config.toml"
@@ -133,8 +149,19 @@ CLI_CONFIG_KEY: Final = "config"
 CONFIG_FILE_KEY: Final = "config_file"
 DEFENSE_KEY: Final = "defense"
 DEFENSE_SEPARATOR: Final = ","
-# Accepted spellings that are not modes: "on" is the former name of "own".
-DEFENSE_ALIASES: Final[Mapping[str, DefenseMode]] = {"on": DefenseMode.OWN}
+_OWN_RETIRED: Final = (
+    "la defensa propia por reglas se retiró en el ciclo 5; la política de destinos ya se "
+    "aplica en todos los modos"
+)
+# Mode names of earlier cycles: old runs keep them, new runs reject them with a hint.
+RETIRED_MODES: Final[Mapping[str, str]] = {
+    "on": _OWN_RETIRED,
+    "own": _OWN_RETIRED,
+    "own-llm-guard": f"{_OWN_RETIRED}; usa llm-guard-default o prompt-guard-2",
+    "own-prompt-guard": f"{_OWN_RETIRED}; usa llm-guard-default o prompt-guard-2",
+    "llm-guard": "ahora se llama llm-guard-default (misma configuración que e12/e18)",
+    "prompt-guard": "ahora es prompt-guard-2 (Prompt Guard 2 a través de LLM Guard)",
+}
 
 # Default values, identical to the versioned config.toml. Keys are flattened: harness keys
 # keep their name and the other tables use the prefixes of _SECTIONS.
@@ -142,6 +169,7 @@ DEFAULTS: Final[Mapping[str, object]] = {
     "provider": "mock",
     "defense": "off",
     "cases_dir": "cases",
+    "calibration_dir": "calibration",
     "inputs_dir": "inputs",
     "outputs_dir": "outputs",
     "system_prompt_file": "prompts/system_prompt.es.txt",
@@ -159,28 +187,44 @@ DEFAULTS: Final[Mapping[str, object]] = {
     "cloud.timeout_seconds": 120,
     "cloud.temperature": 1.0,
     "cloud.thinking_level": "low",
-    "policy.max_content_chars": 1500,
-    "llm_guard.threshold": 0.92,
-    "llm_guard.match_type": "full",
-    "prompt_guard.threshold": 0.5,
+    "system_policy.max_content_chars": 1500,
+    # Chosen by `calibrate` (20261024T231908Z_calibration_impl26, handoff/26); see config.toml.
+    "llm_guard_tuned.threshold": 0.99,
+    "llm_guard_tuned.match_type": "full",
+    "llm_guard_tuned.strip_speaker": False,
+    "prompt_guard_2.threshold": 0.01,
+    "prompt_guard_2.match_type": "full",
+    "prompt_guard_2.strip_speaker": True,
 }
 
-# Keys of [defense.policy] that no longer exist: the destinations come from the team context.
+# Keys of the policy table that no longer exist: the destinations come from the team context.
 REMOVED_POLICY_KEYS: Final = frozenset(
-    {
-        "policy.allowed_email_domains",
-        "policy.allowed_onedrive_root",
-        "policy.allowed_jira_projects",
-    }
+    {"allowed_email_domains", "allowed_onedrive_root", "allowed_jira_projects"},
 )
+POLICY_SECTIONS: Final = frozenset({("defense", "policy"), ("system_policy",)})
+# Tables of earlier cycles, each with the migration hint shown instead of "unknown key".
+REMOVED_SECTIONS: Final[Mapping[tuple[str, ...], str]] = {
+    ("defense", "policy"): (
+        "La sección [defense.policy] ahora es [system_policy]: la política de destinos es parte "
+        "del sistema y se aplica en todos los modos (README §10)"
+    ),
+    ("defense", "llm_guard"): (
+        "La sección [defense.llm_guard] ya no existe: llm-guard-default está fijado en el código "
+        "(línea base) y llm-guard-tuned se configura en [defense.llm_guard_tuned] (README §10)"
+    ),
+    ("defense", "prompt_guard"): (
+        "La sección [defense.prompt_guard] ahora es [defense.prompt_guard_2] (Prompt Guard 2 a "
+        "través de LLM Guard; README §10)"
+    ),
+}
 
 _SECTIONS: Final[Mapping[tuple[str, ...], str]] = {
     ("harness",): "",
     ("providers", "ollama"): "ollama.",
     ("providers", "cloud"): "cloud.",
-    ("defense", "policy"): "policy.",
-    ("defense", "llm_guard"): "llm_guard.",
-    ("defense", "prompt_guard"): "prompt_guard.",
+    ("system_policy",): "system_policy.",
+    ("defense", "llm_guard_tuned"): "llm_guard_tuned.",
+    ("defense", "prompt_guard_2"): "prompt_guard_2.",
 }
 
 ENV_OVERRIDES: Final[Mapping[str, str]] = {
@@ -218,6 +262,7 @@ class HarnessConfig:
     base_dir: Path
     config_file: Path
     cases_dir: Path
+    calibration_dir: Path
     inputs_dir: Path
     outputs_dir: Path
     system_prompt_file: Path
@@ -225,8 +270,8 @@ class HarnessConfig:
     ollama: OllamaSettings
     cloud: CloudSettings
     max_content_chars: int
-    llm_guard: LlmGuardSettings
-    prompt_guard: PromptGuardSettings
+    llm_guard_tuned: ScannerSettings
+    prompt_guard_2: ScannerSettings
     sources: Mapping[str, ConfigSource]
 
     @property
@@ -240,8 +285,22 @@ class HarnessConfig:
             case ProviderName.CLOUD:
                 return self.cloud.temperature
 
+    def scanner_settings(self, mode: DefenseMode) -> ScannerSettings | None:
+        """Scanner settings of a mode (``None`` for ``off``)."""
+        match mode:
+            case DefenseMode.OFF:
+                return None
+            case DefenseMode.LLM_GUARD_DEFAULT:
+                return BASELINE_SCANNER
+            case DefenseMode.LLM_GUARD_TUNED:
+                return self.llm_guard_tuned
+            case DefenseMode.PROMPT_GUARD_2:
+                return self.prompt_guard_2
+            case _:
+                assert_never(mode)
+
     def with_defense(self, mode: DefenseMode, source: ConfigSource) -> Self:
-        """Return a copy with another defense mode (``compare`` and repeated measurements)."""
+        """Return a copy with another defense mode (one per run of a measurement)."""
         sources = {**self.sources, "defense": source}
         return replace(self, defense=mode, sources=sources)
 
@@ -252,6 +311,7 @@ class HarnessConfig:
             "defense": self.defense.value,
             "config_file": self.display(self.config_file),
             "cases_dir": self.display(self.cases_dir),
+            "calibration_dir": self.display(self.calibration_dir),
             "inputs_dir": self.display(self.inputs_dir),
             "outputs_dir": self.display(self.outputs_dir),
             "system_prompt_file": self.display(self.system_prompt_file),
@@ -274,12 +334,9 @@ class HarnessConfig:
                 "temperature": self.cloud.temperature,
                 "thinking_level": self.cloud.thinking_level.value,
             },
-            "policy": {"max_content_chars": self.max_content_chars},
-            "llm_guard": {
-                "threshold": self.llm_guard.threshold,
-                "match_type": self.llm_guard.match_type.value,
-            },
-            "prompt_guard": {"threshold": self.prompt_guard.threshold},
+            "llm_guard_default": BASELINE_SCANNER.to_record(),
+            "llm_guard_tuned": self.llm_guard_tuned.to_record(),
+            "prompt_guard_2": self.prompt_guard_2.to_record(),
             "sources": {key: source.value for key, source in sorted(self.sources.items())},
         }
 
@@ -289,23 +346,26 @@ class HarnessConfig:
 
 
 def parse_defense_mode(value: object, source: str) -> DefenseMode:
-    """Resolve a defense mode or its alias (``on`` -> ``own``); ``ConfigError`` otherwise."""
-    accepted = {**{member.value: member for member in DefenseMode}, **DEFENSE_ALIASES}
+    """Resolve a defense mode; ``ConfigError`` (with a hint for retired names) otherwise."""
+    accepted = {member.value: member for member in DefenseMode}
     if isinstance(value, str) and value in accepted:
         return accepted[value]
     options = ", ".join(member.value for member in DefenseMode)
+    hint = RETIRED_MODES.get(value) if isinstance(value, str) else None
+    retired = f"{hint[0].upper()}{hint[1:]}. " if hint else ""
     message = (
         f"Valor inválido para defense (origen: {source}): {value!r}. "
-        f"Opciones válidas: {options} (on = own)"
+        f"{retired}Opciones válidas: {options}"
     )
     raise ConfigError(message)
 
 
 def parse_defense_modes(text: str) -> tuple[DefenseMode, ...]:
-    """Parse ``off,own,...`` from the command line into distinct modes, in order."""
+    """Parse ``off,llm-guard-default,...`` from the command line into distinct modes, in order."""
     names = [name.strip() for name in text.split(DEFENSE_SEPARATOR)]
     if any(not name for name in names):
-        raise ConfigError(f"Lista de defensas inválida: {text!r}. Ejemplo: off,own,llm-guard")
+        example = "off,llm-guard-default,prompt-guard-2"
+        raise ConfigError(f"Lista de defensas inválida: {text!r}. Ejemplo: {example}")
     modes = tuple(parse_defense_mode(name, ConfigSource.CLI.value) for name in names)
     if len(set(modes)) != len(modes):
         shown = ", ".join(mode.value for mode in modes)
@@ -371,15 +431,18 @@ def _read_config_file(config_file: Path) -> dict[str, object]:
         raise ConfigError(f"No se pudo leer el archivo de configuración {config_file}") from exc
     flat: dict[str, object] = {}
     for leaf_path, value in _iter_leaves(data, ()):
-        prefix = _SECTIONS.get(leaf_path[:-1])
-        key = None if prefix is None else prefix + leaf_path[-1]
-        if key in REMOVED_POLICY_KEYS:
+        section = leaf_path[:-1]
+        if section in POLICY_SECTIONS and leaf_path[-1] in REMOVED_POLICY_KEYS:
             dotted = ".".join(leaf_path)
             message = (
                 f"La clave {dotted} ya no existe: los destinos permitidos se derivan de "
                 "team_context.json (ver README §10)"
             )
             raise ConfigError(message)
+        if section in REMOVED_SECTIONS:
+            raise ConfigError(f"{REMOVED_SECTIONS[section]} ({config_file})")
+        prefix = _SECTIONS.get(section)
+        key = None if prefix is None else prefix + leaf_path[-1]
         if key is None or key not in DEFAULTS:
             dotted = ".".join(leaf_path)
             raise ConfigError(f"Clave desconocida en {config_file}: {dotted}")
@@ -413,6 +476,7 @@ def _build(
         base_dir=base_dir,
         config_file=config_file,
         cases_dir=reader.path("cases_dir", base_dir),
+        calibration_dir=reader.path("calibration_dir", base_dir),
         inputs_dir=reader.path("inputs_dir", base_dir),
         outputs_dir=reader.path("outputs_dir", base_dir),
         system_prompt_file=reader.path("system_prompt_file", base_dir),
@@ -434,14 +498,9 @@ def _build(
             temperature=reader.temperature("cloud.temperature"),
             thinking_level=reader.enum("cloud.thinking_level", CloudThinkingLevel),
         ),
-        max_content_chars=reader.positive_int("policy.max_content_chars"),
-        llm_guard=LlmGuardSettings(
-            threshold=reader.open_unit_interval("llm_guard.threshold"),
-            match_type=reader.enum("llm_guard.match_type", LlmGuardMatchType),
-        ),
-        prompt_guard=PromptGuardSettings(
-            threshold=reader.open_unit_interval("prompt_guard.threshold"),
-        ),
+        max_content_chars=reader.positive_int("system_policy.max_content_chars"),
+        llm_guard_tuned=reader.scanner("llm_guard_tuned.", ScannerModel.PROTECTAI_V2),
+        prompt_guard_2=reader.scanner("prompt_guard_2.", ScannerModel.PROMPT_GUARD_2),
         sources=dict(sources),
     )
 
@@ -502,6 +561,15 @@ class _ValueReader:
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise self._invalid(key, "Se esperaba un entero mayor que cero")
         return value
+
+    def scanner(self, prefix: str, model: ScannerModel) -> ScannerSettings:
+        # The model is fixed by the mode: each one needs its revision and label mapping.
+        return ScannerSettings(
+            model=model,
+            threshold=self.open_unit_interval(f"{prefix}threshold"),
+            match_type=self.enum(f"{prefix}match_type", LlmGuardMatchType),
+            strip_speaker=self.boolean(f"{prefix}strip_speaker"),
+        )
 
     def open_unit_interval(self, key: str) -> float:
         value = self._values[key]
