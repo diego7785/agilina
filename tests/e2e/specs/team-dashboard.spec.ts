@@ -79,10 +79,16 @@ test.afterAll(async () => {
 async function pickDate(box: string, date: string): Promise<void> {
   await page.getByTestId(box).click();
   // The calendar is drawn as a whole: once it is there, counting the days does not race it.
-  await page.locator(`[id="${box}-calendar"]`).waitFor();
-  const day = page.locator(`[data-date="${date}"]`);
+  const calendar = page.locator(`[id="${box}-calendar"]`);
+  await calendar.waitFor();
+  const day = calendar.locator(`[data-date="${date}"]`);
+  const firstDay = calendar.locator('[data-date]').first();
   for (let month = 0; month < 2 && (await day.count()) === 0; month++) {
+    const shown = (await firstDay.getAttribute('data-date')) ?? '';
     await page.getByRole('button', { name: 'Mes siguiente' }).click();
+    // Counting again before the next month is drawn would move one month too many, and the
+    // click would land on the day in the same cell of that month.
+    await expect(firstDay).not.toHaveAttribute('data-date', shown);
   }
   await day.click();
 }
