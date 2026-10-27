@@ -36,6 +36,8 @@ def _settings(pending_dir: Path) -> Settings:
         api_public_url=NOBODY,
         keycloak_url=NOBODY,
         agent_pending_dir=pending_dir,
+        # The tools container loads .env: a real key there must not change the tests.
+        elevenlabs_api_key="",
     )
 
 
@@ -108,3 +110,22 @@ def test_with_an_elevenlabs_key_the_voice_is_real_and_closes_with_the_job(
 
     assert isinstance(synthesizer, ElevenLabsSynthesizer)
     assert ctx.shutdown_callbacks == [synthesizer.close]
+
+
+async def test_when_agilina_fails_to_join_the_job_ends_and_frees_what_it_opened(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # LiveKit ends a job whose entrypoint raises and runs its shutdown callbacks; the people
+    # stay in the room and the screen marks Agilina unavailable (CA7).
+    monkeypatch.setattr(main, "get_settings", lambda: _settings(tmp_path))
+    failure = ConnectionError("LiveKit refused the agent")
+    ctx = FakeJobContext("acme-room", connect_failure=failure)
+
+    with pytest.raises(ConnectionError) as raised:
+        await entrypoint(ctx)  # type: ignore[arg-type]
+
+    assert raised.value is failure
+    assert ctx.room.local_participant.attributes == {}
+    assert len(ctx.shutdown_callbacks) == 2
+    for close in ctx.shutdown_callbacks:
+        await close()

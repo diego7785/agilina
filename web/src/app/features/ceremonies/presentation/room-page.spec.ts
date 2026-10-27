@@ -547,10 +547,25 @@ describe('RoomPage', () => {
           'Agilina no pudo unirse; la reunión puede continuar sin ella',
         );
         expect(page.querySelector('[data-testid="room-agilina-unavailable"]')?.role).toBe('alert');
-        expect(page.querySelector('[data-testid="room-mute"]')).not.toBeNull();
         expect(page.querySelector('[data-testid="room-agilina-avatar"]')?.classList).toContain(
           'absent',
         );
+
+        // The meeting goes on without her: connected, listed, can silence and leave.
+        expect(text(page, 'room-status')).toBe('Conectado');
+        expect(page.querySelector('[data-testid="room-participants"]')).not.toBeNull();
+        expect(page.querySelector<HTMLButtonElement>('[data-testid="room-mute"]')?.disabled).toBe(
+          false,
+        );
+        click(page, 'room-mute');
+        await settle();
+        expect(text(page, 'microphone-muted')).toBe('Micrófono silenciado');
+
+        const before = room.disconnects;
+        click(page, 'room-leave');
+        await settle();
+        expect(TestBed.inject(Router).url).toBe('/acme/teams/atlas');
+        expect(room.disconnects).toBe(before + 1);
       } finally {
         jasmine.clock().uninstall();
       }

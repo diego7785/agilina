@@ -26,10 +26,17 @@ class FakeRoom:
 
 class FakeJobContext:
     """By default someone is already in the room; with ``nobody_yet`` the wait blocks
-    until ``person_joins``."""
+    until ``person_joins``. With ``connect_failure`` joining the room raises it."""
 
-    def __init__(self, room_name: str, *, nobody_yet: bool = False) -> None:
+    def __init__(
+        self,
+        room_name: str,
+        *,
+        nobody_yet: bool = False,
+        connect_failure: Exception | None = None,
+    ) -> None:
         self.room = FakeRoom(room_name)
+        self._connect_failure = connect_failure
         self.subscribed: AutoSubscribe | None = None
         self.waited_for_participant = 0
         self._someone_joined = asyncio.Event()
@@ -38,6 +45,8 @@ class FakeJobContext:
         self.shutdown_callbacks: list[Callable[..., Coroutine[Any, Any, None]]] = []
 
     async def connect(self, auto_subscribe: AutoSubscribe = AutoSubscribe.SUBSCRIBE_ALL) -> None:
+        if self._connect_failure is not None:
+            raise self._connect_failure
         self.subscribed = auto_subscribe
 
     async def wait_for_participant(self) -> None:

@@ -16,9 +16,13 @@ import { WEB } from '../playwright.config';
  *
  * AGI-61 as one person can check it: her own row in Participantes, the actions shown but not yet
  * available, no live transcript, «Salir de la sala» back to the dashboard and the room on a
- * phone. Who else comes and goes, who is speaking (in under a second) and Agilina in the room
- * need several people and the agent: they are checked by hand with three people, one on a phone
- * (AGI-135 and AGI-61, in docs/sala-y-emision-del-token.md).
+ * phone. Who else comes and goes and who is speaking (in under a second) need several people:
+ * they are checked by hand with three people, one on a phone (AGI-135 and AGI-61, in
+ * docs/sala-y-emision-del-token.md).
+ *
+ * AGI-62 without depending on whether the agent is on (`make agent`): the card «Estado de Agilina»
+ * settles on a final state (on standby, without facilitation, or unavailable with its notice once
+ * her 30 s run out) and the room stays usable. Her greeting by voice is checked by hand.
  *
  * Firefox, and whether two people hear each other, are checked by hand (AGI-135): the Firefox
  * that Playwright ships does not set up WebRTC with LiveKit (its ICE fails, TURN included).
@@ -174,6 +178,25 @@ test('on a phone the room stacks, nothing scrolls sideways and she can still lea
   expect(actions!.y).toBeGreaterThan(participants!.y + participants!.height - 1);
   await page.getByTestId('room-leave').scrollIntoViewIfNeeded();
   await expect(page.getByTestId('room-leave')).toBeInViewport();
+  await page.getByTestId('room-leave').click();
+  await expect(page).toHaveURL(new RegExp(`/${TENANT}/teams/[0-9a-f-]{36}$`));
+});
+
+test('Agilina settles on a final state and the room stays usable', async ({ page }) => {
+  // Her 30 s to arrive, on top of signing in and entering.
+  test.setTimeout(90_000);
+  await signIn(page);
+  await enterRoom(page);
+
+  const status = page.getByTestId('room-agilina-status');
+  await expect(status).toContainText(/En espera|Sin facilitación|No disponible/, {
+    timeout: 35_000,
+  });
+  const unavailable = (await status.innerText()).includes('No disponible');
+  await expect(page.getByTestId('room-agilina-unavailable')).toHaveCount(unavailable ? 1 : 0);
+
+  await expect(page.getByTestId('room-status')).toHaveText('Conectado');
+  await expect(page.getByTestId('room-mute')).toBeEnabled();
   await page.getByTestId('room-leave').click();
   await expect(page).toHaveURL(new RegExp(`/${TENANT}/teams/[0-9a-f-]{36}$`));
 });

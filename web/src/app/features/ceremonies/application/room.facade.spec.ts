@@ -581,6 +581,21 @@ describe('RoomFacade', () => {
       expect(facade.agilinaStatus()).toBe('unavailable');
     });
 
+    it('keeps the room connected and usable when she never arrives', async () => {
+      room.emit({ kind: 'presence', present: [eva] });
+      jasmine.clock().tick(AGILINA_ARRIVAL_BUDGET_MS);
+      expect(facade.agilinaStatus()).toBe('unavailable');
+
+      expect(facade.status()).toBe('connected');
+      expect(facade.failure()).toBeNull();
+      await facade.toggleMute();
+      expect(facade.muted()).toBeTrue();
+
+      const before = room.disconnects;
+      TestBed.resetTestingModule();
+      expect(room.disconnects).toBe(before + 1);
+    });
+
     it('is the state she published, before the budget or after it', () => {
       room.emit({
         kind: 'presence',

@@ -138,7 +138,7 @@ async def test_agilina_waits_for_the_first_person_before_speaking() -> None:
     assert len(synthesizer.spoken) == 1
 
 
-@pytest.mark.parametrize("has_context", [True, False])
+@pytest.mark.parametrize("has_context", [True, False], ids=["with_context", "without_context"])
 async def test_on_standby_agilina_never_calls_the_transcriber(has_context: bool) -> None:
     context = CeremonyContextBuilder().build()
     transcriber = FakeTranscriber()
