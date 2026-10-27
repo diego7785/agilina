@@ -198,7 +198,8 @@ services:
     <<: *python-dev
     container_name: agilina-agent
     profiles: ["voice"]
-    command: ["python", "-m", "agilina_agent.main", "dev"]
+    # `start` prewarms job processes (`dev` is deprecated); one copy only: the fixed container_name blocks --scale.
+    command: ["python", "-m", "agilina_agent.main", "start"]
     environment:
       AGILINA_API_PUBLIC_URL: http://api:8000
       AGILINA_STT_URL: http://stt:8001

@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { DailyParticipantsPort } from './daily-participants.port';
 import { RoomAccessPort } from './room-access.port';
 import { type RoomChange, RoomPort } from './room.port';
+import { AGILINA_ARRIVAL_BUDGET_MS, agilinaStatusOf } from '../domain/agilina-status';
 import { type ConnectionStatus } from '../domain/connection-status';
 import { type DailyParticipant } from '../domain/daily-participant';
 import { type MicrophoneState } from '../domain/microphone-state';
@@ -31,7 +32,8 @@ import { type RoomPresence } from '../domain/room-presence';
  * The list of participants (AGI-61) joins the invited, asked for on each connection once in, with
  * who the room says is in it; if the invited cannot be read, it lists only who is in the room.
  * It also follows who is speaking, as LiveKit tells it, and whether Agilina (the agent in the
- * room) is there and speaking.
+ * room) is there and speaking. Her status is the state she published; if she has not told one
+ * `AGILINA_ARRIVAL_BUDGET_MS` after the participant got in, she is unavailable until she does.
  */
 @Injectable()
 export class RoomFacade {
@@ -44,6 +46,8 @@ export class RoomFacade {
   private destroyed = false;
   /** Gives up on getting back once the budget to reconnect is spent. */
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Marks Agilina unavailable if she has not told her state once the budget to arrive is spent. */
+  private arrivalTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly currentStatus = signal<ConnectionStatus>('connecting');
   private readonly currentMicrophone = signal<MicrophoneState>('pending');
@@ -53,6 +57,7 @@ export class RoomFacade {
   private readonly invitees = signal<readonly DailyParticipant[]>([]);
   private readonly present = signal<readonly RoomPresence[]>([]);
   private readonly speaking = signal<readonly string[]>([]);
+  private readonly arrivalExpired = signal(false);
 
   readonly status = this.currentStatus.asReadonly();
   readonly microphone = this.currentMicrophone.asReadonly();
@@ -66,6 +71,7 @@ export class RoomFacade {
     participantRows(this.invitees(), this.present(), this.speaking()),
   );
   readonly agilinaPresent = computed(() => this.present().some((presence) => presence.agent));
+  readonly agilinaStatus = computed(() => agilinaStatusOf(this.present(), this.arrivalExpired()));
   readonly agilinaSpeaking = computed(() =>
     this.present().some(
       (presence) => presence.agent && this.speaking().includes(presence.identity),
@@ -80,6 +86,7 @@ export class RoomFacade {
       this.destroyed = true;
       this.attempt++;
       this.stopReconnectTimer();
+      this.stopArrivalTimer();
       void this.room.disconnect();
     });
   }
@@ -136,6 +143,7 @@ export class RoomFacade {
     const attempt = ++this.attempt;
     const current = (): boolean => attempt === this.attempt;
     this.stopReconnectTimer();
+    this.stopArrivalTimer();
     this.currentStatus.set('connecting');
     this.currentFailure.set(null);
     this.currentMicrophone.set('pending');
@@ -154,6 +162,10 @@ export class RoomFacade {
         return;
       }
       this.currentStatus.set('connected');
+      this.arrivalTimer = setTimeout(() => {
+        this.arrivalTimer = null;
+        this.arrivalExpired.set(true);
+      }, AGILINA_ARRIVAL_BUDGET_MS);
       void this.loadInvitees(teamId, current);
       const microphone = asked === 'on' ? await this.room.enableMicrophone() : asked;
       if (current()) {
@@ -214,6 +226,7 @@ export class RoomFacade {
   }
 
   private lose(): void {
+    this.stopArrivalTimer();
     this.currentStatus.set('failed');
     this.currentFailure.set('connection_lost');
     this.present.set([]);
@@ -225,6 +238,14 @@ export class RoomFacade {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+  }
+
+  private stopArrivalTimer(): void {
+    if (this.arrivalTimer !== null) {
+      clearTimeout(this.arrivalTimer);
+      this.arrivalTimer = null;
+    }
+    this.arrivalExpired.set(false);
   }
 
   private apply(change: RoomChange): void {

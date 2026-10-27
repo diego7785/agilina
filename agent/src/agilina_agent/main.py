@@ -2,12 +2,15 @@
 
     make agent     → registers the worker in LiveKit and waits for jobs
 
-The worker opens an outbound connection to LiveKit and registers. When a
-ceremony room is created, LiveKit offers the job over that connection and this
-module launches the subprocess that joins the room as one more participant.
+The worker opens an outbound connection to LiveKit and registers without a
+name, so LiveKit dispatches every new room to it. When a ceremony room is
+created, LiveKit offers the job over that connection, issues the agent's token
+with the permissions the worker declared, and this module launches a dedicated
+subprocess that joins that room as one more participant.
 
 What is here is the skeleton that shows the life cycle: join the room, ask the
-API for the ceremony context, announce itself and wait. Before registering, the
+API for the ceremony context, publish its state, greet the first person and
+wait on standby without transcribing. Before registering, the
 worker resends once the results kept on disk that the API never accepted. Full
 facilitation arrives with the Release 1 and 2 stories; the logic that already
 exists lives in ``agilina_agent.domain.facilitation`` and is tested without a
@@ -17,15 +20,22 @@ room or audio.
 import asyncio
 
 import httpx
-from livekit.agents import JobContext, WorkerOptions, cli
+from livekit.agents import JobContext, WorkerOptions, WorkerPermissions, cli
+from livekit.protocol.models import TrackSource
 
+from agilina_agent.application.ports import SpeechSynthesizer
 from agilina_agent.infrastructure.http_agilina_api import REQUEST_TIMEOUT, HttpAgilinaApi
 from agilina_agent.infrastructure.logging_setup import configure_logging, get_logger
 from agilina_agent.infrastructure.pending_results import PendingResults
 from agilina_agent.infrastructure.settings import Settings, get_settings
-from agilina_agent.infrastructure.speech_synthesizers import RecordingSynthesizer
+from agilina_agent.infrastructure.speech_synthesizers import (
+    ElevenLabsSynthesizer,
+    RecordingSynthesizer,
+)
+from agilina_agent.infrastructure.whisper_transcriber import WhisperTranscriber
 from agilina_agent.infrastructure.worker_tokens import KeycloakWorkerTokens
 from agilina_agent.presentation.room_job import RoomJob
+from agilina_shared.enums import Language
 
 logger = get_logger(__name__)
 
@@ -55,17 +65,60 @@ async def resend_pending(settings: Settings) -> None:
         await api.close()
 
 
+def speech_synthesizer(settings: Settings, ctx: JobContext) -> SpeechSynthesizer:
+    """The real voice with an ElevenLabs key; without it the simulated one, so the
+    ceremony also runs locally and in the tests."""
+    if not settings.elevenlabs_api_key:
+        return RecordingSynthesizer()
+    synthesizer = ElevenLabsSynthesizer(
+        ctx.room,
+        api_key=settings.elevenlabs_api_key,
+        voice_by_language={
+            Language.ES: settings.elevenlabs_voice_es,
+            Language.EN: settings.elevenlabs_voice_en,
+        },
+    )
+    ctx.add_shutdown_callback(synthesizer.close)
+    return synthesizer
+
+
 async def entrypoint(ctx: JobContext) -> None:
     """Runs once per ceremony, in its own subprocess: wires the job here."""
     settings = get_settings()
     configure_logging(settings.log_level)
 
+    api = agilina_api(settings)
+    transcriber = WhisperTranscriber(settings.stt_url)
+    ctx.add_shutdown_callback(api.close)
+    ctx.add_shutdown_callback(transcriber.close)
     job = RoomJob(
-        api=agilina_api(settings),
-        synthesizer=RecordingSynthesizer(),
+        api=api,
+        synthesizer=speech_synthesizer(settings, ctx),
+        transcriber=transcriber,
         default_language=settings.default_language,
     )
     await job.run(ctx)
+
+
+def worker_options(settings: Settings) -> WorkerOptions:
+    """Registers without agent_name (automatic dispatch) and with least privilege:
+    listen, speak through the microphone source (where the voice is published) and
+    publish its state attribute; no camera, screen or data channel. WorkerPermissions
+    offers no roomAdmin, so the agent never gets it."""
+    return WorkerOptions(
+        entrypoint_fnc=entrypoint,
+        ws_url=settings.livekit_url,
+        api_key=settings.livekit_api_key,
+        api_secret=settings.livekit_api_secret,
+        permissions=WorkerPermissions(
+            can_publish=True,
+            can_publish_sources=[TrackSource.MICROPHONE],
+            can_subscribe=True,
+            can_publish_data=False,
+            can_update_metadata=True,
+            hidden=False,
+        ),
+    )
 
 
 def run() -> None:
@@ -74,17 +127,10 @@ def run() -> None:
     asyncio.run(resend_pending(settings))
     logger.info("Registering the worker in %s", settings.livekit_url or "(not configured)")
 
-    cli.run_app(
-        WorkerOptions(
-            entrypoint_fnc=entrypoint,
-            ws_url=settings.livekit_url,
-            api_key=settings.livekit_api_key,
-            api_secret=settings.livekit_api_secret,
-        )
-    )
+    cli.run_app(worker_options(settings))
 
 
-__all__ = ["entrypoint", "run"]
+__all__ = ["entrypoint", "run", "speech_synthesizer", "worker_options"]
 
 if __name__ == "__main__":
     run()

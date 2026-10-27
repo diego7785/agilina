@@ -20,7 +20,18 @@ ya trae). No se instala Python, uv, Node ni nada más.
 El código fuente se monta dentro de los contenedores de desarrollo: al guardar un
 archivo, la API y la web se recargan solas, sin reconstruir nada. Reconstruir
 solo hace falta cuando cambian las dependencias (`pyproject.toml`,
-`package.json`); `make up` ya lo hace.
+`package.json`); `make up` ya lo hace. El worker del agente corre en modo `start`
+y no se recarga solo: después de cambiar `agent/src`, reinícialo con
+`docker compose -f infra/docker-compose.yml --env-file .env restart agent`. Tras
+cambiar sus dependencias (como `livekit-plugins-elevenlabs`, que llegó con AGI-62),
+`make agent` reconstruye la imagen `agent` y `make test`, `make lint` o
+`make typecheck` la de `tools`.
+
+Del worker hay **una sola copia por entorno**: un proyecto de LiveKit por
+desarrollador, sin compartir sus claves, y nunca dos `make agent` (u otro checkout,
+otra máquina o el spike de voz) contra el mismo proyecto, porque LiveKit reparte las
+salas entre todos los workers registrados. El porqué y el resto del ciclo de vida
+están en [ciclo-de-vida-del-agente.md](ciclo-de-vida-del-agente.md#7-una-sola-copia-por-entorno).
 
 Mailpit atrapa todo correo que envíe la aplicación (por ejemplo el enlace de
 activación de una invitación): nada sale de tu máquina y lo ves en
@@ -47,8 +58,11 @@ ElevenLabs y Gemini las completas tú: sin ellas la API y la web funcionan, pero
 nadie entra a una sala. La API también usa las de LiveKit: abre la sala de cada
 daily y firma el token de cada participante; sin ellas,
 `POST /v1/teams/{team_id}/dailies/current/token` responde
-`503 room_service_unavailable`, y el worker no arranca. La primera ejecución descarga y construye las
-imágenes y tarda varios minutos; las siguientes son rápidas.
+`503 room_service_unavailable`, y el worker no arranca. La llave de ElevenLabs
+(`AGILINA_ELEVENLABS_API_KEY`, con las voces opcionales `AGILINA_ELEVENLABS_VOICE_ES` y
+`AGILINA_ELEVENLABS_VOICE_EN`) es opcional: sin ella Agilina entra y saluda con la voz simulada,
+que solo escribe el texto en `make logs s=agent`; con ella saluda por voz en la sala. La
+primera ejecución descarga y construye las imágenes y tarda varios minutos; las siguientes son rápidas.
 
 Los ganchos de git (`make hooks`) son opcionales y necesitan
 [pre-commit](https://pre-commit.com) en tu máquina. La CI ejecuta las mismas
@@ -697,7 +711,8 @@ make clean          # borra contenedores, volúmenes, imágenes y cachés
 | `make migrate` falla con conexión rechazada | Postgres todavía arranca: `make logs s=postgres` y reintenta |
 | `make agent` pide completar el `.env` | Faltan `AGILINA_LIVEKIT_URL`, `AGILINA_LIVEKIT_API_KEY` y `AGILINA_LIVEKIT_API_SECRET`: el worker no arranca sin ellos |
 | Entrar a la sala responde `503 room_service_unavailable` | La API no tiene `AGILINA_LIVEKIT_URL`, `AGILINA_LIVEKIT_API_KEY` o `AGILINA_LIVEKIT_API_SECRET`, o LiveKit no responde. Complétalos en el `.env`, reinicia la API (`make up`) y revisa `make logs s=api`. Para probar la ruta: crea el equipo con `make invite`, configura un sprint cuya daily esté en su ventana (de diez minutos antes a quince minutos después) y pide el token desde `/docs` con el token de un participante |
-| La web muestra «No disponible» | La API no está corriendo: `make logs s=api` |
+| La web muestra «No disponible» en lugar de la página | La API no está corriendo: `make logs s=api` |
+| La tarjeta «Estado de Agilina» de la sala dice «No disponible» | El worker no está corriendo (`make agent`), no se registró (`make logs s=agent`), la sala ya estaba abierta cuando arrancó (LiveKit despacha una vez por sala: espera a que se cierre o usa otra daily) u otro worker con las mismas claves de LiveKit se llevó la sala ([una sola copia](ciclo-de-vida-del-agente.md#7-una-sola-copia-por-entorno)) |
 | Un tenant no tiene realm en Keycloak | Keycloak perdió sus datos o el tenant se agregó sin él: `make tenant-realms` |
 | Cambié `package.json` o `pyproject.toml` y la imagen no se construye ("lockfile needs to be updated" o `npm ci` falla) | Ejecuta `make lock`, commitea los dos locks y repite `make up` |
 | Los archivos que crea un contenedor son de `root` | El compose usa tu usuario (`HOST_UID`/`HOST_GID`); ejecuta siempre con `make`, no con `docker compose` a mano |

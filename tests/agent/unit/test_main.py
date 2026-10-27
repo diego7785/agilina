@@ -1,14 +1,29 @@
-"""The composition root: the adapter is built without connecting, and the startup resend
-reads the configured folder and leaves there what it could not deliver."""
+"""The composition root: the adapter is built without connecting, the startup resend
+reads the configured folder and leaves there what it could not deliver, and the worker
+registers without a name so LiveKit dispatches every room to it."""
 
 from pathlib import Path
 
 import pytest
+from livekit.agents import WorkerOptions
+from livekit.protocol.models import TrackSource
 
+from agilina_agent import main
 from agilina_agent.infrastructure.http_agilina_api import HttpAgilinaApi
 from agilina_agent.infrastructure.pending_results import PendingResults
 from agilina_agent.infrastructure.settings import Settings
-from agilina_agent.main import agilina_api, resend_pending
+from agilina_agent.infrastructure.speech_synthesizers import (
+    ElevenLabsSynthesizer,
+    RecordingSynthesizer,
+)
+from agilina_agent.main import (
+    agilina_api,
+    entrypoint,
+    resend_pending,
+    speech_synthesizer,
+    worker_options,
+)
+from tests.agent.doubles import FakeJobContext
 from tests.shared.builders import TENANT, CeremonyResultBuilder
 
 # Nothing listens on the discard port: every connection is refused at once.
@@ -21,6 +36,8 @@ def _settings(pending_dir: Path) -> Settings:
         api_public_url=NOBODY,
         keycloak_url=NOBODY,
         agent_pending_dir=pending_dir,
+        # The tools container loads .env: a real key there must not change the tests.
+        elevenlabs_api_key="",
     )
 
 
@@ -43,3 +60,72 @@ async def test_what_the_startup_resend_cannot_deliver_stays_in_the_configured_fo
 
     assert kept.pending() == [(TENANT, result)]
     assert f"Pending result of ceremony {result.ceremony_id} not delivered" in caplog.text
+
+
+def test_the_worker_registers_for_automatic_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registered: list[WorkerOptions] = []
+    monkeypatch.setattr(main, "get_settings", lambda: _settings(tmp_path))
+    monkeypatch.setattr(main.cli, "run_app", registered.append)
+
+    main.run()
+
+    [options] = registered
+    # LiveKit dispatches every new room only to workers registered without a name.
+    assert options.agent_name == ""
+    assert options.entrypoint_fnc is entrypoint
+
+
+def test_the_agent_can_listen_speak_and_publish_its_state_but_not_data(tmp_path: Path) -> None:
+    permissions = worker_options(_settings(tmp_path)).permissions
+
+    assert permissions.can_subscribe
+    assert permissions.can_publish
+    # Only its voice: no camera or screen share.
+    assert permissions.can_publish_sources == [TrackSource.MICROPHONE]
+    assert permissions.can_update_metadata
+    assert not permissions.can_publish_data
+    # Agilina must show up in the participant list.
+    assert not permissions.hidden
+
+
+def test_without_an_elevenlabs_key_the_voice_is_simulated(tmp_path: Path) -> None:
+    ctx = FakeJobContext("acme-room")
+
+    synthesizer = speech_synthesizer(_settings(tmp_path), ctx)  # type: ignore[arg-type]
+
+    assert isinstance(synthesizer, RecordingSynthesizer)
+    assert ctx.shutdown_callbacks == []
+
+
+def test_with_an_elevenlabs_key_the_voice_is_real_and_closes_with_the_job(
+    tmp_path: Path,
+) -> None:
+    settings = _settings(tmp_path)
+    settings.elevenlabs_api_key = "test-key"
+    ctx = FakeJobContext("acme-room")
+
+    synthesizer = speech_synthesizer(settings, ctx)  # type: ignore[arg-type]
+
+    assert isinstance(synthesizer, ElevenLabsSynthesizer)
+    assert ctx.shutdown_callbacks == [synthesizer.close]
+
+
+async def test_when_agilina_fails_to_join_the_job_ends_and_frees_what_it_opened(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # LiveKit ends a job whose entrypoint raises and runs its shutdown callbacks; the people
+    # stay in the room and the screen marks Agilina unavailable (CA7).
+    monkeypatch.setattr(main, "get_settings", lambda: _settings(tmp_path))
+    failure = ConnectionError("LiveKit refused the agent")
+    ctx = FakeJobContext("acme-room", connect_failure=failure)
+
+    with pytest.raises(ConnectionError) as raised:
+        await entrypoint(ctx)  # type: ignore[arg-type]
+
+    assert raised.value is failure
+    assert ctx.room.local_participant.attributes == {}
+    assert len(ctx.shutdown_callbacks) == 2
+    for close in ctx.shutdown_callbacks:
+        await close()

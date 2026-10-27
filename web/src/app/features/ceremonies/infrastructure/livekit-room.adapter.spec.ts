@@ -13,6 +13,14 @@ import { RoomFailure } from '../domain/room-failure';
 
 type Listener = (...args: unknown[]) => void;
 
+/** Someone else in a LiveKit room, as the adapter reads them. */
+interface FakeParticipant {
+  identity: string;
+  isAgent: boolean;
+  isMicrophoneEnabled: boolean;
+  attributes: Record<string, string>;
+}
+
 /** A LiveKit room without network: it records what it is asked and emits what the test says. */
 class FakeRoom {
   readonly listeners = new Map<string, Listener[]>();
@@ -24,14 +32,12 @@ class FakeRoom {
   canPlaybackAudio = true;
   audioStarts = 0;
   disconnects = 0;
-  readonly remoteParticipants = new Map<
-    string,
-    { identity: string; isAgent: boolean; isMicrophoneEnabled: boolean }
-  >();
+  readonly remoteParticipants = new Map<string, FakeParticipant>();
   readonly localParticipant = {
     identity: 'eva',
     isAgent: false,
     isMicrophoneEnabled: false,
+    attributes: {},
     setMicrophoneEnabled: (enabled: boolean): Promise<undefined> => {
       if (this.microphoneFailure !== null) {
         return Promise.reject(this.microphoneFailure);
@@ -55,8 +61,8 @@ class FakeRoom {
   }
 
   /** Someone enters the room, as the SDK tells it: in the map first, then the event. */
-  arrive(identity: string, isAgent = false): void {
-    const participant = { identity, isAgent, isMicrophoneEnabled: true };
+  arrive(identity: string, isAgent = false, attributes: Record<string, string> = {}): void {
+    const participant = { identity, isAgent, isMicrophoneEnabled: true, attributes };
     this.remoteParticipants.set(identity, participant);
     this.emit(RoomEvent.ParticipantConnected, participant);
   }
@@ -119,7 +125,7 @@ describe('LiveKitRoomAdapter', () => {
   /** What the next room created fails with when it connects. */
   let nextConnectFailure: Error | null;
   /** Who is already in the next room created when the participant enters it. */
-  let nextRemotes: { identity: string; isAgent: boolean; isMicrophoneEnabled: boolean }[];
+  let nextRemotes: FakeParticipant[];
   const microphoneProvider = {
     provide: LIVEKIT_MICROPHONE,
     useValue: () => {
@@ -196,8 +202,13 @@ describe('LiveKitRoomAdapter', () => {
 
     it('tells who is in the room once in, the participant first and Agilina as an agent', async () => {
       nextRemotes = [
-        { identity: 'ana', isAgent: false, isMicrophoneEnabled: true },
-        { identity: 'agilina', isAgent: true, isMicrophoneEnabled: true },
+        { identity: 'ana', isAgent: false, isMicrophoneEnabled: true, attributes: {} },
+        {
+          identity: 'agilina',
+          isAgent: true,
+          isMicrophoneEnabled: true,
+          attributes: { 'agilina.state': 'standby' },
+        },
       ];
 
       await adapter.connect(anAccess());
@@ -207,9 +218,9 @@ describe('LiveKitRoomAdapter', () => {
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true, muted: true },
-            { identity: 'ana', agent: false, local: false, muted: false },
-            { identity: 'agilina', agent: true, local: false, muted: false },
+            { identity: 'eva', agent: false, local: true, muted: true, agentState: null },
+            { identity: 'ana', agent: false, local: false, muted: false, agentState: null },
+            { identity: 'agilina', agent: true, local: false, muted: false, agentState: 'standby' },
           ],
         },
       ]);
@@ -390,8 +401,8 @@ describe('LiveKitRoomAdapter', () => {
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true, muted: false },
-            { identity: 'ana', agent: false, local: false, muted: true },
+            { identity: 'eva', agent: false, local: true, muted: false, agentState: null },
+            { identity: 'ana', agent: false, local: false, muted: true, agentState: null },
           ],
         },
       ]);
@@ -405,19 +416,48 @@ describe('LiveKitRoomAdapter', () => {
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true, muted: true },
-            { identity: 'ana', agent: false, local: false, muted: false },
+            { identity: 'eva', agent: false, local: true, muted: true, agentState: null },
+            { identity: 'ana', agent: false, local: false, muted: false, agentState: null },
           ],
         },
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true, muted: true },
-            { identity: 'ana', agent: false, local: false, muted: false },
-            { identity: 'agilina', agent: true, local: false, muted: false },
+            { identity: 'eva', agent: false, local: true, muted: true, agentState: null },
+            { identity: 'ana', agent: false, local: false, muted: false, agentState: null },
+            { identity: 'agilina', agent: true, local: false, muted: false, agentState: null },
           ],
         },
       ]);
+    });
+
+    it('tells everyone in the room again when Agilina tells her state, and only a known one', () => {
+      room().arrive('agilina', true);
+      changes = [];
+
+      room().remoteParticipants.get('agilina')!.attributes = { 'agilina.state': 'no_facilitation' };
+      room().emit(RoomEvent.ParticipantAttributesChanged);
+      room().remoteParticipants.get('agilina')!.attributes = { 'agilina.state': 'dancing' };
+      room().emit(RoomEvent.ParticipantAttributesChanged);
+
+      expect(
+        changes.map((change) => change.kind === 'presence' && change.present[1]?.agentState),
+      ).toEqual(['no_facilitation', null]);
+    });
+
+    it('leaves out the state that someone who is not an agent claims', () => {
+      room().arrive('ana', false, { 'agilina.state': 'standby' });
+      room().localParticipant.attributes = { 'agilina.state': 'no_facilitation' };
+      changes = [];
+
+      room().emit(RoomEvent.ParticipantAttributesChanged);
+
+      expect(
+        changes.map(
+          (change) =>
+            change.kind === 'presence' && change.present.map((presence) => presence.agentState),
+        ),
+      ).toEqual([[null, null]]);
     });
 
     it('leaves out who leaves, even while the SDK still holds them', () => {
@@ -431,8 +471,8 @@ describe('LiveKitRoomAdapter', () => {
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true, muted: true },
-            { identity: 'luis', agent: false, local: false, muted: false },
+            { identity: 'eva', agent: false, local: true, muted: true, agentState: null },
+            { identity: 'luis', agent: false, local: false, muted: false, agentState: null },
           ],
         },
       ]);
@@ -451,8 +491,8 @@ describe('LiveKitRoomAdapter', () => {
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true, muted: true },
-            { identity: 'ana', agent: false, local: false, muted: false },
+            { identity: 'eva', agent: false, local: true, muted: true, agentState: null },
+            { identity: 'ana', agent: false, local: false, muted: false, agentState: null },
           ],
         },
       ]);

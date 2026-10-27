@@ -14,6 +14,7 @@ import { DailyParticipantsPort } from './daily-participants.port';
 import { RoomAccessPort } from './room-access.port';
 import { RoomFacade } from './room.facade';
 import { RoomPort } from './room.port';
+import { AGILINA_ARRIVAL_BUDGET_MS } from '../domain/agilina-status';
 import { type DailyParticipant } from '../domain/daily-participant';
 import { RoomFailure } from '../domain/room-failure';
 
@@ -553,6 +554,92 @@ describe('RoomFacade', () => {
       expect(speakers()).toEqual([]);
       expect(facade.agilinaPresent()).toBeTrue();
       expect(facade.agilinaSpeaking()).toBeFalse();
+    });
+  });
+
+  describe('the status of Agilina (AGI-62)', () => {
+    const eva = aPresence('user-eva', { local: true });
+
+    beforeEach(async () => {
+      jasmine.clock().install();
+      facade.join('atlas');
+      await settle();
+    });
+
+    afterEach(() => {
+      jasmine.clock().uninstall();
+    });
+
+    it('is arriving, then unavailable once the budget runs out without her', () => {
+      room.emit({ kind: 'presence', present: [eva] });
+      expect(facade.agilinaStatus()).toBe('arriving');
+
+      jasmine.clock().tick(AGILINA_ARRIVAL_BUDGET_MS - 1);
+      expect(facade.agilinaStatus()).toBe('arriving');
+
+      jasmine.clock().tick(1);
+      expect(facade.agilinaStatus()).toBe('unavailable');
+    });
+
+    it('keeps the room connected and usable when she never arrives', async () => {
+      room.emit({ kind: 'presence', present: [eva] });
+      jasmine.clock().tick(AGILINA_ARRIVAL_BUDGET_MS);
+      expect(facade.agilinaStatus()).toBe('unavailable');
+
+      expect(facade.status()).toBe('connected');
+      expect(facade.failure()).toBeNull();
+      await facade.toggleMute();
+      expect(facade.muted()).toBeTrue();
+
+      const before = room.disconnects;
+      TestBed.resetTestingModule();
+      expect(room.disconnects).toBe(before + 1);
+    });
+
+    it('is the state she published, before the budget or after it', () => {
+      room.emit({
+        kind: 'presence',
+        present: [eva, aPresence('agilina', { agent: true, agentState: 'standby' })],
+      });
+      jasmine.clock().tick(AGILINA_ARRIVAL_BUDGET_MS);
+      expect(facade.agilinaStatus()).toBe('standby');
+
+      room.emit({ kind: 'presence', present: [eva] });
+      expect(facade.agilinaStatus()).toBe('unavailable');
+
+      room.emit({
+        kind: 'presence',
+        present: [eva, aPresence('agilina', { agent: true, agentState: 'no_facilitation' })],
+      });
+      expect(facade.agilinaStatus()).toBe('no_facilitation');
+    });
+
+    it('gives her the whole budget again when it enters again', async () => {
+      jasmine.clock().tick(AGILINA_ARRIVAL_BUDGET_MS);
+      expect(facade.agilinaStatus()).toBe('unavailable');
+
+      facade.retry();
+      await settle();
+
+      expect(facade.agilinaStatus()).toBe('arriving');
+      jasmine.clock().tick(AGILINA_ARRIVAL_BUDGET_MS - 1);
+      expect(facade.agilinaStatus()).toBe('arriving');
+    });
+
+    it('stops counting when the connection is lost', () => {
+      room.emit({ kind: 'lost' });
+
+      jasmine.clock().tick(AGILINA_ARRIVAL_BUDGET_MS);
+
+      expect(facade.agilinaStatus()).toBe('arriving');
+    });
+
+    it('stops counting when the page goes away', () => {
+      TestBed.resetTestingModule();
+
+      jasmine.clock().tick(AGILINA_ARRIVAL_BUDGET_MS);
+
+      expect(facade.agilinaStatus()).toBe('arriving');
     });
   });
 

@@ -107,11 +107,19 @@ puede borrar.
      en las tres pantallas (también en la propia), en menos de 1 s, medido igual; al callar se
      apaga.
   3. **«· tú»:** cada persona ve «· tú» solo en su fila, con su nombre y su correo.
-  4. **Agilina:** con `make agent`, la tarjeta Estado de Agilina dice «En la sala» y Agilina no
-     aparece como fila de Participantes; cuando habla, el indicador de voz sale en la tarjeta.
+  4. **Agilina:** con `make agent`, la tarjeta Estado de Agilina pasa de «Llegando…» a «En espera»
+     (o a «Sin facilitación» si la API no le dio el contexto) y Agilina no aparece como fila de
+     Participantes. Al entrar la primera persona saluda una sola vez, con el día N de M del sprint
+     y la invitación a pulsar «Iniciar reunión diaria», y el indicador de voz sale en la tarjeta.
+     La voz y el indicador necesitan `AGILINA_ELEVENLABS_API_KEY` ([entorno local](entorno-local.md));
+     sin la llave la voz es simulada y el saludo solo aparece en `make logs s=agent` como
+     `[simulated voice · es] …`.
      Confirmar en los registros del worker (o en la consola de LiveKit) que entra como
      participante de tipo agente (`participant.isAgent`); si no, la web la mostraría como
-     «Participante».
+     «Participante». Sin `make agent` (o con `docker compose -f infra/docker-compose.yml
+     --env-file .env stop agent` antes de abrir la sala), a los 30 s la tarjeta dice «No
+     disponible», la sala avisa «Agilina no pudo unirse; la reunión puede continuar sin ella» y
+     todo lo demás sigue funcionando. El [ciclo de vida del agente](ciclo-de-vida-del-agente.md) explica cada estado.
   5. **Celular:** en 375 px la sala se apila en una columna (Estado de Agilina, Turno de,
      Participantes y Acciones), nada se desplaza de lado y **Salir de la sala** se alcanza y
      funciona.

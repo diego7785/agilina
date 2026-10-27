@@ -153,6 +153,16 @@
         }
       }
 
+      @if (agilinaStatus() === 'unavailable') {
+        <p
+          role="alert"
+          class="rounded-xl border border-border bg-surface p-6 text-sm shadow-sm"
+          data-testid="room-agilina-unavailable"
+        >
+          {{ t('agilina.unavailable_notice') }}
+        </p>
+      }
+
       @if (audioBlocked()) {
         <div
           role="alert"
@@ -185,7 +195,7 @@
           class="size-14 shrink-0"
           data-testid="room-agilina-avatar"
           [speaking]="agilinaSpeaking()"
-          [present]="agilinaPresent()"
+          [present]="agilinaPresent() && agilinaStatus() !== 'unavailable'"
         />
         <div>
           <h2
@@ -195,7 +205,7 @@
             {{ t('agilina.title') }}
           </h2>
           <p class="font-display text-xl font-bold">
-            {{ t(agilinaPresent() ? 'agilina.present' : 'agilina.absent') }}
+            {{ t('agilina.' + agilinaStatus()) }}
           </p>
           @if (agilinaSpeaking()) {
             <agl-speaking-indicator class="mt-1" data-testid="room-agilina-speaking" />

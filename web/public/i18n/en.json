@@ -440,8 +440,11 @@
       "agilina": {
         "title": "Agilina status",
         "name": "Agilina",
-        "present": "In the room",
-        "absent": "Not in the room yet"
+        "arriving": "Arriving…",
+        "standby": "On standby",
+        "no_facilitation": "No facilitation",
+        "unavailable": "Unavailable",
+        "unavailable_notice": "Agilina could not join; the meeting can go on without her"
       },
       "turn": {
         "title": "Turn of",
