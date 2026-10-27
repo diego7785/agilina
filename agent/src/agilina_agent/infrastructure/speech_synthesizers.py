@@ -14,7 +14,7 @@ without spending minutes of a paid service.
 from typing import Any
 
 from livekit import rtc
-from livekit.agents import Agent, AgentSession, TurnHandlingOptions, tts
+from livekit.agents import Agent, AgentSession, ErrorEvent, TurnHandlingOptions, tts
 from livekit.agents.voice.room_io import RoomOptions
 from livekit.plugins import elevenlabs
 
@@ -71,14 +71,27 @@ class ElevenLabsSynthesizer(SpeechSynthesizer):
             )
             # Kept only once started, so a failed start is retried on the next sentence.
             self._session = session
-        speech = self._session.say(text)
-        await speech.wait_for_playout()
-        # A TTS failure stays inside the session: the speech ends interrupted, not raised.
-        if speech.interrupted:
+        # A TTS failure stays inside the session: it is not raised and the speech is not
+        # marked interrupted, it only shows up as an "error" event once the retries run out.
+        failures: list[tts.TTSError] = []
+
+        def on_error(event: ErrorEvent) -> None:
+            if isinstance(event.error, tts.TTSError) and not event.error.recoverable:
+                failures.append(event.error)
+
+        self._session.on("error", on_error)
+        try:
+            speech = self._session.say(text)
+            await speech.wait_for_playout()
+        finally:
+            self._session.off("error", on_error)
+        if failures or speech.interrupted:
+            reason = failures[0].error if failures else "interrupted"
             logger.warning(
-                "ElevenLabs did not finish speaking in room %s (%s)",
+                "ElevenLabs did not speak in room %s (%s): %s",
                 self._room.name,
                 language.value,
+                reason,
             )
         else:
             logger.info("ElevenLabs spoke %d characters in %s", len(text), language.value)

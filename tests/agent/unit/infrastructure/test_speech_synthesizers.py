@@ -103,3 +103,39 @@ async def test_each_language_speaks_with_its_voice_or_the_default_one(
     await synthesizer.synthesize("Hello", Language.EN)
 
     assert synthesizer._tts.voices == ["voice-es", elevenlabs.DEFAULT_VOICE_ID]  # type: ignore[attr-defined]
+
+
+async def test_a_voice_that_fails_is_logged_as_a_failure_not_as_spoken(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    session = FakeAgentSession(tts_failure=Exception("paid_plan_required"))
+    monkeypatch.setattr(speech_synthesizers, "new_session", lambda _voice: session)
+    synthesizer = ElevenLabsSynthesizer(
+        FakeRoom("acme-room"),  # type: ignore[arg-type]
+        api_key="test-key",
+        voice_by_language={Language.ES: "voice-es"},
+    )
+
+    # The meeting goes on without the voice: nothing is raised.
+    assert await synthesizer.synthesize("Hola", Language.ES) == b""
+
+    assert "ElevenLabs did not speak in room acme-room (es): paid_plan_required" in caplog.text
+    assert "ElevenLabs spoke" not in caplog.text
+    assert session.error_handlers == []
+
+
+async def test_a_voice_that_works_is_logged_as_spoken(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level("INFO")
+    monkeypatch.setattr(speech_synthesizers, "new_session", lambda _voice: FakeAgentSession())
+    synthesizer = ElevenLabsSynthesizer(
+        FakeRoom("acme-room"),  # type: ignore[arg-type]
+        api_key="test-key",
+        voice_by_language={Language.ES: "voice-es"},
+    )
+
+    await synthesizer.synthesize("Hola", Language.ES)
+
+    assert "ElevenLabs spoke 4 characters in es" in caplog.text
+    assert "did not speak" not in caplog.text
