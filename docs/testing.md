@@ -180,10 +180,22 @@ De la pantalla de la sala (AGI-61), `room.spec.ts` comprueba lo que se ve con **
 persona**: su fila en Participantes con «· tú», su correo y Conectado; las tres acciones visibles y
 deshabilitadas; que no hay transcripción; que **Salir de la sala** vuelve al dashboard y suelta el
 audio; y que a 375 px la sala se apila sin desplazarse de lado. Lo que necesita **tres personas**
-(altas y bajas, quién habla en menos de un segundo, Agilina en la sala con `make agent`) se
-verifica a mano, con la lista de
+(altas y bajas, quién habla en menos de un segundo, el saludo por voz de Agilina con
+`make agent` y la llave de ElevenLabs) se verifica a mano, con la lista de
 [sala-y-emision-del-token.md](sala-y-emision-del-token.md#probar-la-sala-contra-livekit) y la evidencia en el pull
 request.
+
+De Agilina en la sala (AGI-62), `room.spec.ts` comprueba que la tarjeta «Estado de Agilina» llega
+a **un estado final cualquiera** («En espera», «Sin facilitación» o, pasados sus 30 s, «No
+disponible» con su aviso) y que la sala sigue usable. No exige uno en particular: pasa igual con o
+sin `make agent`, y un agente encendido contra el mismo proyecto de LiveKit entra también a la
+sala de la prueba (ver el [ciclo de vida del agente](ciclo-de-vida-del-agente.md)). El fallo
+determinista se prueba sin LiveKit: en Karma, con el reloj falso (`jasmine.clock()`), «Llegando…»
+pasa a «No disponible» a los 30 s, el aviso aparece, la reunión sigue y un estado que llega tarde
+manda (`room.facade.spec.ts`, `room-page.spec.ts`, `agilina-status.spec.ts`); en pytest, con los
+dobles de LiveKit de `tests/agent/doubles/`, en espera el transcriptor nunca se llama
+(`test_room_job.py`), la sesión de voz no usa detectores ni graba (`test_speech_synthesizers.py`)
+y si Agilina no logra entrar el trabajo termina y libera lo que abrió (`test_main.py`).
 
 Una prueba de punta a punta encuentra los elementos por su `data-testid` (`page.getByTestId(…)`),
 nunca por su texto, su etiqueta, su rol o su clase: un texto o una etiqueta que cambian no la rompen.
