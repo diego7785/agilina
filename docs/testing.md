@@ -197,6 +197,17 @@ dobles de LiveKit de `tests/agent/doubles/`, en espera el transcriptor nunca se 
 (`test_room_job.py`), la sesión de voz no usa detectores ni graba (`test_speech_synthesizers.py`)
 y si Agilina no logra entrar el trabajo termina y libera lo que abrió (`test_main.py`).
 
+De la voz de Agilina (AGI-69), en pytest y con la sesión falsa de `tests/agent/doubles/livekit.py`:
+el modelo `eleven_v4_turbo`, la voz y el idioma de cada frase, la sesión sin reintentos, el corte a
+los 5 s sin audio (con un plazo corto en la prueba), cada respuesta de ElevenLabs con su motivo y su
+nivel de log, la sesión que se reemplaza tras cerrarse por errores, la latencia y el consumo
+(`test_speech_synthesizers.py`); y que la frase no dicha se publica en `agilina.text` y se borra
+cuando la voz vuelve (`test_room_job.py`, con `ScriptedSynthesizer`). En Karma, que la sala la
+muestra en una región `aria-live` y la quita (`agilina-text.spec.ts`, `room.facade.spec.ts`,
+`room-page.spec.ts`, `livekit-room.adapter.spec.ts`). La voz real se verifica a mano con
+`make agent` y la llave: que tres personas oyen el saludo, la latencia de 10 saludos en el log
+(menos de 2 s) y, con una llave inválida en el `.env`, que el saludo aparece por escrito.
+
 Una prueba de punta a punta encuentra los elementos por su `data-testid` (`page.getByTestId(…)`),
 nunca por su texto, su etiqueta, su rol o su clase: un texto o una etiqueta que cambian no la rompen.
 Lo que la persona lee se sigue comprobando, sobre el elemento encontrado así

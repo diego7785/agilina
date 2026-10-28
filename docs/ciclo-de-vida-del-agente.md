@@ -1,7 +1,8 @@
 # Ciclo de vida del agente
 
 Cómo llega Agilina a la sala de una ceremonia, qué hace mientras espera, cómo se entera la web de
-su estado y qué pasa cuando no llega (AGI-62). Lo que el worker le pide a la API está en
+su estado y qué pasa cuando no llega (AGI-62), y cómo habla y qué pasa cuando su voz falla
+(AGI-69). Lo que el worker le pide a la API está en
 [contrato-worker-api.md](contrato-worker-api.md); por qué Agilina no manda audio a los detectores
 de LiveKit en la nube, en
 [AD-32](adr/0032-no-enviar-audio-a-los-detectores-de-livekit-en-la-nube.md).
@@ -84,9 +85,10 @@ despachar, aunque el subproceso haya caído. Si Agilina cae, vuelve en la siguie
      (`AGILINA_DEFAULT_LANGUAGE`): no va a facilitar y pueden continuar sin ella.
 
    Las plantillas están en `shared/src/agilina_shared/i18n.py`. La voz es real con
-   `AGILINA_ELEVENLABS_API_KEY` (`ElevenLabsSynthesizer`); sin llave es simulada
+   `AGILINA_ELEVENLABS_API_KEY` (`ElevenLabsSynthesizer`, §9); sin llave es simulada
    (`RecordingSynthesizer`) y el texto sale en el log del worker como `[simulated voice · es] …`.
-   Si ElevenLabs falla, se registra en el log y la reunión sigue.
+   Si la voz real no suena en 5 s o ElevenLabs la rechaza, el saludo se publica por escrito en
+   `agilina.text` (§6), se registra el motivo y la reunión sigue.
 
 ## 4. En espera, sin transcribir
 
@@ -128,15 +130,22 @@ evento, y quien entra tarde lo lee de la presencia. Las personas no necesitan `c
 | `agilina.state` | `no_facilitation` | El agente, sin contexto | «Sin facilitación» |
 | — | sin atributo, dentro del plazo | — | «Llegando…» |
 | — | sin atributo, plazo vencido | — | «No disponible» y el aviso |
+| `agilina.text` | la última frase que su voz no pudo decir | El agente, cuando ElevenLabs falla o no suena en 5 s | «Agilina no pudo hablar y lo dejó por escrito:» y la frase, en una región `aria-live` |
+| `agilina.text` | vacío | El agente, cuando su voz vuelve a sonar | Nada: el texto viejo desaparece |
 
-- La clave vive en dos constantes, una en cada desplegable: `STATE_ATTRIBUTE` en
-  `agent/src/agilina_agent/presentation/room_job.py` y `AGENT_STATE_ATTRIBUTE` en
+- Cada clave vive en dos constantes, una en cada desplegable: `STATE_ATTRIBUTE` y
+  `TEXT_ATTRIBUTE` en `agent/src/agilina_agent/presentation/room_job.py`, y
+  `AGENT_STATE_ATTRIBUTE` y `AGENT_TEXT_ATTRIBUTE` en
   `web/src/app/features/ceremonies/infrastructure/livekit-room.adapter.ts`. No hay catálogo
   compartido entre Python y TypeScript: un valor nuevo se agrega en los dos lados en el mismo
   cambio.
 - La web solo cuenta el atributo de un participante **agente** (`participant.isAgent`) con un valor
-  que conoce: una persona no puede falsear el estado de Agilina, y un valor desconocido se trata
-  como si no hubiera llegado.
+  que conoce: una persona no puede falsear el estado de Agilina ni escribir como ella, y un valor
+  desconocido se trata como si no hubiera llegado.
+- `agilina.text` es estado, no un evento: quien entra tarde ve la última frase no dicha. Lleva una
+  plantilla en el idioma del equipo (no es transcripción) y la web la muestra escapada, nunca como
+  HTML. Usa el mismo permiso que `agilina.state` (`can_update_metadata`); el canal de datos sigue
+  cerrado.
 - Las claves `lk.*` (como `lk.agent.state`, que escribe `AgentSession`) son de LiveKit: no se usan
   ni se escriben como contrato propio.
 
@@ -167,7 +176,55 @@ lee al registrarse); eso exige que la API lo despache al crear la sala y no se h
   se revisa en la consola de LiveKit Cloud que la observabilidad del proyecto siga apagada: se
   enciende desde la consola sin cambiar código.
 - **Saludo:** «Agilina joined room …» y, sin llave de ElevenLabs, la línea `[simulated voice · …]`
-  con el saludo; con llave, «ElevenLabs spoke N characters in es».
+  con el saludo; con llave, las líneas de la voz de §9 («ElevenLabs started speaking in N ms …» y
+  «ElevenLabs spoke N characters …»).
 - **Pruebas automáticas:** las de `tests/agent/` y las de la sala en Karma y en la e2e, descritas en
   [testing.md](testing.md#de-punta-a-punta). La verificación con varias personas está en
   [sala-y-emision-del-token.md](sala-y-emision-del-token.md#probar-la-sala-contra-livekit).
+
+## 9. Voz de Agilina y consumo de ElevenLabs
+
+Lo que dice Agilina sale de las plantillas (AD-19) y suena con ElevenLabs (AGI-69), en
+`ElevenLabsSynthesizer` (`agent/src/agilina_agent/infrastructure/speech_synthesizers.py`).
+
+- **Modelo y voz:** `eleven_v4_turbo` (`AGILINA_ELEVENLABS_MODEL`; `eleven_flash_v2_5` es la
+  alternativa si el arranque se vuelve lento), con la voz predeterminada del plugin
+  (`hpp4J3VqNfWAUOO0d1Us`) mientras `AGILINA_ELEVENLABS_VOICE_ES` y `…_VOICE_EN` estén vacías. El
+  plan gratuito solo permite las voces predeterminadas: las de la *Voice Library* fallan con
+  `paid_plan_required`.
+- **Idioma:** antes de cada frase se fijan la voz y el código del idioma del equipo (`es`, `en`),
+  que obliga al modelo a pronunciar y normalizar en ese idioma. El idioma sale del contexto, que se
+  pide una vez por sala: si el equipo cambia de idioma, la siguiente ceremonia ya habla en el nuevo.
+- **Latencia (criterio: menos de 2 s):** se mide desde que el agente decide la frase hasta que la
+  sesión pasa a `speaking`, es decir, hasta que el primer audio está en la pista de la sala. Queda en
+  el log como `ElevenLabs started speaking in N ms in room … (es)`, en `WARNING` si pasa de 2 s. El
+  tiempo hasta el primer audio de ElevenLabs (TTFB, ≈ 0,5 s en el spike HU-01) va en la línea de
+  consumo. Lo que tarda el audio en llegar a cada navegador depende de su red y no se mide aquí.
+- **Cuando la voz no suena:** la sesión no reintenta (`max_retry=0`, conexión de 5 s). Si en
+  **5 s** no hay audio, la frase se corta (con `interrupt(force=True)`, porque las interrupciones
+  están apagadas por AD-32) y se muestra por escrito (§6). La sala sigue en todos los casos:
+
+  | Respuesta de ElevenLabs | Motivo en el log | Nivel | En la sala |
+  | --- | --- | --- | --- |
+  | Audio en flujo | `started speaking in N ms` | INFO (WARNING si > 2 s) | Se oye |
+  | 401, llave inválida | `rejected the API key` | ERROR | La frase por escrito |
+  | 429, o `quota_exceeded` / `too_many_concurrent_requests` en el WebSocket | `quota or rate limit … after N characters (≈ C credits)` | WARNING | La frase por escrito |
+  | 5xx, otro código u otro error (`paid_plan_required`) | `did not speak … (provider_error)` | WARNING | La frase por escrito |
+  | Sin audio en 5 s | `did not speak … (timeout)` | WARNING | La frase por escrito |
+
+  Después de cuatro fallos seguidos `AgentSession` se cierra sola; la siguiente frase abre otra, así
+  que si el servicio vuelve, Agilina vuelve a hablar y el texto escrito desaparece.
+- **Consumo:** `eleven_v4_turbo` y `eleven_flash_v2_5` cobran **0,5 créditos por carácter**. Cada
+  frase deja `ElevenLabs spoke N characters (≈ C credits), first audio from ElevenLabs in N ms`, y
+  al cerrar la sala, `ElevenLabs used N characters (≈ C credits) in room …`. Para ver lo gastado:
+  `make logs s=agent | grep "ElevenLabs used"`. El saldo del mes se ve en la cuenta de ElevenLabs
+  (*Subscription* o *Usage*).
+- **Cupo (confirmado el 2026-10-28, AGI-155):** el plan gratuito trae **10.000 créditos al mes por
+  cuenta**. Angélica y Diego tienen cada uno su cuenta y su llave. Con ≈ 160 créditos por daily de 6
+  personas (estimación U6 del spike: ≈ 315 caracteres), caben **≈ 62 dailies al mes por cuenta**;
+  una daily por día hábil (≈ 22 al mes) usa ≈ 3.520 créditos, el 35 % del cupo. Si el cupo se agota,
+  Agilina sigue en la sala y sus frases salen por escrito hasta que se renueve.
+- **La llave:** solo en el `.env` de cada desarrollador (`AGILINA_ELEVENLABS_API_KEY`), que git
+  ignora. El worker la lee como `SecretStr`: no aparece en logs ni en `repr`. Se crea en
+  elevenlabs.io → *Developers* → *API Keys*; si la cuenta lo permite, conviene restringirla a *Text
+  to Speech* y ponerle un límite de créditos.
