@@ -1,6 +1,7 @@
 """Agilina publishes its state, waits for the first person and greets once per room on
 standby without transcribing (CA2-CA6). Without the context there is no facilitation:
-Agilina says so in the room (CA5)."""
+Agilina says so in the room (CA5). What the voice cannot say is shown as text in the
+room, and the ceremony goes on (AGI-69, CA4)."""
 
 import asyncio
 
@@ -8,11 +9,16 @@ import pytest
 from livekit.agents import AutoSubscribe
 
 from agilina_agent.infrastructure.speech_synthesizers import RecordingSynthesizer
-from agilina_agent.presentation.room_job import STATE_ATTRIBUTE, RoomJob
+from agilina_agent.presentation.room_job import STATE_ATTRIBUTE, TEXT_ATTRIBUTE, RoomJob
 from agilina_shared import room_name_for
 from agilina_shared.enums import Language
 from agilina_shared.i18n import render_text
-from tests.agent.doubles import FakeAgilinaApi, FakeJobContext, FakeTranscriber
+from tests.agent.doubles import (
+    FakeAgilinaApi,
+    FakeJobContext,
+    FakeTranscriber,
+    ScriptedSynthesizer,
+)
 from tests.shared.builders import TENANT, CeremonyContextBuilder
 
 
@@ -153,3 +159,61 @@ async def test_on_standby_agilina_never_calls_the_transcriber(has_context: bool)
 
     assert transcriber.transcribed == 0
     assert transcriber.availability_checks == 0
+
+
+@pytest.mark.parametrize("has_context", [True, False], ids=["with_context", "without_context"])
+async def test_a_greeting_the_voice_cannot_say_is_shown_as_text(has_context: bool) -> None:
+    context = CeremonyContextBuilder().in_language(Language.EN).build()
+    synthesizer = ScriptedSynthesizer(failing={0})
+    job = RoomJob(
+        FakeAgilinaApi(context=context if has_context else None),
+        synthesizer,
+        FakeTranscriber(),
+        default_language=Language.ES,
+    )
+    ctx = FakeJobContext(context.room)
+
+    await job.run(ctx)
+
+    [(language, greeting)] = synthesizer.attempted
+    assert language is (Language.EN if has_context else Language.ES)
+    assert ctx.room.local_participant.attributes == {
+        STATE_ATTRIBUTE: "standby" if has_context else "no_facilitation",
+        TEXT_ATTRIBUTE: greeting,
+    }
+
+
+async def test_a_greeting_the_voice_says_shows_no_text() -> None:
+    context = CeremonyContextBuilder().build()
+    job = RoomJob(
+        FakeAgilinaApi(context=context),
+        ScriptedSynthesizer(),
+        FakeTranscriber(),
+        default_language=Language.ES,
+    )
+    ctx = FakeJobContext(context.room)
+
+    await job.run(ctx)
+
+    assert TEXT_ATTRIBUTE not in ctx.room.local_participant.attributes
+
+
+async def test_the_text_goes_away_once_the_voice_is_heard_again() -> None:
+    context = CeremonyContextBuilder().build()
+    job = RoomJob(
+        FakeAgilinaApi(context=context),
+        ScriptedSynthesizer(failing={0, 1}),
+        FakeTranscriber(),
+        default_language=Language.ES,
+    )
+    ctx = FakeJobContext(context.room)
+    attributes = ctx.room.local_participant.attributes
+
+    await job.say(ctx, "Primera", Language.ES)  # type: ignore[arg-type]
+    assert attributes[TEXT_ATTRIBUTE] == "Primera"
+
+    await job.say(ctx, "Segunda", Language.ES)  # type: ignore[arg-type]
+    assert attributes[TEXT_ATTRIBUTE] == "Segunda"
+
+    await job.say(ctx, "Tercera", Language.ES)  # type: ignore[arg-type]
+    assert attributes[TEXT_ATTRIBUTE] == ""
