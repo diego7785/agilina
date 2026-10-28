@@ -48,6 +48,7 @@ export class RoomPage implements OnInit {
   protected readonly agilinaPresent = this.facade.agilinaPresent;
   protected readonly agilinaStatus = this.facade.agilinaStatus;
   protected readonly agilinaSpeaking = this.facade.agilinaSpeaking;
+  protected readonly agilinaText = this.facade.agilinaText;
   private readonly unknownName = translateSignal('ceremonies.room.participants.unknown');
   private readonly agilinaName = translateSignal('ceremonies.room.agilina.name');
   /** Who is speaking now, for a screen reader: the rows that speak, then Agilina; empty if nobody. */

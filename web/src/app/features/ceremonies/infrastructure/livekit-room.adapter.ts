@@ -26,6 +26,8 @@ import { type AgentState } from '../domain/room-presence';
 
 /** The participant attribute where the agent publishes its state (AGI-146). */
 const AGENT_STATE_ATTRIBUTE = 'agilina.state';
+/** The participant attribute where the agent leaves what its voice could not say (AGI-69). */
+const AGENT_TEXT_ATTRIBUTE = 'agilina.text';
 
 /**
  * LiveKit adapter of the room port: the only place that knows `livekit-client`. Each connection
@@ -145,7 +147,7 @@ export class LiveKitRoomAdapter implements RoomPort {
       .on(RoomEvent.ParticipantConnected, () => {
         this.emitFor(room, presenceOf(room));
       })
-      // The agent told its state (standby, no facilitation).
+      // The agent told its state (standby, no facilitation) or what its voice could not say.
       .on(RoomEvent.ParticipantAttributesChanged, () => {
         this.emitFor(room, presenceOf(room));
       })
@@ -263,6 +265,7 @@ function presenceOf(room: Room, leaving?: string): RoomChange {
         local: true,
         muted: !local.isMicrophoneEnabled,
         agentState: agentStateOf(local),
+        agentText: agentTextOf(local),
       },
       ...remote.map((participant) => ({
         identity: participant.identity,
@@ -270,6 +273,7 @@ function presenceOf(room: Room, leaving?: string): RoomChange {
         local: false,
         muted: !participant.isMicrophoneEnabled,
         agentState: agentStateOf(participant),
+        agentText: agentTextOf(participant),
       })),
     ],
   };
@@ -279,6 +283,12 @@ function presenceOf(room: Room, leaving?: string): RoomChange {
 function agentStateOf(participant: Participant): AgentState | null {
   const state = participant.attributes[AGENT_STATE_ATTRIBUTE];
   return participant.isAgent && (state === 'standby' || state === 'no_facilitation') ? state : null;
+}
+
+/** What an agent's voice could not say, or `null` for anyone else or an empty text. */
+function agentTextOf(participant: Participant): string | null {
+  const text = participant.attributes[AGENT_TEXT_ATTRIBUTE];
+  return participant.isAgent && text ? text : null;
 }
 
 /** Why LiveKit did not let the participant in. */

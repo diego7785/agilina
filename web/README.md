@@ -319,6 +319,12 @@ Un solo estilo para todos los formularios (el de `/:tenant/activate`, el de `/:t
   después «No disponible» con el aviso, sin bloquear la sala. El plazo vuelve a empezar cada vez
   que la persona entra (también con **Reintentar**) y se detiene al perder la conexión o salir. La clave es un contrato con el worker:
   [docs/ciclo-de-vida-del-agente.md](../docs/ciclo-de-vida-del-agente.md#6-contrato-con-la-web-agilinastate).
+- **Lo que Agilina no pudo decir** (AGI-69): si su voz falla, el agente publica la frase en el
+  atributo `agilina.text` (vacío cuando la voz vuelve). El adaptador la lee solo de un agente, llega
+  en el cambio `presence` y `agilinaTextOf` (dominio) la entrega a la fachada. La sala la muestra
+  debajo de la tarjeta Estado de Agilina, en una región `aria-live` siempre presente
+  (`room-agilina-text`), escapada como texto. No es transcripción: es la plantilla que Agilina iba a
+  decir, en el idioma del equipo.
 - **Quién habla** (AGI-61): `RoomPort` traduce los oradores activos de LiveKit
   (`ActiveSpeakersChanged`) al cambio `speaking`, con las identidades que hablan. La fila de quien
   habla lleva `agl-speaking-indicator` (el ícono de voz y «Hablando») y un anillo; si es Agilina,

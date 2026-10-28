@@ -534,6 +534,38 @@ describe('RoomPage', () => {
       expect(text(page, 'room-agilina-status')).toBe('Estado de Agilina Llegando…');
     });
 
+    it('shows in writing what Agilina could not say, and hides it when her voice is back', async () => {
+      const page = await open();
+      const live = page.querySelector('[data-testid="room-agilina-text"]');
+      expect(live?.getAttribute('aria-live')).toBe('polite');
+      expect(text(page, 'room-agilina-text')).toBe('');
+
+      room.emit({
+        kind: 'presence',
+        present: [
+          ...everyone.slice(0, 2),
+          aPresence('agilina', {
+            agent: true,
+            agentState: 'standby',
+            agentText: 'Hola, equipo. Hoy es el día 5 de 15 del sprint.',
+          }),
+        ],
+      });
+      await settle();
+
+      expect(text(page, 'room-agilina-text')).toContain(
+        'Agilina no pudo hablar y lo dejó por escrito:',
+      );
+      expect(text(page, 'room-agilina-text-said')).toBe(
+        'Hola, equipo. Hoy es el día 5 de 15 del sprint.',
+      );
+
+      room.emit({ kind: 'presence', present: everyone });
+      await settle();
+      expect(text(page, 'room-agilina-text')).toBe('');
+      expect(page.querySelector('[data-testid="room-agilina-text"]')).toBe(live);
+    });
+
     it('says Agilina could not join once her time runs out, and keeps the room usable', async () => {
       jasmine.clock().install();
       try {

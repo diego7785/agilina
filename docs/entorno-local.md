@@ -59,9 +59,14 @@ nadie entra a una sala. La API también usa las de LiveKit: abre la sala de cada
 daily y firma el token de cada participante; sin ellas,
 `POST /v1/teams/{team_id}/dailies/current/token` responde
 `503 room_service_unavailable`, y el worker no arranca. La llave de ElevenLabs
-(`AGILINA_ELEVENLABS_API_KEY`, con las voces opcionales `AGILINA_ELEVENLABS_VOICE_ES` y
-`AGILINA_ELEVENLABS_VOICE_EN`) es opcional: sin ella Agilina entra y saluda con la voz simulada,
-que solo escribe el texto en `make logs s=agent`; con ella saluda por voz en la sala. La
+(`AGILINA_ELEVENLABS_API_KEY`, con el modelo `AGILINA_ELEVENLABS_MODEL`, `eleven_v4_turbo` por
+defecto, y las voces opcionales `AGILINA_ELEVENLABS_VOICE_ES` y `AGILINA_ELEVENLABS_VOICE_EN`) es
+opcional: sin ella Agilina entra y saluda con la voz simulada, que solo escribe el texto en
+`make logs s=agent` (la sala no muestra nada); con ella saluda por voz en la sala y, si la voz
+falla, la sala muestra el saludo por escrito. Cada desarrollador usa **su propia cuenta y su propia
+llave** del plan gratuito, solo en su `.env`: ni se comparten ni van al repositorio. Cómo sacarla,
+el cupo y el consumo, en
+[ciclo-de-vida-del-agente.md](ciclo-de-vida-del-agente.md#9-voz-de-agilina-y-consumo-de-elevenlabs). La
 primera ejecución descarga y construye las imágenes y tarda varios minutos; las siguientes son rápidas.
 
 Los ganchos de git (`make hooks`) son opcionales y necesitan

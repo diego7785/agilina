@@ -10,13 +10,17 @@ says so in the room and the machine is never created (CA5).
 
 On standby Agilina is subscribed to the audio but never calls the transcriber: nothing
 said before the ceremony starts is transcribed, stored or logged.
+
+What Agilina could not say out loud is published in the ``agilina.text`` attribute so the
+room shows it as text, and the ceremony goes on (AGI-69). It is cleared once the voice
+is heard again, so the room never shows an old sentence.
 """
 
 import logging
 
 from livekit.agents import AutoSubscribe, JobContext
 
-from agilina_agent.application.errors import ContextUnavailableError
+from agilina_agent.application.errors import ContextUnavailableError, SpeechUnavailableError
 from agilina_agent.application.ports import AgilinaApi, SpeechSynthesizer, Transcriber
 from agilina_agent.domain.facilitation import FacilitationMachine
 from agilina_shared.contract import CeremonyContext
@@ -28,6 +32,8 @@ logger = logging.getLogger(__name__)
 
 # Participant attribute the room screen reads: a contract between the agent and the web.
 STATE_ATTRIBUTE = "agilina.state"
+# Same contract: the last sentence Agilina could not say, or empty.
+TEXT_ATTRIBUTE = "agilina.text"
 
 
 class RoomJob:
@@ -45,6 +51,7 @@ class RoomJob:
         self._default_language = default_language
         # The facilitation of this room, for AGI-62; None while there is no context.
         self.machine: FacilitationMachine | None = None
+        self._showing_text = False
 
     async def run(self, ctx: JobContext) -> None:
         await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
@@ -60,7 +67,7 @@ class RoomJob:
         await ctx.wait_for_participant()
         if context is None:
             text = render_text("context_unavailable", self._default_language)
-            await self._synthesizer.synthesize(text, self._default_language)
+            await self.say(ctx, text, self._default_language)
             return
 
         text = render_text(
@@ -69,7 +76,19 @@ class RoomJob:
             day=context.sprint_day,
             total=context.sprint_total_days,
         )
-        await self._synthesizer.synthesize(text, context.language)
+        await self.say(ctx, text, context.language)
+
+    async def say(self, ctx: JobContext, text: str, language: Language) -> None:
+        """Says a sentence in the room or, if the voice does not come out, shows it as text."""
+        try:
+            await self._synthesizer.synthesize(text, language)
+        except SpeechUnavailableError:
+            await ctx.room.local_participant.set_attributes({TEXT_ATTRIBUTE: text})
+            self._showing_text = True
+            return
+        if self._showing_text:
+            await ctx.room.local_participant.set_attributes({TEXT_ATTRIBUTE: ""})
+            self._showing_text = False
 
     async def _context_of(self, room_name: str) -> CeremonyContext | None:
         ceremony = parse_room_name(room_name)

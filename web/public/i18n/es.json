@@ -444,7 +444,8 @@
         "standby": "En espera",
         "no_facilitation": "Sin facilitación",
         "unavailable": "No disponible",
-        "unavailable_notice": "Agilina no pudo unirse; la reunión puede continuar sin ella"
+        "unavailable_notice": "Agilina no pudo unirse; la reunión puede continuar sin ella",
+        "text_fallback_title": "Agilina no pudo hablar y lo dejó por escrito:"
       },
       "turn": {
         "title": "Turno de",

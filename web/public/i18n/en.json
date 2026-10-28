@@ -444,7 +444,8 @@
         "standby": "On standby",
         "no_facilitation": "No facilitation",
         "unavailable": "Unavailable",
-        "unavailable_notice": "Agilina could not join; the meeting can go on without her"
+        "unavailable_notice": "Agilina could not join; the meeting can go on without her",
+        "text_fallback_title": "Agilina couldn't speak, so she wrote it down:"
       },
       "turn": {
         "title": "Turn of",

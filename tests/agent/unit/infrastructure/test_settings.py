@@ -1,4 +1,5 @@
-"""The worker settings: a secret per tenant, a folder for pending results, and no database."""
+"""The worker settings: a secret per tenant, a folder for pending results, the voice, and no
+database."""
 
 from pathlib import Path
 
@@ -51,3 +52,22 @@ def test_the_pending_folder_can_be_moved(monkeypatch: pytest.MonkeyPatch, tmp_pa
 
 def test_the_worker_has_no_database_setting() -> None:
     assert not [name for name in Settings.model_fields if "database" in name or "db" in name]
+
+
+def test_the_elevenlabs_key_is_a_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGILINA_ELEVENLABS_API_KEY", "sk_elevenlabs")
+
+    settings = _settings()
+
+    assert settings.elevenlabs_api_key.get_secret_value() == "sk_elevenlabs"
+    assert "sk_elevenlabs" not in repr(settings)
+
+
+def test_the_voice_uses_eleven_v4_turbo_unless_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("AGILINA_ELEVENLABS_MODEL", raising=False)
+    assert _settings().elevenlabs_model == "eleven_v4_turbo"
+
+    monkeypatch.setenv("AGILINA_ELEVENLABS_MODEL", "eleven_flash_v2_5")
+    assert _settings().elevenlabs_model == "eleven_flash_v2_5"

@@ -221,6 +221,16 @@
       </section>
     </div>
 
+    <!-- Always in the room, so that a screen reader reads what Agilina could not say out loud. -->
+    <div aria-live="polite" data-testid="room-agilina-text">
+      @if (agilinaText(); as said) {
+        <div class="mt-4 rounded-xl border border-border bg-surface p-6 shadow-sm">
+          <p class="text-sm font-medium text-muted">{{ t('agilina.text_fallback_title') }}</p>
+          <p class="mt-2 text-base" data-testid="room-agilina-text-said">{{ said }}</p>
+        </div>
+      }
+    </div>
+
     <!-- Always in the room, so that a screen reader announces each change of who is speaking. -->
     <p aria-live="polite" class="sr-only" data-testid="room-speaking-announcer">
       @if (speakingNames(); as names) {
