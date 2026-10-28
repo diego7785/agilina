@@ -45,9 +45,16 @@ export function aPresence(
     local = false,
     muted = false,
     agentState = null,
-  }: { agent?: boolean; local?: boolean; muted?: boolean; agentState?: AgentState | null } = {},
+    agentText = null,
+  }: {
+    agent?: boolean;
+    local?: boolean;
+    muted?: boolean;
+    agentState?: AgentState | null;
+    agentText?: string | null;
+  } = {},
 ): RoomPresence {
-  return { identity, agent, local, muted, agentState };
+  return { identity, agent, local, muted, agentState, agentText };
 }
 
 /** API double: it hands over `participants` each time, or the failure the test sets. */

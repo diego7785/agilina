@@ -6,6 +6,7 @@ import { DailyParticipantsPort } from './daily-participants.port';
 import { RoomAccessPort } from './room-access.port';
 import { type RoomChange, RoomPort } from './room.port';
 import { AGILINA_ARRIVAL_BUDGET_MS, agilinaStatusOf } from '../domain/agilina-status';
+import { agilinaTextOf } from '../domain/agilina-text';
 import { type ConnectionStatus } from '../domain/connection-status';
 import { type DailyParticipant } from '../domain/daily-participant';
 import { type MicrophoneState } from '../domain/microphone-state';
@@ -72,6 +73,8 @@ export class RoomFacade {
   );
   readonly agilinaPresent = computed(() => this.present().some((presence) => presence.agent));
   readonly agilinaStatus = computed(() => agilinaStatusOf(this.present(), this.arrivalExpired()));
+  /** What Agilina could not say out loud: the room shows it in writing. */
+  readonly agilinaText = computed(() => agilinaTextOf(this.present()));
   readonly agilinaSpeaking = computed(() =>
     this.present().some(
       (presence) => presence.agent && this.speaking().includes(presence.identity),

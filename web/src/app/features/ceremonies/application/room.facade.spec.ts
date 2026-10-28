@@ -614,6 +614,19 @@ describe('RoomFacade', () => {
       expect(facade.agilinaStatus()).toBe('no_facilitation');
     });
 
+    it('shows what she could not say out loud until she clears it', () => {
+      expect(facade.agilinaText()).toBeNull();
+
+      room.emit({
+        kind: 'presence',
+        present: [eva, aPresence('agilina', { agent: true, agentText: 'Hola, equipo.' })],
+      });
+      expect(facade.agilinaText()).toBe('Hola, equipo.');
+
+      room.emit({ kind: 'presence', present: [eva, aPresence('agilina', { agent: true })] });
+      expect(facade.agilinaText()).toBeNull();
+    });
+
     it('gives her the whole budget again when it enters again', async () => {
       jasmine.clock().tick(AGILINA_ARRIVAL_BUDGET_MS);
       expect(facade.agilinaStatus()).toBe('unavailable');

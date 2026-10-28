@@ -218,9 +218,30 @@ describe('LiveKitRoomAdapter', () => {
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true, muted: true, agentState: null },
-            { identity: 'ana', agent: false, local: false, muted: false, agentState: null },
-            { identity: 'agilina', agent: true, local: false, muted: false, agentState: 'standby' },
+            {
+              identity: 'eva',
+              agent: false,
+              local: true,
+              muted: true,
+              agentState: null,
+              agentText: null,
+            },
+            {
+              identity: 'ana',
+              agent: false,
+              local: false,
+              muted: false,
+              agentState: null,
+              agentText: null,
+            },
+            {
+              identity: 'agilina',
+              agent: true,
+              local: false,
+              muted: false,
+              agentState: 'standby',
+              agentText: null,
+            },
           ],
         },
       ]);
@@ -401,8 +422,22 @@ describe('LiveKitRoomAdapter', () => {
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true, muted: false, agentState: null },
-            { identity: 'ana', agent: false, local: false, muted: true, agentState: null },
+            {
+              identity: 'eva',
+              agent: false,
+              local: true,
+              muted: false,
+              agentState: null,
+              agentText: null,
+            },
+            {
+              identity: 'ana',
+              agent: false,
+              local: false,
+              muted: true,
+              agentState: null,
+              agentText: null,
+            },
           ],
         },
       ]);
@@ -416,16 +451,51 @@ describe('LiveKitRoomAdapter', () => {
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true, muted: true, agentState: null },
-            { identity: 'ana', agent: false, local: false, muted: false, agentState: null },
+            {
+              identity: 'eva',
+              agent: false,
+              local: true,
+              muted: true,
+              agentState: null,
+              agentText: null,
+            },
+            {
+              identity: 'ana',
+              agent: false,
+              local: false,
+              muted: false,
+              agentState: null,
+              agentText: null,
+            },
           ],
         },
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true, muted: true, agentState: null },
-            { identity: 'ana', agent: false, local: false, muted: false, agentState: null },
-            { identity: 'agilina', agent: true, local: false, muted: false, agentState: null },
+            {
+              identity: 'eva',
+              agent: false,
+              local: true,
+              muted: true,
+              agentState: null,
+              agentText: null,
+            },
+            {
+              identity: 'ana',
+              agent: false,
+              local: false,
+              muted: false,
+              agentState: null,
+              agentText: null,
+            },
+            {
+              identity: 'agilina',
+              agent: true,
+              local: false,
+              muted: false,
+              agentState: null,
+              agentText: null,
+            },
           ],
         },
       ]);
@@ -460,6 +530,35 @@ describe('LiveKitRoomAdapter', () => {
       ).toEqual([[null, null]]);
     });
 
+    it('tells what Agilina could not say out loud, and forgets it once she clears it', () => {
+      room().arrive('agilina', true);
+      changes = [];
+
+      room().remoteParticipants.get('agilina')!.attributes = { 'agilina.text': 'Hola, equipo.' };
+      room().emit(RoomEvent.ParticipantAttributesChanged);
+      room().remoteParticipants.get('agilina')!.attributes = { 'agilina.text': '' };
+      room().emit(RoomEvent.ParticipantAttributesChanged);
+
+      expect(
+        changes.map((change) => change.kind === 'presence' && change.present[1]?.agentText),
+      ).toEqual(['Hola, equipo.', null]);
+    });
+
+    it('leaves out the text that someone who is not an agent writes as Agilina', () => {
+      room().arrive('ana', false, { 'agilina.text': 'Soy Agilina' });
+      room().localParticipant.attributes = { 'agilina.text': 'Yo también' };
+      changes = [];
+
+      room().emit(RoomEvent.ParticipantAttributesChanged);
+
+      expect(
+        changes.map(
+          (change) =>
+            change.kind === 'presence' && change.present.map((presence) => presence.agentText),
+        ),
+      ).toEqual([[null, null]]);
+    });
+
     it('leaves out who leaves, even while the SDK still holds them', () => {
       room().arrive('ana');
       room().arrive('luis');
@@ -471,8 +570,22 @@ describe('LiveKitRoomAdapter', () => {
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true, muted: true, agentState: null },
-            { identity: 'luis', agent: false, local: false, muted: false, agentState: null },
+            {
+              identity: 'eva',
+              agent: false,
+              local: true,
+              muted: true,
+              agentState: null,
+              agentText: null,
+            },
+            {
+              identity: 'luis',
+              agent: false,
+              local: false,
+              muted: false,
+              agentState: null,
+              agentText: null,
+            },
           ],
         },
       ]);
@@ -491,8 +604,22 @@ describe('LiveKitRoomAdapter', () => {
         {
           kind: 'presence',
           present: [
-            { identity: 'eva', agent: false, local: true, muted: true, agentState: null },
-            { identity: 'ana', agent: false, local: false, muted: false, agentState: null },
+            {
+              identity: 'eva',
+              agent: false,
+              local: true,
+              muted: true,
+              agentState: null,
+              agentText: null,
+            },
+            {
+              identity: 'ana',
+              agent: false,
+              local: false,
+              muted: false,
+              agentState: null,
+              agentText: null,
+            },
           ],
         },
       ]);
