@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from livekit.agents import WorkerOptions
 from livekit.protocol.models import TrackSource
+from pydantic import SecretStr
 
 from agilina_agent import main
 from agilina_agent.infrastructure.http_agilina_api import HttpAgilinaApi
@@ -37,7 +38,7 @@ def _settings(pending_dir: Path) -> Settings:
         keycloak_url=NOBODY,
         agent_pending_dir=pending_dir,
         # The tools container loads .env: a real key there must not change the tests.
-        elevenlabs_api_key="",
+        elevenlabs_api_key=SecretStr(""),
     )
 
 
@@ -103,12 +104,14 @@ def test_with_an_elevenlabs_key_the_voice_is_real_and_closes_with_the_job(
     tmp_path: Path,
 ) -> None:
     settings = _settings(tmp_path)
-    settings.elevenlabs_api_key = "test-key"
+    settings.elevenlabs_api_key = SecretStr("test-key")
+    settings.elevenlabs_model = "eleven_flash_v2_5"
     ctx = FakeJobContext("acme-room")
 
     synthesizer = speech_synthesizer(settings, ctx)  # type: ignore[arg-type]
 
     assert isinstance(synthesizer, ElevenLabsSynthesizer)
+    assert synthesizer._tts.model == "eleven_flash_v2_5"
     assert ctx.shutdown_callbacks == [synthesizer.close]
 
 

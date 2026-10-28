@@ -7,7 +7,14 @@ from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from typing import Any
 
-from livekit.agents import AutoSubscribe, ErrorEvent, tts
+from livekit.agents import (
+    AgentStateChangedEvent,
+    AutoSubscribe,
+    CloseEvent,
+    CloseReason,
+    ErrorEvent,
+    tts,
+)
 
 
 @dataclass
@@ -61,44 +68,88 @@ class FakeJobContext:
 
 
 class FakeSpeech:
-    interrupted = False
+    """A sentence in the session. Unless ``hangs``, its playout is already over; a hanging
+    one ends only when it is interrupted, and only by a forced interruption."""
+
+    def __init__(self, *, hangs: bool = False) -> None:
+        self.interrupted = False
+        self.forced = False
+        self._done = asyncio.Event()
+        if not hangs:
+            self._done.set()
 
     async def wait_for_playout(self) -> None:
-        return None
+        await self._done.wait()
+
+    def interrupt(self, *, force: bool = False) -> "FakeSpeech":
+        if not force:
+            raise RuntimeError("This speech does not allow interruptions")
+        self.interrupted = True
+        self.forced = True
+        self._done.set()
+        return self
 
 
 class FakeAgentSession:
     """Records how the voice session is started, what it says and whether it closes.
-    With ``tts_failure`` each sentence fails as LiveKit reports it: an "error" event once
-    the TTS retries run out, with the speech neither raised nor interrupted."""
 
-    def __init__(self, tts_failure: Exception | None = None) -> None:
+    Each sentence is heard at once (``agent_state_changed`` to ``speaking``), unless:
+    ``tts_failure`` makes it fail as LiveKit reports it, an "error" event with the speech
+    neither raised nor interrupted; ``silent`` makes it end without any audio; and
+    ``hangs`` makes it never start until it is interrupted."""
+
+    def __init__(
+        self,
+        tts_failure: Exception | None = None,
+        *,
+        silent: bool = False,
+        hangs: bool = False,
+    ) -> None:
         self.started: list[dict[str, Any]] = []
         self.said: list[str] = []
+        self.speeches: list[FakeSpeech] = []
         self.closed = False
-        self.error_handlers: list[Callable[[ErrorEvent], None]] = []
+        self.handlers: dict[str, list[Callable[[Any], None]]] = {}
         self._tts_failure = tts_failure
+        self._silent = silent
+        self._hangs = hangs
+
+    @property
+    def error_handlers(self) -> list[Callable[[Any], None]]:
+        return self.handlers.get("error", [])
 
     async def start(self, **options: Any) -> None:
         self.started.append(options)
 
-    def on(self, event: str, handler: Callable[[ErrorEvent], None]) -> None:
-        assert event == "error"
-        self.error_handlers.append(handler)
+    def on(self, event: str, handler: Callable[[Any], None]) -> None:
+        self.handlers.setdefault(event, []).append(handler)
 
-    def off(self, event: str, handler: Callable[[ErrorEvent], None]) -> None:
-        assert event == "error"
-        self.error_handlers.remove(handler)
+    def off(self, event: str, handler: Callable[[Any], None]) -> None:
+        self.handlers[event].remove(handler)
+
+    def emit(self, event: str, payload: Any) -> None:
+        for handler in list(self.handlers.get(event, [])):
+            handler(payload)
 
     def say(self, text: str) -> FakeSpeech:
         self.said.append(text)
+        speech = FakeSpeech(hangs=self._hangs)
+        self.speeches.append(speech)
         if self._tts_failure is not None:
             error = tts.TTSError(
                 timestamp=0, label="elevenlabs", error=self._tts_failure, recoverable=False
             )
-            for handler in list(self.error_handlers):
-                handler(ErrorEvent(error=error, source=None))
-        return FakeSpeech()
+            self.emit("error", ErrorEvent(error=error, source=None))
+        elif not self._silent and not self._hangs:
+            self.emit(
+                "agent_state_changed",
+                AgentStateChangedEvent(old_state="listening", new_state="speaking"),
+            )
+        return speech
+
+    def close_on_errors(self) -> None:
+        """What AgentSession does after too many unrecoverable errors in a row."""
+        self.emit("close", CloseEvent(error=None, reason=CloseReason.ERROR))
 
     async def aclose(self) -> None:
         self.closed = True

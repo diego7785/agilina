@@ -27,9 +27,11 @@ class Transcriber(Protocol):
 
 @runtime_checkable
 class SpeechSynthesizer(Protocol):
-    """Turns the text of a template into audio to publish it in the room."""
+    """Says the text of a template in the room, with the voice of its language."""
 
-    async def synthesize(self, text: str, language: Language) -> bytes: ...
+    async def synthesize(self, text: str, language: Language) -> None:
+        """Returns once it was heard; raises ``SpeechUnavailableError`` if it was not."""
+        ...
 
 
 @runtime_checkable

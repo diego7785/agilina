@@ -49,8 +49,10 @@ class Settings(BaseSettings):
     # Transcription service, never exposed to the internet.
     stt_url: str = "http://localhost:8001"
 
-    # Speech synthesis.
-    elevenlabs_api_key: str = ""
+    # Speech synthesis. The key only lives in .env and never shows up in a log or a repr.
+    elevenlabs_api_key: SecretStr = SecretStr("")
+    # A free plan model (HU-01 spike); eleven_flash_v2_5 is the fallback if it gets slow.
+    elevenlabs_model: str = "eleven_v4_turbo"
     elevenlabs_voice_es: str = ""
     elevenlabs_voice_en: str = ""
 

@@ -68,11 +68,13 @@ async def resend_pending(settings: Settings) -> None:
 def speech_synthesizer(settings: Settings, ctx: JobContext) -> SpeechSynthesizer:
     """The real voice with an ElevenLabs key; without it the simulated one, so the
     ceremony also runs locally and in the tests."""
-    if not settings.elevenlabs_api_key:
+    api_key = settings.elevenlabs_api_key.get_secret_value()
+    if not api_key:
         return RecordingSynthesizer()
     synthesizer = ElevenLabsSynthesizer(
         ctx.room,
-        api_key=settings.elevenlabs_api_key,
+        api_key=api_key,
+        model=settings.elevenlabs_model,
         voice_by_language={
             Language.ES: settings.elevenlabs_voice_es,
             Language.EN: settings.elevenlabs_voice_en,
