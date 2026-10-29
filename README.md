@@ -20,7 +20,7 @@ Solo necesitas Docker con Compose y `make` (más `bash`, `curl` y `openssl`, que
 casi todo sistema ya trae); no se instala Python, Node ni nada más.
 
 ```bash
-git clone git@github.com:angelicamunoz2204/agilina.git && cd agilina
+git clone git@github.com:diego7785/agilina.git && cd agilina
 make up
 ```
 
@@ -113,6 +113,6 @@ para la versión final validada (Release 3).
 
 ## Estado
 
-Esqueleto del Sprint 0: los cuatro componentes arrancan, se hablan entre sí y
-tienen pruebas, pero todavía no hay facilitación de ceremonias. Las capacidades
-del producto llegan con las historias del backlog, sprint por sprint.
+Release 1 (v1.0), la primera versión local. Un equipo puede recibir una invitación y activar su cuenta (Keycloak, un realm por organización), gestionar equipos, roles y el sprint, ver en el dashboard el día del sprint y la próxima daily, unirse a la sala de la daily con su micrófono, ver quién está y quién habla, y ver a Agilina entrar sola, saludar por voz con el contexto del sprint y quedar en espera. Para la sala se necesitan las claves de LiveKit en el `.env` y, para que Agilina hable, la de ElevenLabs (detalles en docs/entorno-local.md).
+
+Lo que sigue, en los Releases 2 y 3: transcripción en vivo con atribución por hablante y en dos idiomas, iniciar y facilitar la daily, resumen estructurado, integraciones con Slack, Jira y Microsoft Graph, y el despliegue en la nube.
