@@ -20,7 +20,7 @@ Solo necesitas Docker con Compose y `make` (más `bash`, `curl` y `openssl`, que
 casi todo sistema ya trae); no se instala Python, Node ni nada más.
 
 ```bash
-git clone git@github.com:angelicamunoz2204/agilina.git && cd agilina
+git clone git@github.com:diego7785/agilina.git && cd agilina
 make up
 ```
 
